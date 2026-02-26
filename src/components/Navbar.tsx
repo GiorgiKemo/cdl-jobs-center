@@ -1,19 +1,32 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Phone, Mail, Truck } from "lucide-react";
+import { Menu, X, Phone, Mail, Truck, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+const jobDropdownItems = [
+  { name: "Dry Van", path: "/jobs?type=dry-van" },
+  { name: "Flatbed", path: "/jobs?type=flatbed" },
+  { name: "Dry Bulk", path: "/jobs?type=dry-bulk" },
+  { name: "Refrigerated", path: "/jobs?type=refrigerated" },
+  { name: "Tanker", path: "/jobs?type=tanker" },
+  { name: "Teams driving", path: "/jobs?type=teams" },
+  { name: "Owner Operator", path: "/jobs?type=owner-operator" },
+  { name: "Students", path: "/jobs?type=students" },
+];
 
 const navLinks = [
   { name: "Home", path: "/" },
   { name: "Apply Now", path: "/apply" },
   { name: "Drivers", path: "/drivers" },
-  { name: "Jobs", path: "/jobs" },
+  { name: "Jobs", path: "/jobs", dropdown: jobDropdownItems },
   { name: "Companies", path: "/companies" },
 ];
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [jobsDropdownOpen, setJobsDropdownOpen] = useState(false);
+  const [jobsMobileOpen, setJobsMobileOpen] = useState(false);
   const location = useLocation();
 
   return (
@@ -55,26 +68,80 @@ const Navbar = () => {
 
           {/* Desktop links */}
           <div className="hidden lg:flex items-center gap-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                  ${location.pathname === link.path
-                    ? "text-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                  }`}
-              >
-                {link.name}
-                {location.pathname === link.path && (
-                  <motion.div
-                    layoutId="activeTab"
-                    className="absolute inset-0 rounded-lg bg-primary/10"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                  />
-                )}
-              </Link>
-            ))}
+            {navLinks.map((link) =>
+              link.dropdown ? (
+                <div
+                  key={link.path}
+                  className="relative"
+                  onMouseEnter={() => setJobsDropdownOpen(true)}
+                  onMouseLeave={() => setJobsDropdownOpen(false)}
+                >
+                  {/* Trigger */}
+                  <button
+                    className={`relative flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                      ${location.pathname === link.path
+                        ? "text-primary"
+                        : "text-muted-foreground hover:text-foreground"
+                      }`}
+                  >
+                    {link.name}
+                    <ChevronDown
+                      className={`h-3.5 w-3.5 transition-transform duration-200 ${jobsDropdownOpen ? "rotate-180" : ""}`}
+                    />
+                    {location.pathname === link.path && (
+                      <motion.div
+                        layoutId="activeTab"
+                        className="absolute inset-0 rounded-lg bg-primary/10"
+                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                      />
+                    )}
+                  </button>
+
+                  {/* Dropdown panel */}
+                  <AnimatePresence>
+                    {jobsDropdownOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute top-full left-0 mt-1 w-44 bg-card border border-border shadow-md py-1"
+                      >
+                        {link.dropdown.map((item) => (
+                          <Link
+                            key={item.path}
+                            to={item.path}
+                            onClick={() => setJobsDropdownOpen(false)}
+                            className="block px-4 py-2 text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+                          >
+                            {item.name}
+                          </Link>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ) : (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                    ${location.pathname === link.path
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                  {link.name}
+                  {location.pathname === link.path && (
+                    <motion.div
+                      layoutId="activeTab"
+                      className="absolute inset-0 rounded-lg bg-primary/10"
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+                </Link>
+              )
+            )}
           </div>
 
           <div className="hidden lg:flex items-center gap-3">
@@ -105,20 +172,61 @@ const Navbar = () => {
               className="lg:hidden overflow-hidden border-t border-border/50"
             >
               <div className="container mx-auto py-4 flex flex-col gap-2">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.path}
-                    to={link.path}
-                    onClick={() => setIsOpen(false)}
-                    className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors
-                      ${location.pathname === link.path
-                        ? "bg-primary/10 text-primary"
-                        : "hover:bg-muted text-muted-foreground"
-                      }`}
-                  >
-                    {link.name}
-                  </Link>
-                ))}
+                {navLinks.map((link) =>
+                  link.dropdown ? (
+                    <div key={link.path}>
+                      <button
+                        onClick={() => setJobsMobileOpen(!jobsMobileOpen)}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium transition-colors
+                          ${location.pathname === link.path
+                            ? "bg-primary/10 text-primary"
+                            : "hover:bg-muted text-muted-foreground"
+                          }`}
+                      >
+                        {link.name}
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform duration-200 ${jobsMobileOpen ? "rotate-180" : ""}`}
+                        />
+                      </button>
+                      <AnimatePresence>
+                        {jobsMobileOpen && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="pl-4 flex flex-col gap-1 pt-1">
+                              {link.dropdown.map((item) => (
+                                <Link
+                                  key={item.path}
+                                  to={item.path}
+                                  onClick={() => { setIsOpen(false); setJobsMobileOpen(false); }}
+                                  className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+                                >
+                                  {item.name}
+                                </Link>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  ) : (
+                    <Link
+                      key={link.path}
+                      to={link.path}
+                      onClick={() => setIsOpen(false)}
+                      className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors
+                        ${location.pathname === link.path
+                          ? "bg-primary/10 text-primary"
+                          : "hover:bg-muted text-muted-foreground"
+                        }`}
+                    >
+                      {link.name}
+                    </Link>
+                  )
+                )}
                 <div className="flex gap-2 pt-2">
                   <Button variant="outline" size="sm" className="flex-1" asChild>
                     <Link to="/signin">Sign In</Link>
