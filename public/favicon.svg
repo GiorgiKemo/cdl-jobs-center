@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Badge background -->
+  <rect width="64" height="64" rx="10" fill="#002868"/>
+  <!-- Trailer body -->
+  <rect x="4" y="17" width="34" height="22" rx="2" fill="white"/>
+  <!-- Cab body -->
+  <path d="M38 23 L38 39 L59 39 L59 28 L51 23 Z" fill="white"/>
+  <!-- Cab window -->
+  <path d="M42 26 L42 34 L56 34 L56 28 L50 26 Z" fill="#002868"/>
+  <!-- Exhaust stack -->
+  <rect x="47" y="10" width="4" height="14" rx="2" fill="white"/>
+  <!-- Front wheel -->
+  <circle cx="50" cy="44" r="7" fill="#B22234"/>
+  <circle cx="50" cy="44" r="3" fill="white"/>
+  <!-- Rear wheel -->
+  <circle cx="14" cy="44" r="7" fill="#B22234"/>
+  <circle cx="14" cy="44" r="3" fill="white"/>
+  <!-- Headlight -->
+  <rect x="57" y="34" width="5" height="4" rx="1" fill="#FFD700"/>
+</svg>
