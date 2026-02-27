@@ -148,6 +148,23 @@ CREATE TABLE public.leads (
 CREATE INDEX idx_leads_state ON leads(state);
 CREATE INDEX idx_leads_status ON leads(status);
 
+-- 9. SUBSCRIPTIONS — Stripe payment plans for companies
+-- ============================================================================
+CREATE TABLE public.subscriptions (
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id              UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE UNIQUE,
+  plan                    TEXT NOT NULL CHECK (plan IN ('free','starter','growth','unlimited')) DEFAULT 'free',
+  lead_limit              INTEGER NOT NULL DEFAULT 3,
+  leads_used              INTEGER NOT NULL DEFAULT 0,
+  stripe_customer_id      TEXT,
+  stripe_subscription_id  TEXT,
+  status                  TEXT CHECK (status IN ('active','past_due','canceled','trialing')) DEFAULT 'active',
+  current_period_start    TIMESTAMPTZ,
+  current_period_end      TIMESTAMPTZ,
+  created_at              TIMESTAMPTZ DEFAULT now(),
+  updated_at              TIMESTAMPTZ DEFAULT now()
+);
+
 -- ============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
 -- ============================================================================
@@ -210,6 +227,12 @@ CREATE POLICY "Companies can read leads" ON leads FOR SELECT USING (
 CREATE POLICY "Companies can update lead status" ON leads FOR UPDATE USING (
   EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'company')
 );
+
+-- subscriptions
+ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Companies can read own subscription" ON subscriptions FOR SELECT USING (company_id = auth.uid());
+CREATE POLICY "Companies can insert own subscription" ON subscriptions FOR INSERT WITH CHECK (company_id = auth.uid());
+CREATE POLICY "Companies can update own subscription" ON subscriptions FOR UPDATE USING (company_id = auth.uid());
 
 -- ============================================================================
 -- STORAGE BUCKET

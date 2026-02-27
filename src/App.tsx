@@ -20,6 +20,7 @@ const DriverDashboard = lazy(() => import("./pages/DriverDashboard"));
 const SignIn = lazy(() => import("./pages/SignIn"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const Pricing = lazy(() => import("./pages/Pricing"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -45,6 +46,7 @@ const App = () => (
             <Route path="/companies/:id" element={<CompanyProfile />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/driver-dashboard" element={<DriverDashboard />} />
+            <Route path="/pricing" element={<Pricing />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />

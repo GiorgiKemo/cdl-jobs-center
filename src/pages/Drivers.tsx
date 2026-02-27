@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Link, useNavigate } from "react-router-dom";
@@ -8,6 +8,7 @@ import { Eye, Heart, Lock } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 
 const LICENSE_CLASSES = ["All", "Class A", "Class B", "Class C", "Permit Only"];
 const EXPERIENCE_OPTIONS = ["All", "None", "Less than 1 year", "1-3 years", "3-5 years", "5+ years"];
@@ -58,6 +59,31 @@ const Drivers = () => {
   const [expFilter, setExpFilter] = useState("All");
   const [stateFilter, setStateFilter] = useState("All");
   const [favorites, setFavorites] = useState<string[]>([]);
+  const favoritesKey = user ? `company-driver-favorites-${user.id}` : "";
+
+  useEffect(() => {
+    if (!favoritesKey) return;
+    try {
+      const raw = localStorage.getItem(favoritesKey);
+      if (!raw) {
+        setFavorites([]);
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setFavorites(parsed.filter((id): id is string => typeof id === "string"));
+      } else {
+        setFavorites([]);
+      }
+    } catch {
+      setFavorites([]);
+    }
+  }, [favoritesKey]);
+
+  useEffect(() => {
+    if (!favoritesKey) return;
+    localStorage.setItem(favoritesKey, JSON.stringify(favorites));
+  }, [favorites, favoritesKey]);
 
   const { data: drivers = [], isLoading, isError, error } = useQuery({
     queryKey: ["driver-directory"],
@@ -101,7 +127,9 @@ const Drivers = () => {
   };
 
   const toggleFavorite = (id: string) => {
-    setFavorites((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]));
+    const isSaved = favorites.includes(id);
+    setFavorites((prev) => (isSaved ? prev.filter((f) => f !== id) : [...prev, id]));
+    toast.success(isSaved ? "Removed from saved drivers" : "Saved driver");
   };
 
   const filtered = drivers.filter((driver) => {
@@ -270,8 +298,14 @@ const Drivers = () => {
                     </button>
                     <button
                       onClick={() => toggleFavorite(driver.id)}
+                      type="button"
+                      aria-pressed={favorites.includes(driver.id)}
                       aria-label={favorites.includes(driver.id) ? "Remove from favorites" : "Add to favorites"}
-                      className="p-1 text-muted-foreground hover:text-primary transition-colors"
+                      className={`p-1 transition-colors ${
+                        favorites.includes(driver.id)
+                          ? "text-accent"
+                          : "text-muted-foreground hover:text-primary"
+                      }`}
                     >
                       <Heart className="h-5 w-5" fill={favorites.includes(driver.id) ? "currentColor" : "none"} />
                     </button>

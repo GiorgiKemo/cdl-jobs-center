@@ -11,7 +11,7 @@ import { useAuth } from "@/context/auth";
 import { useJobs } from "@/hooks/useJobs";
 import { Job } from "@/data/jobs";
 import { toast } from "sonner";
-import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload, Bell, MessageSquare, Users, Phone as PhoneIcon, Mail as MailIcon, MapPin, Truck as TruckIcon } from "lucide-react";
+import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload, Bell, MessageSquare, Users, Phone as PhoneIcon, Mail as MailIcon, MapPin, Truck as TruckIcon, Lock } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -24,6 +24,7 @@ import {
 import { ChatPanel } from "@/components/ChatPanel";
 import { useUnreadCount } from "@/hooks/useMessages";
 import { useLeads, useUpdateLeadStatus } from "@/hooks/useLeads";
+import { useSubscription, PLANS } from "@/hooks/useSubscription";
 
 const FREIGHT_TYPES = [
   "Box", "Car Hauler", "Drop and Hook", "Dry Bulk", "Dry Van", "Flatbed",
@@ -297,6 +298,8 @@ const DashboardInner = () => {
   const { data: unreadMsgCount = 0 } = useUnreadCount(user!.id);
   const { data: leads = [] } = useLeads();
   const updateLeadStatus = useUpdateLeadStatus();
+  const { data: subscription } = useSubscription(user!.id);
+  const leadLimit = subscription ? PLANS[subscription.plan].leads : 3;
 
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<Tab>(() => {
@@ -942,6 +945,8 @@ const DashboardInner = () => {
           const LEAD_PAGE_SIZE = 10;
           const totalPages = Math.ceil(filtered.length / LEAD_PAGE_SIZE);
           const pageLeads = filtered.slice(leadPage * LEAD_PAGE_SIZE, (leadPage + 1) * LEAD_PAGE_SIZE);
+          const isFreePlan = !subscription || subscription.plan === "free";
+          const leadsAllowed = leadLimit;
 
           const expLabel = (v: string | null) => {
             if (!v) return "N/A";
@@ -971,6 +976,25 @@ const DashboardInner = () => {
 
           return (
             <div>
+              {/* Subscription status banner */}
+              <div className={`mb-4 border p-3 flex items-center justify-between gap-3 text-sm ${isFreePlan ? "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30" : "border-primary/20 bg-primary/5"}`}>
+                <p>
+                  {isFreePlan ? (
+                    <>You're on the <strong>Free</strong> plan ({leadsAllowed} leads). Upgrade to access more leads.</>
+                  ) : (
+                    <>
+                      <strong className="text-primary">{PLANS[subscription!.plan].label}</strong> plan — {leadsAllowed === 9999 ? "Unlimited" : `${leadsAllowed}`} leads/month.
+                      {subscription!.leadsUsed > 0 && <span className="text-muted-foreground"> {leadsAllowed - subscription!.leadsUsed} remaining.</span>}
+                    </>
+                  )}
+                </p>
+                <Link to="/pricing">
+                  <Button size="sm" variant={isFreePlan ? "default" : "outline"} className="text-xs h-7 shrink-0">
+                    {isFreePlan ? "Upgrade" : "Manage Plan"}
+                  </Button>
+                </Link>
+              </div>
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <div>
                   <h2 className="font-display font-semibold text-base flex items-center gap-2">
@@ -1018,9 +1042,20 @@ const DashboardInner = () => {
               ) : (
                 <>
                   <div className="space-y-3">
-                    {pageLeads.map((lead) => (
-                      <div key={lead.id} className={`border bg-card p-4 transition-colors ${lead.status === "dismissed" ? "border-border opacity-60" : lead.status === "new" ? "border-blue-200 dark:border-blue-800" : "border-border"}`}>
-                        <div className="flex items-start justify-between gap-3">
+                    {pageLeads.map((lead, idx) => {
+                      const globalIdx = leadPage * LEAD_PAGE_SIZE + idx;
+                      const isLocked = leadsAllowed !== 9999 && globalIdx >= leadsAllowed;
+
+                      return (
+                      <div key={lead.id} className={`relative border bg-card p-4 transition-colors ${isLocked ? "border-border" : lead.status === "dismissed" ? "border-border opacity-60" : lead.status === "new" ? "border-blue-200 dark:border-blue-800" : "border-border"}`}>
+                        {isLocked && (
+                          <div className="absolute inset-0 z-10 backdrop-blur-sm bg-background/60 flex items-center justify-center">
+                            <Link to="/pricing">
+                              <Button size="sm" className="text-xs">Upgrade to Unlock</Button>
+                            </Link>
+                          </div>
+                        )}
+                        <div className={`flex items-start justify-between gap-3 ${isLocked ? "select-none" : ""}`}>
                           <div className="flex items-start gap-3 min-w-0 flex-1">
                             {/* Avatar */}
                             <div className="h-10 w-10 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
@@ -1079,6 +1114,7 @@ const DashboardInner = () => {
                             </div>
                           </div>
                           {/* Actions */}
+                          {!isLocked && (
                           <div className="flex flex-col gap-1.5 shrink-0">
                             {lead.status !== "contacted" && lead.status !== "hired" && (
                               <Button
@@ -1111,9 +1147,11 @@ const DashboardInner = () => {
                               </Button>
                             )}
                           </div>
+                          )}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   {totalPages > 1 && (
                     <div className="flex items-center justify-between mt-4 text-sm">

@@ -28,6 +28,7 @@ const navLinks = [
   { name: "Drivers", path: "/drivers" },
   { name: "Jobs", path: "/jobs", dropdown: jobDropdownItems },
   { name: "Companies", path: "/companies" },
+  { name: "Pricing", path: "/pricing" },
 ];
 
 const getInitials = (name: string) =>

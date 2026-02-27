@@ -46,31 +46,36 @@ const Companies = () => {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["companies-directory"],
+    queryKey: ["companies-directory-v2"],
     networkMode: "always",
     retry: 2,
     refetchOnMount: "always",
     queryFn: async () => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const timeoutMs = 12000;
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
       try {
-        const { data, error } = await supabase
-          .from("company_profiles")
-          .select("id, company_name, phone, address, email, website, about, logo_url")
-          .abortSignal(controller.signal)
-          .order("company_name");
+        const result = await Promise.race([
+          supabase
+            .from("company_profiles")
+            .select("id, company_name, phone, address, email, website, about, logo_url")
+            .abortSignal(controller.signal)
+            .order("company_name"),
+          new Promise<never>((_, reject) => {
+            timeoutId = setTimeout(() => {
+              controller.abort();
+              reject(new Error("Loading companies timed out. Please try again."));
+            }, timeoutMs);
+          }),
+        ]);
+
+        const { data, error } = result;
 
         if (error) throw error;
         return (data ?? []) as CompanyRow[];
-      } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") {
-          throw new Error("Loading companies timed out. Please try again.");
-        }
-        throw err;
       } finally {
-        clearTimeout(timeoutId);
+        if (timeoutId) clearTimeout(timeoutId);
       }
-
     },
   });
 
