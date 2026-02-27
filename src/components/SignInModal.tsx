@@ -74,6 +74,7 @@ const ModalHeader = ({ title, onClose }: { title: string; onClose: () => void })
 
 export function SignInModal({ onClose }: SignInModalProps) {
   const [view, setView] = useState<View>("login");
+  const [submitting, setSubmitting] = useState(false);
   const { signIn, register } = useAuth();
 
   // Login state
@@ -112,13 +113,23 @@ export function SignInModal({ onClose }: SignInModalProps) {
       toast.error("Please enter your email and password.");
       return;
     }
+    setSubmitting(true);
     try {
       await signIn(loginEmail, loginPassword);
       toast.success("Welcome back!");
       onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sign in failed. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
+  };
+
+  const friendlyRegisterError = (err: unknown) => {
+    const msg = err instanceof Error ? err.message : "";
+    if (msg.toLowerCase().includes("already registered") || msg.toLowerCase().includes("already been registered"))
+      return "This email is already registered. Please check your inbox for a confirmation email or sign in.";
+    return msg || "Registration failed. Please try again.";
   };
 
   const handleDriverRegister = async (e: React.FormEvent) => {
@@ -131,12 +142,15 @@ export function SignInModal({ onClose }: SignInModalProps) {
       toast.error("Passwords do not match.");
       return;
     }
+    setSubmitting(true);
     try {
       await register(regUsername, regEmail, regPassword, "driver");
-      toast.success("Account created! Check your email to confirm, then sign in.");
+      toast.success("Account created! You can now sign in.");
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Registration failed. Please try again.");
+      toast.error(friendlyRegisterError(err));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -150,12 +164,15 @@ export function SignInModal({ onClose }: SignInModalProps) {
       toast.error("Passwords do not match.");
       return;
     }
+    setSubmitting(true);
     try {
       await register(companyName, regEmail, regPassword, "company");
-      toast.success("Company account created! Check your email to confirm, then sign in.");
+      toast.success("Company account created! You can now sign in.");
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Registration failed. Please try again.");
+      toast.error(friendlyRegisterError(err));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -194,7 +211,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 onChange={(e) => setLoginPassword(e.target.value)}
                 autoComplete="current-password"
               />
-              <Button type="submit" className="w-full">Login</Button>
+              <Button type="submit" disabled={submitting} className="w-full">{submitting ? "Signing in…" : "Login"}</Button>
               <hr className="border-border" />
               <div className="flex gap-3">
                 <Button
@@ -376,7 +393,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button type="submit" className="w-full">Submit</Button>
+                <Button type="submit" disabled={submitting} className="w-full">{submitting ? "Submitting…" : "Submit"}</Button>
                 <button type="button" onClick={() => setView("login")} className="w-full text-center text-sm text-primary hover:underline">
                   ← Back to login
                 </button>
@@ -466,7 +483,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button type="submit" className="w-full">Submit</Button>
+                <Button type="submit" disabled={submitting} className="w-full">{submitting ? "Submitting…" : "Submit"}</Button>
                 <button type="button" onClick={() => setView("login")} className="w-full text-center text-sm text-primary hover:underline">
                   ← Back to login
                 </button>
