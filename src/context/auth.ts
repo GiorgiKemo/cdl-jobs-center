@@ -11,7 +11,7 @@ export interface AuthContextType {
   user: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, role: "driver" | "company") => Promise<void>;
+  register: (name: string, email: string, password: string, role: "driver" | "company") => Promise<import("@supabase/supabase-js").User | null>;
   signOut: () => Promise<void>;
 }
 

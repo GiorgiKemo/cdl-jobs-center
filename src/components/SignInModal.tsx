@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useAuth } from "@/context/auth";
+import { supabase } from "@/lib/supabase";
 
 type View = "login" | "rules" | "register";
 
@@ -163,8 +164,19 @@ export function SignInModal({ onClose }: SignInModalProps) {
     }
     setSubmitting(true);
     try {
-      await register(regUsername, regEmail, regPassword, "driver");
-      toast.success("Account created! You can now sign in.");
+      const newUser = await register(regUsername, regEmail, regPassword, "driver");
+      // Save driver profile fields collected during registration
+      if (newUser) {
+        const [first, ...rest] = driverName.trim().split(/\s+/);
+        await supabase.from("driver_profiles").upsert({
+          id: newUser.id,
+          first_name: first || "",
+          last_name: rest.join(" ") || "",
+          phone: driverPhone || "",
+          cdl_number: cdlNumber || "",
+        });
+      }
+      toast.success("Account created! You're now signed in.");
       onClose();
     } catch (err) {
       toast.error(friendlyRegisterError(err));
@@ -189,8 +201,18 @@ export function SignInModal({ onClose }: SignInModalProps) {
     }
     setSubmitting(true);
     try {
-      await register(companyName, regEmail, regPassword, "company");
-      toast.success("Company account created! You can now sign in.");
+      const newUser = await register(companyName, regEmail, regPassword, "company");
+      // Save company profile fields collected during registration
+      if (newUser) {
+        await supabase.from("company_profiles").upsert({
+          id: newUser.id,
+          company_name: companyName,
+          phone: companyPhone || "",
+          address: companyAddress || "",
+          email: regEmail,
+        });
+      }
+      toast.success("Company account created! You're now signed in.");
       onClose();
     } catch (err) {
       toast.error(friendlyRegisterError(err));

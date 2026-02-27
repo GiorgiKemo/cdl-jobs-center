@@ -70,12 +70,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     role: "driver" | "company"
   ) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { name, role } },
     });
     if (error) throw error;
+    return data.user;
   };
 
   const signOut = async () => {
