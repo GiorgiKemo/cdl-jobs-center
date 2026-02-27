@@ -103,7 +103,7 @@ const Drivers = () => {
               {!user && (
                 <div className="flex gap-3 mt-2">
                   <Button asChild>
-                    <Link to="/">Sign In as Company</Link>
+                    <Link to="/signin">Sign In as Company</Link>
                   </Button>
                   <Button variant="outline" asChild>
                     <Link to="/apply">Apply as Driver</Link>
