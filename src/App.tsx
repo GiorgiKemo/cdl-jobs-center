@@ -6,9 +6,11 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import ApplyNow from "./pages/ApplyNow";
 import Jobs from "./pages/Jobs";
+import JobDetail from "./pages/JobDetail";
 import Drivers from "./pages/Drivers";
 import Companies from "./pages/Companies";
 import CompanyProfile from "./pages/CompanyProfile";
+import Dashboard from "./pages/Dashboard";
 import SignIn from "./pages/SignIn";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
@@ -28,9 +30,11 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/apply" element={<ApplyNow />} />
             <Route path="/jobs" element={<Jobs />} />
+            <Route path="/jobs/:id" element={<JobDetail />} />
             <Route path="/drivers" element={<Drivers />} />
             <Route path="/companies" element={<Companies />} />
             <Route path="/companies/:slug" element={<CompanyProfile />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />

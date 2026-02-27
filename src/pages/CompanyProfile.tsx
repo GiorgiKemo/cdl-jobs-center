@@ -52,9 +52,19 @@ const CompanyProfile = () => {
         <div className="border border-border bg-card p-5 mb-4">
           <div className="flex flex-col sm:flex-row items-start gap-5">
             {/* Logo */}
-            <div className="shrink-0 h-20 w-20 bg-muted flex items-center justify-center font-display text-3xl font-bold text-primary border border-border">
-              {company.name.charAt(0)}
-            </div>
+            {(() => {
+              let logo = "";
+              try { logo = JSON.parse(localStorage.getItem("cdl-company-logos") ?? "{}")[company.name] ?? ""; } catch {}
+              return (
+                <div className="shrink-0 h-20 w-20 bg-muted flex items-center justify-center font-display text-3xl font-bold text-primary border border-border overflow-hidden">
+                  {logo ? (
+                    <img src={logo} alt={company.name} className="h-full w-full object-contain p-1" />
+                  ) : (
+                    company.name.charAt(0)
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Info */}
             <div className="flex-1 min-w-0">

@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { SignInModal } from "@/components/SignInModal";
 
 const jobDropdownItems = [
+  { name: "All Jobs", path: "/jobs" },
   { name: "Dry Van", path: "/jobs?type=dry-van" },
   { name: "Flatbed", path: "/jobs?type=flatbed" },
   { name: "Dry Bulk", path: "/jobs?type=dry-bulk" },
@@ -233,6 +234,25 @@ const Navbar = () => {
             <TruckToggle isDark={isDark} onClick={toggle} />
             {user ? (
               <>
+                {user.role === "company" && (
+                  <Link
+                    to="/dashboard"
+                    className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      location.pathname === "/dashboard"
+                        ? "text-primary"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Dashboard
+                    {location.pathname === "/dashboard" && (
+                      <motion.div
+                        layoutId="activeTab"
+                        className="absolute inset-0 rounded-lg bg-primary/10"
+                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                      />
+                    )}
+                  </Link>
+                )}
                 <div className="flex items-center gap-2 px-3 py-1.5 border border-border text-sm">
                   <User className="h-3.5 w-3.5 text-primary" />
                   <span className="text-foreground font-medium">{user.name}</span>
@@ -332,16 +352,31 @@ const Navbar = () => {
                   )
                 )}
                 {user ? (
-                  <div className="flex gap-2 pt-2 items-center">
-                    <div className="flex items-center gap-2 px-3 py-1.5 border border-border text-sm flex-1">
-                      <User className="h-3.5 w-3.5 text-primary shrink-0" />
-                      <span className="font-medium truncate">{user.name}</span>
+                  <>
+                    {user.role === "company" && (
+                      <Link
+                        to="/dashboard"
+                        onClick={() => setIsOpen(false)}
+                        className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                          location.pathname === "/dashboard"
+                            ? "bg-primary/10 text-primary"
+                            : "hover:bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        Dashboard
+                      </Link>
+                    )}
+                    <div className="flex gap-2 pt-2 items-center">
+                      <div className="flex items-center gap-2 px-3 py-1.5 border border-border text-sm flex-1">
+                        <User className="h-3.5 w-3.5 text-primary shrink-0" />
+                        <span className="font-medium truncate">{user.name}</span>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => { handleSignOut(); setIsOpen(false); }} className="flex items-center gap-1.5">
+                        <LogOut className="h-3.5 w-3.5" />
+                        Sign Out
+                      </Button>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => { handleSignOut(); setIsOpen(false); }} className="flex items-center gap-1.5">
-                      <LogOut className="h-3.5 w-3.5" />
-                      Sign Out
-                    </Button>
-                  </div>
+                  </>
                 ) : (
                   <div className="flex gap-2 pt-2">
                     <Button variant="outline" size="sm" className="flex-1" onClick={() => { setIsOpen(false); setSignInOpen(true); }}>

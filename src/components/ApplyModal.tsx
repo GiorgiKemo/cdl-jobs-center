@@ -91,11 +91,19 @@ export function ApplyModal({ companyName, onClose }: ApplyModalProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    save({
+    const data = {
       firstName, lastName, email, phone, cdlNumber, zipCode, date,
       driverType, licenseClass, yearsExp, licenseState, soloTeam, notes,
       prefs, endorse, hauler, route, extra,
-    });
+    };
+    save(data);
+
+    // Record received application for the company's dashboard
+    const KEY_RECEIVED = "cdl-applications-received";
+    const received = JSON.parse(localStorage.getItem(KEY_RECEIVED) ?? "[]");
+    received.push({ ...data, companyName, submittedAt: new Date().toISOString() });
+    localStorage.setItem(KEY_RECEIVED, JSON.stringify(received));
+
     toast.success(`Application submitted to ${companyName}!`);
     onClose();
   };

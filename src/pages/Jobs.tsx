@@ -4,106 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link, useSearchParams } from "react-router-dom";
 import { Truck } from "lucide-react";
-import { useState, useEffect } from "react";
-
-const jobListings = [
-  {
-    id: 1,
-    company: "GI Super Service",
-    title: "OTR Dry Van Driver",
-    description: "What would it feel like to drive for a company that puts drivers first and loads second? At GI Super Service we offer top pay, consistent miles, and a supportive team.",
-    type: "Dry Van",
-    driverType: "Company Driver",
-    routeType: "OTR",
-    teamDriving: "Solo",
-    location: "Illinois",
-    pay: "$0.60-0.70/mile",
-  },
-  {
-    id: 2,
-    company: "United Global Carrier",
-    title: "Regional Flatbed Driver",
-    description: "What would it feel like to drive for a company that puts drivers first and loads second? United Global Carrier offers regional routes with great home time.",
-    type: "Flatbed",
-    driverType: "Company Driver",
-    routeType: "Regional",
-    teamDriving: "Solo",
-    location: "Texas",
-    pay: "$1,400-1,800/week",
-  },
-  {
-    id: 3,
-    company: "PKD Express",
-    title: "Local Tanker Driver",
-    description: "How would you rate your current trucking company? What would it feel like to drive for a company that puts drivers first and loads second? PKD Express is hiring.",
-    type: "Tanker",
-    driverType: "Company Driver",
-    routeType: "Local",
-    teamDriving: "Solo",
-    location: "California",
-    pay: "$75,000-90,000/year",
-  },
-  {
-    id: 4,
-    company: "AN Enterprise Inc",
-    title: "Refrigerated Solo Driver",
-    description: "AN Enterprise Inc offers excellent pay and benefits for refrigerated drivers. Join a company that values your time at home and on the road.",
-    type: "Refrigerated",
-    driverType: "Company Driver",
-    routeType: "OTR",
-    teamDriving: "Solo",
-    location: "Florida",
-    pay: "$0.65-0.75/mile",
-  },
-  {
-    id: 5,
-    company: "GI Super Service",
-    title: "Owner Operator - Dry Van",
-    description: "GI Super Service is looking for owner operators who want to maximize earnings. Earn 85% of load with no forced dispatch and great support.",
-    type: "Owner Operator",
-    driverType: "Owner Operator",
-    routeType: "OTR",
-    teamDriving: "Solo",
-    location: "Nationwide",
-    pay: "85% of load",
-  },
-  {
-    id: 6,
-    company: "United Global Carrier",
-    title: "Student Driver Program",
-    description: "No experience? No problem. United Global Carrier's student driver program provides paid training and job placement upon graduation.",
-    type: "Students",
-    driverType: "Student",
-    routeType: "OTR",
-    teamDriving: "Solo",
-    location: "Multiple States",
-    pay: "$600-800/week training",
-  },
-  {
-    id: 7,
-    company: "PKD Express",
-    title: "Dry Bulk Hauler",
-    description: "PKD Express is seeking experienced dry bulk drivers for steady regional runs. Competitive weekly pay, home weekends, full benefits package.",
-    type: "Dry Bulk",
-    driverType: "Company Driver",
-    routeType: "Regional",
-    teamDriving: "Solo",
-    location: "Texas",
-    pay: "$1,200-1,600/week",
-  },
-  {
-    id: 8,
-    company: "AN Enterprise Inc",
-    title: "Team Driver - Long Haul",
-    description: "AN Enterprise Inc is looking for team drivers for long-haul OTR runs. Split pay, consistent miles, and top equipment available immediately.",
-    type: "Teams",
-    driverType: "Company Driver",
-    routeType: "OTR",
-    teamDriving: "Team",
-    location: "Nationwide",
-    pay: "$0.70-0.80/mile split",
-  },
-];
+import { useState, useEffect, useMemo } from "react";
+import { SEED_JOBS } from "@/data/jobs";
+import { useJobs } from "@/hooks/useJobs";
 
 const urlTypeMap: Record<string, string> = {
   "dry-van": "Dry Van",
@@ -118,6 +21,8 @@ const urlTypeMap: Record<string, string> = {
 
 const Jobs = () => {
   const [searchParams] = useSearchParams();
+  const { loadAll } = useJobs();
+  const allJobs = useMemo(() => [...SEED_JOBS, ...loadAll()], []);
 
   // Pending filter values (before Search is clicked)
   const [pendingFreight, setPendingFreight] = useState("all");
@@ -157,7 +62,7 @@ const Jobs = () => {
     setTeamDriving("all");
   };
 
-  const filtered = jobListings.filter((j) => {
+  const filtered = allJobs.filter((j) => {
     const matchesFreight = freightType === "all" || j.type === freightType;
     const matchesDriver = driverType === "all" || j.driverType === driverType;
     const matchesRoute = routeType === "all" || j.routeType === routeType;
@@ -301,7 +206,7 @@ const Jobs = () => {
                   </div>
                   <div className="flex flex-col items-stretch gap-3 shrink-0 w-36">
                     <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90 w-full">
-                      <Link to="/apply">Apply Now</Link>
+                      <Link to={`/jobs/${job.id}`}>View Job</Link>
                     </Button>
                     <div className="h-14 w-full border border-border flex items-center justify-center bg-muted/30">
                       <Truck className="h-6 w-6 text-muted-foreground" />
