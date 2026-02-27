@@ -48,19 +48,13 @@ const Drivers = () => {
   const [classFilter, setClassFilter] = useState("All");
   const [expFilter, setExpFilter] = useState("All");
   const [stateFilter, setStateFilter] = useState("All");
-  const [activeFilters, setActiveFilters] = useState({ type: "All", class: "All", exp: "All", state: "All" });
   const [favorites, setFavorites] = useState<number[]>([]);
-
-  const handleSearch = () => {
-    setActiveFilters({ type: typeFilter, class: classFilter, exp: expFilter, state: stateFilter });
-  };
 
   const handleClear = () => {
     setTypeFilter("All");
     setClassFilter("All");
     setExpFilter("All");
     setStateFilter("All");
-    setActiveFilters({ type: "All", class: "All", exp: "All", state: "All" });
   };
 
   const toggleFavorite = (id: number) => {
@@ -70,10 +64,10 @@ const Drivers = () => {
   };
 
   const filtered = mockDrivers.filter((d) => {
-    if (activeFilters.type !== "All" && d.type !== activeFilters.type) return false;
-    if (activeFilters.class !== "All" && d.licenseClass !== activeFilters.class) return false;
-    if (activeFilters.exp !== "All" && d.experience !== activeFilters.exp) return false;
-    if (activeFilters.state !== "All" && d.state !== activeFilters.state) return false;
+    if (typeFilter !== "All" && d.type !== typeFilter) return false;
+    if (classFilter !== "All" && d.licenseClass !== classFilter) return false;
+    if (expFilter !== "All" && d.experience !== expFilter) return false;
+    if (stateFilter !== "All" && d.state !== stateFilter) return false;
     return true;
   });
 
@@ -184,9 +178,6 @@ const Drivers = () => {
               </div>
             </div>
             <div className="flex gap-3">
-              <Button onClick={handleSearch} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                Search
-              </Button>
               <Button
                 variant="outline"
                 onClick={handleClear}
