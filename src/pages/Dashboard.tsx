@@ -330,7 +330,7 @@ const DashboardInner = () => {
       .from("company_profiles")
       .select("*")
       .eq("id", user!.id)
-      .single()
+      .maybeSingle()
       .then(({ data }) => {
         if (data) {
           setProfileName(data.company_name ?? user!.name);

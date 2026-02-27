@@ -28,7 +28,7 @@ const JobDetail = () => {
         .from("company_profiles")
         .select("phone, address, website, logo_url")
         .eq("id", job!.companyId!)
-        .single();
+        .maybeSingle();
       return data;
     },
     enabled: !!job?.companyId,

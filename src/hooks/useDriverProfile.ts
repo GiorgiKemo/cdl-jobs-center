@@ -23,9 +23,8 @@ export function useDriverProfile(driverId: string) {
         .from("driver_profiles")
         .select("*")
         .eq("id", driverId)
-        .single();
-      // PGRST116 = no rows found (new driver with no profile yet)
-      if (error && error.code !== "PGRST116") throw error;
+        .maybeSingle();
+      if (error) throw error;
       if (!data) return null;
       return {
         firstName: data.first_name ?? "",
