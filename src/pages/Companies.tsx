@@ -3,45 +3,61 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Phone, MapPin, Star, CheckCircle } from "lucide-react";
-import { COMPANIES } from "@/data/companies";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Phone, MapPin, CheckCircle, Building2, ExternalLink } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 
-const DRIVER_TYPES = ["All", "Owner Operator", "Company Driver", "Student"];
-const FREIGHT_TYPES = [
-  "All", "Dry Van", "Flatbed", "Refrigerated", "Tanker", "Dry Bulk",
-  "LTL", "Intermodal", "Hazmat", "Oversized/Heavy Haul", "Auto Transport",
-  "Livestock", "Logging", "Dump Truck", "Pneumatic Tanker",
-];
+interface CompanyRow {
+  id: string;
+  company_name: string;
+  phone: string;
+  address: string;
+  email: string;
+  website: string | null;
+  about: string | null;
+  logo_url: string | null;
+}
+
 const COMPANY_STATES = [
   "All",
-  "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado",
-  "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho",
-  "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana",
-  "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi",
-  "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey",
-  "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma",
-  "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
-  "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington",
-  "West Virginia", "Wisconsin", "Wyoming",
+  "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware",
+  "Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky",
+  "Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi",
+  "Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico",
+  "New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania",
+  "Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont",
+  "Virginia","Washington","West Virginia","Wisconsin","Wyoming",
 ];
 
-
 const Companies = () => {
-  const [driverTypeFilter, setDriverTypeFilter] = useState("All");
-  const [freightTypeFilter, setFreightTypeFilter] = useState("All");
   const [stateFilter, setStateFilter] = useState("All");
 
+  const { data: companies = [], isLoading } = useQuery({
+    queryKey: ["companies-directory"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("company_profiles")
+        .select("id, company_name, phone, address, email, website, about, logo_url")
+        .order("company_name");
+      if (error) throw error;
+      return (data ?? []) as CompanyRow[];
+    },
+  });
+
   const handleClear = () => {
-    setDriverTypeFilter("All");
-    setFreightTypeFilter("All");
     setStateFilter("All");
   };
 
-  const filtered = COMPANIES.filter((c) => {
-    if (driverTypeFilter !== "All" && !c.driverTypes.includes(driverTypeFilter)) return false;
-    if (freightTypeFilter !== "All" && !c.freightTypes.includes(freightTypeFilter)) return false;
-    if (stateFilter !== "All" && c.state !== stateFilter) return false;
+  // Simple address-based state filter
+  const filtered = companies.filter((c) => {
+    if (stateFilter !== "All" && !c.address?.includes(stateFilter)) return false;
     return true;
   });
 
@@ -51,7 +67,9 @@ const Companies = () => {
       <main className="container mx-auto py-8">
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary hover:underline">Main</Link>
+          <Link to="/" className="text-primary hover:underline">
+            Main
+          </Link>
           <span className="mx-1">»</span>
           Companies
         </p>
@@ -59,40 +77,26 @@ const Companies = () => {
         {/* Filter box */}
         <div className="bg-foreground text-background dark:bg-muted dark:text-foreground border border-border mb-6">
           <div className="px-5 py-3 border-b border-white/10 dark:border-border">
-            <h1 className="font-display font-bold text-base">Filter Companies</h1>
+            <h1 className="font-display font-bold text-base">
+              Filter Companies
+            </h1>
           </div>
           <div className="px-5 py-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
               <div>
-                <label className="text-xs font-medium uppercase tracking-wide opacity-70 block mb-1.5">Driver Type:</label>
-                <Select value={driverTypeFilter} onValueChange={setDriverTypeFilter}>
-                  <SelectTrigger className="bg-background/10 border-white/20 dark:bg-background dark:border-border text-inherit">
-                    <SelectValue placeholder="Choose an option..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DRIVER_TYPES.map((o) => <SelectItem key={o} value={o}>{o === "All" ? "Choose an option..." : o}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs font-medium uppercase tracking-wide opacity-70 block mb-1.5">Freight Type:</label>
-                <Select value={freightTypeFilter} onValueChange={setFreightTypeFilter}>
-                  <SelectTrigger className="bg-background/10 border-white/20 dark:bg-background dark:border-border text-inherit">
-                    <SelectValue placeholder="Choose an option..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FREIGHT_TYPES.map((o) => <SelectItem key={o} value={o}>{o === "All" ? "Choose an option..." : o}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs font-medium uppercase tracking-wide opacity-70 block mb-1.5">Company State:</label>
+                <label className="text-xs font-medium uppercase tracking-wide opacity-70 block mb-1.5">
+                  Company State:
+                </label>
                 <Select value={stateFilter} onValueChange={setStateFilter}>
                   <SelectTrigger className="bg-background/10 border-white/20 dark:bg-background dark:border-border text-inherit">
                     <SelectValue placeholder="Choose an option..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {COMPANY_STATES.map((o) => <SelectItem key={o} value={o}>{o === "All" ? "Choose an option..." : o}</SelectItem>)}
+                    {COMPANY_STATES.map((o) => (
+                      <SelectItem key={o} value={o}>
+                        {o === "All" ? "Choose an option..." : o}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -114,11 +118,18 @@ const Companies = () => {
           <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
             <div className="w-1 h-5 bg-primary shrink-0" />
             <h2 className="font-display font-bold text-base">
-              Companies <span className="text-muted-foreground font-normal text-sm ml-1">({filtered.length} found)</span>
+              Companies{" "}
+              <span className="text-muted-foreground font-normal text-sm ml-1">
+                ({filtered.length} found)
+              </span>
             </h2>
           </div>
 
-          {filtered.length === 0 ? (
+          {isLoading ? (
+            <div className="px-5 py-12 text-center text-muted-foreground text-sm">
+              Loading companies...
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="px-5 py-12 text-center text-muted-foreground text-sm">
               No companies match the selected filters.
             </div>
@@ -129,42 +140,67 @@ const Companies = () => {
                   key={c.id}
                   className="flex flex-col sm:flex-row items-start sm:items-center gap-5 px-5 py-5 border-l-2 border-l-primary hover:bg-muted/20 transition-colors"
                 >
-                  {/* Logo + stars */}
+                  {/* Logo */}
                   <div className="shrink-0 flex flex-col items-center gap-2 w-24">
-                    <div className="h-20 w-20 bg-muted flex items-center justify-center font-display text-3xl font-bold text-primary border border-border">
-                      {c.name.charAt(0)}
-                    </div>
-                    <div className="flex gap-0.5">
-                      {Array.from({ length: c.rating }).map((_, j) => (
-                        <Star key={j} className="h-3.5 w-3.5 fill-cdl-amber text-cdl-amber" />
-                      ))}
-                    </div>
+                    {c.logo_url ? (
+                      <img
+                        src={c.logo_url}
+                        alt={c.company_name}
+                        className="h-20 w-20 object-contain border border-border bg-white"
+                      />
+                    ) : (
+                      <div className="h-20 w-20 bg-muted flex items-center justify-center font-display text-3xl font-bold text-primary border border-border">
+                        {c.company_name?.charAt(0) || <Building2 className="h-8 w-8" />}
+                      </div>
+                    )}
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <Link
-                      to={`/companies/${c.slug}`}
+                      to={`/companies/${c.id}`}
                       className="font-display font-semibold text-primary hover:underline text-left mb-1.5 block"
                     >
-                      {c.name}
+                      {c.company_name}
                     </Link>
-                    <p className="flex items-center gap-1.5 text-sm text-muted-foreground mb-1">
-                      <Phone className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                      {c.phone}
-                    </p>
-                    <p className="flex items-start gap-1.5 text-sm text-muted-foreground mb-2">
-                      <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden="true" />
-                      {c.address}
-                    </p>
+                    {c.phone && (
+                      <p className="flex items-center gap-1.5 text-sm text-muted-foreground mb-1">
+                        <Phone className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        {c.phone}
+                      </p>
+                    )}
+                    {c.address && (
+                      <p className="flex items-start gap-1.5 text-sm text-muted-foreground mb-1">
+                        <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+                        {c.address}
+                      </p>
+                    )}
+                    {c.website && (
+                      <a
+                        href={c.website.startsWith("http") ? c.website : `https://${c.website}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-sm text-primary hover:underline mb-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        {c.website.replace(/^https?:\/\//, "")}
+                      </a>
+                    )}
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/30 text-xs font-medium">
-                      <CheckCircle className="h-3 w-3" aria-hidden="true" /> VERIFIED COMPANY
+                      <CheckCircle className="h-3 w-3" aria-hidden="true" />{" "}
+                      VERIFIED COMPANY
                     </span>
                   </div>
 
                   {/* Action */}
-                  <Button variant="outline" size="sm" className="shrink-0" asChild>
-                    <Link to={`/companies/${c.slug}`}>View Profile</Link>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    asChild
+                  >
+                    <Link to={`/companies/${c.id}`}>View Profile</Link>
                   </Button>
                 </div>
               ))}

@@ -180,6 +180,7 @@ const ApplyNow = () => {
     setCdlNumber(prev => prev || profile.cdlNumber);
     setLicenseClass(prev => prev || profile.licenseClass);
     setYearsExp(prev => prev || profile.yearsExp);
+    setDriverType(prev => prev || profile.driverType);
     setLicenseState(prev => prev || profile.licenseState);
     setZipCode(prev => prev || profile.zipCode);
     setDate(prev => prev || profile.dateOfBirth);

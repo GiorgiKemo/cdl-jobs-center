@@ -66,6 +66,7 @@ const EasyApplyDialog = ({ trigger, companyName = "General Application" }: EasyA
       setLastName((prev) => prev || profile.lastName);
       setCdl((prev) => prev || profile.cdlNumber);
       setPhone((prev) => prev || profile.phone);
+      setDriverType((prev) => prev || profile.driverType);
     }
     if (user?.email) {
       setEmail((prev) => prev || (user.email ?? ""));

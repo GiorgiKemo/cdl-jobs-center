@@ -42,7 +42,7 @@ const App = () => (
             <Route path="/drivers" element={<Drivers />} />
             <Route path="/drivers/:id" element={<DriverProfile />} />
             <Route path="/companies" element={<Companies />} />
-            <Route path="/companies/:slug" element={<CompanyProfile />} />
+            <Route path="/companies/:id" element={<CompanyProfile />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/driver-dashboard" element={<DriverDashboard />} />
             <Route path="/signin" element={<SignIn />} />

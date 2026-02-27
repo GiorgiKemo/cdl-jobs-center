@@ -1,49 +1,110 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Phone, MapPin, Star, CheckCircle, ExternalLink } from "lucide-react";
+import { Phone, MapPin, CheckCircle, ExternalLink, Mail, Building2, Briefcase, MapPinned, DollarSign } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { ApplyModal } from "@/components/ApplyModal";
 import { SignInModal } from "@/components/SignInModal";
-import { COMPANIES } from "@/data/companies";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
+interface CompanyData {
+  id: string;
+  company_name: string;
+  email: string;
+  phone: string;
+  address: string;
+  about: string | null;
+  website: string | null;
+  logo_url: string | null;
+}
+
+interface JobRow {
+  id: string;
+  title: string;
+  location: string;
+  pay: string;
+  route_type: string;
+  driver_type: string;
+  type: string;
+}
+
 const CompanyProfile = () => {
-  const { slug } = useParams<{ slug: string }>();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [applyOpen, setApplyOpen] = useState(false);
   const [signInOpen, setSignInOpen] = useState(false);
 
-  const company = COMPANIES.find((c) => c.slug === slug);
-
-  // Redirect if company not found — done in effect to avoid render-time navigation
-  useEffect(() => {
-    if (!company) {
-      toast.error("Company not found.");
-      navigate("/companies");
-    }
-  }, [company, navigate]);
-
-  // Load Supabase profile overrides for this company
-  const { data: dbProfile } = useQuery({
-    queryKey: ["company-profile-by-name", company?.name],
+  // Fetch company profile from Supabase
+  const { data: company, isLoading } = useQuery({
+    queryKey: ["company-profile", id],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("company_profiles")
-        .select("company_name, phone, address, website, about, logo_url")
-        .eq("company_name", company!.name)
+        .select("*")
+        .eq("id", id!)
         .maybeSingle();
-      return data ?? null;
+      if (error) throw error;
+      return data as CompanyData | null;
     },
-    enabled: !!company?.name,
+    enabled: !!id,
   });
 
-  if (!company) return null;
+  // Check if current driver already applied to this company
+  const isDriver = user?.role === "driver";
+  const { data: hasApplied = false } = useQuery({
+    queryKey: ["has-applied", user?.id, id],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("applications")
+        .select("*", { count: "exact", head: true })
+        .eq("driver_id", user!.id)
+        .eq("company_id", id!);
+      if (error) return false;
+      return (count ?? 0) > 0;
+    },
+    enabled: !!isDriver && !!id,
+  });
+
+  // Fetch company's active jobs
+  const { data: jobs = [] } = useQuery({
+    queryKey: ["company-jobs", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("jobs")
+        .select("id, title, location, pay, route_type, driver_type, type")
+        .eq("company_id", id!)
+        .eq("status", "Active")
+        .order("posted_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as JobRow[];
+    },
+    enabled: !!id,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="container mx-auto py-8 max-w-4xl">
+          <div className="text-center text-muted-foreground py-20">Loading...</div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!company) {
+    toast.error("Company not found.");
+    navigate("/companies");
+    return null;
+  }
+
+  const isOwnProfile = user?.role === "company" && user.id === id;
 
   const handleApplyClick = () => {
     if (!user) {
@@ -55,8 +116,6 @@ const CompanyProfile = () => {
     }
   };
 
-  const logoUrl = dbProfile?.logo_url as string | undefined;
-
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -67,94 +126,151 @@ const CompanyProfile = () => {
           <span className="mx-1">»</span>
           <Link to="/companies" className="text-primary hover:underline">Companies</Link>
           <span className="mx-1">»</span>
-          {company.name}
+          {company.company_name}
         </p>
 
-        {/* Header card */}
-        <div className="border border-border bg-card p-5 mb-4">
-          <div className="flex flex-col sm:flex-row items-start gap-5">
+        {/* Hero header */}
+        <div className="border border-border bg-card mb-6">
+          <div className="p-6 flex flex-col sm:flex-row items-start gap-6">
             {/* Logo */}
-            <div className="shrink-0 h-20 w-20 bg-muted flex items-center justify-center font-display text-3xl font-bold text-primary border border-border overflow-hidden">
-              {logoUrl ? (
-                <img src={logoUrl} alt={company.name} className="h-full w-full object-contain p-1" />
+            <div className="shrink-0 h-24 w-24 rounded-lg bg-muted flex items-center justify-center border border-border overflow-hidden">
+              {company.logo_url ? (
+                <img src={company.logo_url} alt={company.company_name} className="h-full w-full object-contain p-1" />
               ) : (
-                company.name.charAt(0)
+                <Building2 className="h-10 w-10 text-primary" />
               )}
             </div>
 
-            {/* Info — Supabase overrides take precedence over static data */}
+            {/* Info */}
             <div className="flex-1 min-w-0">
-              <h1 className="font-display font-bold text-primary text-lg mb-2">
-                {(dbProfile?.company_name as string | undefined) ?? company.name}
+              <h1 className="font-display font-bold text-2xl text-foreground mb-3">
+                {company.company_name}
               </h1>
-              <p className="flex items-center gap-1.5 text-sm text-muted-foreground mb-1">
-                <Phone className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
-                {(dbProfile?.phone as string | undefined) || company.phone}
-              </p>
-              <p className="flex items-start gap-1.5 text-sm text-muted-foreground mb-1">
-                <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" aria-hidden="true" />
-                {(dbProfile?.address as string | undefined) || company.address}
-              </p>
-              {((dbProfile?.website as string | undefined) || company.website) && (
-                <a
-                  href={(dbProfile?.website as string | undefined) ?? company.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-sm text-primary hover:underline"
-                >
-                  <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  Visit Company Website
-                </a>
-              )}
+              <div className="space-y-1.5">
+                {company.phone && (
+                  <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Phone className="h-4 w-4 shrink-0 text-primary" />
+                    {company.phone}
+                  </p>
+                )}
+                {company.address && (
+                  <p className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <MapPin className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
+                    {company.address}
+                  </p>
+                )}
+                {company.email && (
+                  <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Mail className="h-4 w-4 shrink-0 text-primary" />
+                    {company.email}
+                  </p>
+                )}
+                {company.website && (
+                  <a
+                    href={company.website.startsWith("http") ? company.website : `https://${company.website}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-primary hover:underline"
+                  >
+                    <ExternalLink className="h-4 w-4 shrink-0" />
+                    Visit Website
+                  </a>
+                )}
+              </div>
             </div>
 
-            {/* Rating + actions */}
+            {/* Actions */}
             <div className="shrink-0 flex flex-col items-end gap-3">
-              <div className="flex gap-0.5">
-                {Array.from({ length: company.rating }).map((_, j) => (
-                  <Star key={j} className="h-5 w-5 fill-cdl-amber text-cdl-amber" />
-                ))}
-              </div>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/30 text-xs font-medium">
-                <CheckCircle className="h-3 w-3" aria-hidden="true" /> VERIFIED COMPANY
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/30 text-xs font-medium rounded-full">
+                <CheckCircle className="h-3.5 w-3.5" /> VERIFIED COMPANY
               </span>
-              <Button onClick={handleApplyClick} className="mt-1">
-                Submit an Application
-              </Button>
+              {isOwnProfile ? (
+                <Button asChild>
+                  <Link to="/dashboard">Edit Profile</Link>
+                </Button>
+              ) : hasApplied ? (
+                <Button variant="outline" disabled>
+                  Already Applied
+                </Button>
+              ) : (
+                <Button onClick={handleApplyClick}>
+                  Submit an Application
+                </Button>
+              )}
             </div>
           </div>
         </div>
 
         {/* About */}
-        <div className="border border-border bg-card p-5 mb-4">
-          <h2 className="font-display font-semibold text-base mb-2">About company</h2>
-          <hr className="border-primary/20 mb-3" />
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {(dbProfile?.about as string | undefined) || company.about}
-          </p>
+        {company.about && (
+          <div className="border border-border bg-card p-6 mb-6">
+            <h2 className="font-display font-semibold text-base border-l-4 border-primary pl-3 mb-4">About</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+              {company.about}
+            </p>
+          </div>
+        )}
+
+        {/* Active Jobs */}
+        <div className="border border-border bg-card mb-6">
+          <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
+            <h2 className="font-display font-semibold text-base border-l-4 border-primary pl-3">
+              Active Jobs
+              <span className="text-muted-foreground font-normal text-sm ml-2">({jobs.length})</span>
+            </h2>
+          </div>
+          {jobs.length === 0 ? (
+            <div className="px-6 py-10 text-center text-muted-foreground text-sm">
+              <Briefcase className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+              No active jobs posted yet.
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {jobs.map((job) => (
+                <Link
+                  key={job.id}
+                  to={`/jobs/${job.id}`}
+                  className="flex flex-col sm:flex-row items-start sm:items-center gap-3 px-6 py-4 hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm text-foreground">{job.title}</p>
+                    <div className="flex flex-wrap gap-3 mt-1 text-xs text-muted-foreground">
+                      {job.location && (
+                        <span className="flex items-center gap-1">
+                          <MapPinned className="h-3 w-3" />{job.location}
+                        </span>
+                      )}
+                      {job.pay && (
+                        <span className="flex items-center gap-1">
+                          <DollarSign className="h-3 w-3" />{job.pay}
+                        </span>
+                      )}
+                      {job.route_type && <span>{job.route_type}</span>}
+                      {job.driver_type && <span>{job.driver_type}</span>}
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" className="shrink-0">View Job</Button>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Information panel */}
-        {(!user || user.role !== "driver") && (
+        {/* Info panel for guests */}
+        {!user && (
           <div className="border border-border bg-blue-50/50 dark:bg-blue-950/20 p-5">
             <h2 className="font-semibold text-sm mb-2">Information</h2>
-            {!user ? (
-              <div>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Users of <strong className="text-foreground">Guests</strong> are not allowed to submit applications.
-                </p>
-                <Button size="sm" onClick={() => setSignInOpen(true)}>Sign in</Button>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Company accounts cannot submit driver applications.</p>
-            )}
+            <p className="text-sm text-muted-foreground mb-3">
+              Sign in as a driver to submit an application to this company.
+            </p>
+            <Button size="sm" onClick={() => setSignInOpen(true)}>Sign In</Button>
           </div>
         )}
       </main>
       <Footer />
 
       {applyOpen && (
-        <ApplyModal companyName={company.name} onClose={() => setApplyOpen(false)} />
+        <ApplyModal companyName={company.company_name} companyId={id} onClose={() => setApplyOpen(false)} />
       )}
       {signInOpen && (
         <SignInModal onClose={() => setSignInOpen(false)} />

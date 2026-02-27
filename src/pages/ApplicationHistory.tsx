@@ -32,7 +32,7 @@ const ApplicationHistory = () => {
         .from("applications")
         .select("*")
         .eq("driver_id", user!.id)
-        .order("submitted_at", { ascending: false });
+        .order("updated_at", { ascending: false });
       if (error) throw error;
       return (data ?? []).map((row): Application => ({
         id: row.id as string,

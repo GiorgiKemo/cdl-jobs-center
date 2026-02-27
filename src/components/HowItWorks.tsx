@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
-import { ClipboardList, Bot, Truck } from "lucide-react";
+import { ClipboardList, Bot, Truck, Users } from "lucide-react";
+import { useAuth } from "@/context/auth";
 
-const steps = [
+const driverSteps = [
   {
     icon: ClipboardList,
     title: "Fill Out the Application",
@@ -22,7 +23,31 @@ const steps = [
   },
 ];
 
+const companySteps = [
+  {
+    icon: ClipboardList,
+    title: "Post Your Job",
+    description: "Create a job listing in minutes with our simple posting form.",
+    step: "01",
+  },
+  {
+    icon: Bot,
+    title: "AI Matches Drivers",
+    description: "Our AI instantly connects your listing with qualified CDL drivers who match your requirements.",
+    step: "02",
+  },
+  {
+    icon: Users,
+    title: "Hire & Onboard",
+    description: "Review applicants, manage your pipeline, and get drivers on the road.",
+    step: "03",
+  },
+];
+
 const HowItWorks = () => {
+  const { user } = useAuth();
+  const isCompany = user?.role === "company";
+  const steps = isCompany ? companySteps : driverSteps;
   return (
     <section className="py-24 bg-background relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-secondary/5 to-transparent" />
@@ -35,7 +60,7 @@ const HowItWorks = () => {
         >
           <span className="text-primary font-medium text-sm uppercase tracking-widest">How It Works</span>
           <h2 className="font-display text-4xl md:text-5xl font-bold mt-3">
-            Three Steps to Your <span className="text-gradient">Dream Job</span>
+            Three Steps to Your <span className="text-gradient">{isCompany ? "Next Hire" : "Dream Job"}</span>
           </h2>
         </motion.div>
 

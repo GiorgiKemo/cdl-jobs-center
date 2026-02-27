@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/context/auth";
 import { SignInModal } from "@/components/SignInModal";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 
 const jobDropdownItems = [
   { name: "All Jobs", path: "/jobs" },
@@ -26,6 +28,14 @@ const navLinks = [
   { name: "Jobs", path: "/jobs", dropdown: jobDropdownItems },
   { name: "Companies", path: "/companies" },
 ];
+
+const getInitials = (name: string) =>
+  name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
 
 // Truck front-view SVG — headlights off in light mode, glowing amber in dark mode
 const TruckToggle = ({ isDark, onClick }: { isDark: boolean; onClick: () => void }) => (
@@ -111,6 +121,47 @@ const Navbar = () => {
   const navigate = useNavigate();
   const { isDark, toggle } = useTheme();
   const { user, signOut } = useAuth();
+
+  // Unseen notification counts
+  const isCompany = user?.role === "company";
+  const isDriver = user?.role === "driver";
+
+  // Company: new applications since last viewed
+  const { data: newAppCount = 0 } = useQuery({
+    queryKey: ["new-app-count", user?.id],
+    queryFn: async () => {
+      const lastSeen = localStorage.getItem(`cdl-apps-seen-${user!.id}`) ?? "1970-01-01T00:00:00Z";
+      const { count, error } = await supabase
+        .from("applications")
+        .select("*", { count: "exact", head: true })
+        .eq("company_id", user!.id)
+        .gt("submitted_at", lastSeen);
+      if (error) return 0;
+      return count ?? 0;
+    },
+    enabled: !!isCompany,
+    refetchInterval: 30_000,
+  });
+
+  // Driver: applications whose status changed since last viewed
+  const { data: driverUpdateCount = 0 } = useQuery({
+    queryKey: ["driver-update-count", user?.id],
+    queryFn: async () => {
+      const lastSeen = localStorage.getItem(`cdl-apps-seen-${user!.id}`) ?? "1970-01-01T00:00:00Z";
+      const { count, error } = await supabase
+        .from("applications")
+        .select("*", { count: "exact", head: true })
+        .eq("driver_id", user!.id)
+        .neq("pipeline_stage", "New")
+        .gt("updated_at", lastSeen);
+      if (error) return 0;
+      return count ?? 0;
+    },
+    enabled: !!isDriver,
+    refetchInterval: 30_000,
+  });
+
+  const notifCount = isCompany ? newAppCount : driverUpdateCount;
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -250,11 +301,30 @@ const Navbar = () => {
                 <div className="relative" ref={profileRef}>
                   <button
                     onClick={() => setProfileOpen((o) => !o)}
-                    className="flex items-center gap-2 px-3 py-1.5 border border-border text-sm hover:border-primary/60 transition-colors"
+                    aria-haspopup="menu"
+                    aria-expanded={profileOpen}
+                    aria-label="Open account menu"
+                    className="group flex max-w-[300px] items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-left shadow-sm transition-all hover:border-primary/50"
                   >
-                    <User className="h-3.5 w-3.5 text-primary" />
-                    <span className="text-foreground font-medium">{user.name}</span>
-                    <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`} />
+                    <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/12 text-xs font-semibold text-primary">
+                      {getInitials(user.name)}
+                      {notifCount > 0 && (
+                        <span
+                          className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-background"
+                          aria-label={`${notifCount} update${notifCount > 1 ? "s" : ""}`}
+                          title={`${notifCount} update${notifCount > 1 ? "s" : ""}`}
+                        >
+                          {notifCount > 99 ? "99+" : notifCount}
+                        </span>
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-foreground">{user.name}</span>
+                      <span className="block text-[11px] text-muted-foreground">
+                        {user.role === "company" ? "Company Account" : "Driver Account"}
+                      </span>
+                    </span>
+                    <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`} />
                   </button>
                   <AnimatePresence>
                     {profileOpen && (
@@ -263,12 +333,26 @@ const Navbar = () => {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -6 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute right-0 top-full mt-1 w-48 bg-card border border-border shadow-md py-1 z-50"
+                        className="absolute right-0 top-full z-50 mt-1.5 w-56 rounded-md border border-border bg-card py-1 shadow-md"
+                        role="menu"
+                        aria-label="Account menu"
                       >
+                        {notifCount > 0 && (
+                          <>
+                            <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
+                              <span className="inline-flex items-center rounded-full bg-red-500/10 px-2 py-0.5 text-red-600 dark:text-red-400">
+                                {isCompany
+                                  ? `${notifCount} new application${notifCount > 1 ? "s" : ""}`
+                                  : `${notifCount} application update${notifCount > 1 ? "s" : ""}`}
+                              </span>
+                            </div>
+                            <hr className="my-1 border-border" />
+                          </>
+                        )}
                         <Link
                           to={user.role === "company" ? "/dashboard" : "/driver-dashboard"}
                           onClick={() => setProfileOpen(false)}
-                          className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary"
                         >
                           <LayoutDashboard className="h-3.5 w-3.5 shrink-0" />
                           {user.role === "company" ? "Dashboard" : "My Dashboard"}
@@ -276,7 +360,7 @@ const Navbar = () => {
                         <hr className="border-border my-1" />
                         <button
                           onClick={() => { handleSignOut(); setProfileOpen(false); }}
-                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary"
                         >
                           <LogOut className="h-3.5 w-3.5 shrink-0" />
                           Sign Out
@@ -388,6 +472,11 @@ const Navbar = () => {
                     >
                       <LayoutDashboard className="h-4 w-4 shrink-0" />
                       {user.role === "company" ? "Dashboard" : "My Dashboard"}
+                      {notifCount > 0 && (
+                        <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                          {notifCount > 9 ? "9+" : notifCount}
+                        </span>
+                      )}
                     </Link>
                     <div className="flex gap-2 pt-2 items-center border-t border-border/50 mt-1">
                       <div className="flex items-center gap-2 px-3 py-1.5 text-sm flex-1 text-muted-foreground">

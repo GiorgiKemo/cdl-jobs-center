@@ -12,7 +12,8 @@ import { useAuth } from "@/context/auth";
 import { useActiveJobs } from "@/hooks/useJobs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { useDriverProfile, DriverProfile } from "@/hooks/useDriverProfile";
-import { Truck, Briefcase, Bookmark, User, BarChart3, ChevronDown, ChevronUp, MapPin, DollarSign } from "lucide-react";
+import { Truck, Briefcase, Bookmark, User, BarChart3, ChevronDown, ChevronUp, MapPin, DollarSign, Bell } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
 
@@ -34,6 +35,7 @@ interface StoredApplication {
   licenseState: string;
   notes?: string;
   submittedAt: string;
+  updatedAt: string;
   pipeline_stage: PipelineStage;
 }
 
@@ -55,6 +57,7 @@ function rowToApp(row: Record<string, any>): StoredApplication {
     licenseState: row.license_state ?? "",
     notes: row.notes ?? "",
     submittedAt: row.submitted_at ?? "",
+    updatedAt: row.updated_at ?? row.submitted_at ?? "",
     pipeline_stage: (row.pipeline_stage ?? "New") as PipelineStage,
   };
 }
@@ -115,12 +118,20 @@ const DriverDashboard = () => {
 // Inner component — only renders when auth is confirmed as driver
 const DriverDashboardInner = () => {
   const { user } = useAuth();
+  const qc = useQueryClient();
   const { jobs: allActiveJobs } = useActiveJobs();
   const { savedIds, toggle: toggleSave } = useSavedJobs(user!.id);
   const { profile, isLoading: profileLoading, saveProfile } = useDriverProfile(user!.id);
 
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [expandedApp, setExpandedApp] = useState<string | null>(null);
+  const [stageFilter, setStageFilter] = useState<PipelineStage | "All">("All");
+  const [dismissedApps, setDismissedApps] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(`cdl-dismissed-apps-${user!.id}`);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
 
   // Fetch driver's applications
   const { data: applications = [] } = useQuery({
@@ -130,7 +141,7 @@ const DriverDashboardInner = () => {
         .from("applications")
         .select("*")
         .eq("driver_id", user!.id)
-        .order("submitted_at", { ascending: false });
+        .order("updated_at", { ascending: false });
       if (error) throw error;
       return (data ?? []).map(rowToApp);
     },
@@ -141,6 +152,7 @@ const DriverDashboardInner = () => {
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [cdlNumber, setCdlNumber] = useState("");
+  const [driverType, setDriverType] = useState("");
   const [licenseClass, setLicenseClass] = useState("");
   const [yearsExp, setYearsExp] = useState("");
   const [licenseState, setLicenseState] = useState("");
@@ -156,6 +168,7 @@ const DriverDashboardInner = () => {
       setLastName(profile.lastName);
       setPhone(profile.phone);
       setCdlNumber(profile.cdlNumber);
+      setDriverType(profile.driverType);
       setLicenseClass(profile.licenseClass);
       setYearsExp(profile.yearsExp);
       setLicenseState(profile.licenseState);
@@ -172,6 +185,9 @@ const DriverDashboardInner = () => {
   const interviews = applications.filter((a) => a.pipeline_stage === "Interview").length;
   const savedCount = savedIds.length;
 
+  // Filtered applications for the applications tab
+  const filteredApps = stageFilter === "All" ? applications : applications.filter((a) => a.pipeline_stage === stageFilter);
+
   // Saved jobs data — full job objects for the saved tab
   const savedJobs = allActiveJobs.filter((j) => savedIds.includes(j.id));
 
@@ -182,16 +198,39 @@ const DriverDashboardInner = () => {
 
   const handleSaveProfile = async () => {
     try {
-      await saveProfile({ firstName, lastName, phone, cdlNumber, licenseClass, yearsExp, licenseState, zipCode, dateOfBirth, about } as DriverProfile);
+      await saveProfile({ firstName, lastName, phone, cdlNumber, driverType, licenseClass, yearsExp, licenseState, zipCode, dateOfBirth, about } as DriverProfile);
       toast.success("Profile saved. Your application form will pre-fill next time.");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to save profile.");
     }
   };
 
-  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  // Unseen application updates
+  // Red dots: driven purely by dismissedApps (per-app click dismiss)
+  const isAppUnseen = (app: StoredApplication) =>
+    app.pipeline_stage !== "New" && app.updatedAt !== app.submittedAt && !dismissedApps.has(app.id);
+  const unseenUpdates = applications.filter(isAppUnseen).length;
+
+  const dismissApp = (appId: string) => {
+    setDismissedApps((prev) => {
+      const next = new Set(prev);
+      next.add(appId);
+      localStorage.setItem(`cdl-dismissed-apps-${user!.id}`, JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  const switchTab = (tab: Tab) => {
+    setActiveTab(tab);
+    if (tab === "applications") {
+      localStorage.setItem(`cdl-apps-seen-${user!.id}`, new Date().toISOString());
+      qc.invalidateQueries({ queryKey: ["driver-update-count", user!.id] });
+    }
+  };
+
+  const tabs: { id: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
     { id: "overview",      label: "Overview",        icon: <BarChart3 className="h-4 w-4" /> },
-    { id: "applications",  label: `My Applications (${totalApps})`, icon: <Briefcase className="h-4 w-4" /> },
+    { id: "applications",  label: `My Applications (${totalApps})`, icon: <Briefcase className="h-4 w-4" />, badge: unseenUpdates },
     { id: "saved",         label: `Saved Jobs (${savedCount})`,     icon: <Bookmark className="h-4 w-4" /> },
     { id: "profile",       label: "My Profile",      icon: <User className="h-4 w-4" /> },
   ];
@@ -214,11 +253,25 @@ const DriverDashboardInner = () => {
         </div>
 
         {/* Tab bar */}
+        {/* Update notification banner */}
+        {unseenUpdates > 0 && (
+          <button
+            onClick={() => switchTab("applications")}
+            className="w-full flex items-center gap-3 px-5 py-3 mb-6 bg-primary/10 border border-primary/30 hover:bg-primary/15 transition-colors text-left"
+          >
+            <Bell className="h-5 w-5 text-primary shrink-0" />
+            <span className="text-sm font-medium text-foreground">
+              {unseenUpdates} application{unseenUpdates > 1 ? "s" : ""} {unseenUpdates > 1 ? "have" : "has"} been updated
+            </span>
+            <span className="ml-auto text-xs text-primary font-medium">View &rarr;</span>
+          </button>
+        )}
+
         <div className="flex gap-1 border-b border-border mb-6 overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => switchTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                 activeTab === tab.id
                   ? "border-primary text-primary"
@@ -227,6 +280,11 @@ const DriverDashboardInner = () => {
             >
               {tab.icon}
               {tab.label}
+              {tab.badge && tab.badge > 0 ? (
+                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white px-1">
+                  {tab.badge}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
@@ -272,15 +330,25 @@ const DriverDashboardInner = () => {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {applications.slice(0, 3).map((app) => (
-                    <div key={app.id} className="border border-border bg-card px-4 py-3 flex items-center justify-between gap-3">
+                  {applications.slice(0, 3).map((app) => {
+                    const unseen = isAppUnseen(app);
+                    return (
+                    <div
+                      key={app.id}
+                      className={`relative border bg-card px-4 py-3 flex items-center justify-between gap-3 ${unseen ? "cursor-pointer" : ""} ${unseen ? "border-primary/50" : "border-border"}`}
+                      onClick={unseen ? () => dismissApp(app.id) : undefined}
+                    >
+                      {unseen && (
+                        <span className="absolute -top-1.5 -right-1.5 h-3 w-3 rounded-full bg-red-500 border-2 border-background" />
+                      )}
                       <div className="min-w-0">
                         <p className="font-medium text-sm truncate">{app.jobTitle && app.jobTitle !== "General Application" ? app.jobTitle : app.companyName}</p>
                         <p className="text-xs text-muted-foreground">{app.companyName} &middot; {formatRelativeDate(app.submittedAt)}</p>
                       </div>
                       <StageBadge stage={app.pipeline_stage} />
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -305,24 +373,56 @@ const DriverDashboardInner = () => {
                 My Applications ({totalApps})
               </h2>
             </div>
+
+            {/* Stage filter */}
+            {applications.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {(["All", "New", "Reviewing", "Interview", "Hired", "Rejected"] as const).map((stage) => {
+                  const count = stage === "All" ? applications.length : applications.filter((a) => a.pipeline_stage === stage).length;
+                  const isActive = stageFilter === stage;
+                  return (
+                    <button
+                      key={stage}
+                      onClick={() => setStageFilter(stage)}
+                      className={`text-xs font-medium px-3 py-1.5 border transition-colors ${
+                        isActive
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                      }`}
+                    >
+                      {stage === "Rejected" ? "Not Moving Forward" : stage} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             {applications.length === 0 ? (
               <div className="border border-border bg-card p-12 text-center text-sm text-muted-foreground">
                 <Truck className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
                 <p className="mb-4">You haven't submitted any applications yet.</p>
                 <Button asChild><Link to="/jobs">Browse Jobs</Link></Button>
               </div>
+            ) : filteredApps.length === 0 ? (
+              <div className="border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+                No applications with status "{stageFilter === "Rejected" ? "Not Moving Forward" : stageFilter}".
+              </div>
             ) : (
               <div className="space-y-3">
-                {applications.map((app) => {
+                {filteredApps.map((app) => {
                   const isExpanded = expandedApp === app.id;
+                  const unseen = isAppUnseen(app);
                   const displayTitle = app.jobTitle && app.jobTitle !== "General Application"
                     ? app.jobTitle
                     : "General Application";
                   return (
-                    <div key={app.id} className="border border-border bg-card">
+                    <div key={app.id} className={`relative border bg-card ${unseen ? "border-primary/50" : "border-border"}`}>
+                      {unseen && (
+                        <span className="absolute -top-1.5 -right-1.5 h-3 w-3 rounded-full bg-red-500 border-2 border-background" />
+                      )}
                       <div
                         className="px-4 py-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-muted/30 transition-colors"
-                        onClick={() => setExpandedApp(isExpanded ? null : app.id)}
+                        onClick={() => { if (unseen) dismissApp(app.id); setExpandedApp(isExpanded ? null : app.id); }}
                       >
                         <div className="min-w-0 flex-1">
                           <p className="font-medium text-sm">{displayTitle}</p>
@@ -474,6 +574,18 @@ const DriverDashboardInner = () => {
                   <Input value={cdlNumber} onChange={(e) => setCdlNumber(e.target.value)} placeholder="CDL-XX-000000" />
                 </div>
                 <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Driver Type</Label>
+                  <Select value={driverType} onValueChange={setDriverType}>
+                    <SelectTrigger><SelectValue placeholder="Select driver type" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="company">Company Driver</SelectItem>
+                      <SelectItem value="owner-operator">Owner Operator</SelectItem>
+                      <SelectItem value="lease">Lease Operator</SelectItem>
+                      <SelectItem value="student">Student / Trainee</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Zip Code</Label>
                   <Input value={zipCode} onChange={(e) => setZipCode(e.target.value)} placeholder="00000" />
                 </div>
@@ -506,7 +618,7 @@ const DriverDashboardInner = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1 sm:col-span-2">
+                <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">License State</Label>
                   <Select value={licenseState} onValueChange={setLicenseState}>
                     <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>

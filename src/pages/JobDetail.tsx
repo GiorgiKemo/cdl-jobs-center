@@ -34,6 +34,22 @@ const JobDetail = () => {
     enabled: !!job?.companyId,
   });
 
+  // Check if current driver already applied to this job
+  const isDriver = user?.role === "driver";
+  const { data: hasApplied = false } = useQuery({
+    queryKey: ["has-applied-job", user?.id, id],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("applications")
+        .select("*", { count: "exact", head: true })
+        .eq("driver_id", user!.id)
+        .eq("job_id", id!);
+      if (error) return false;
+      return (count ?? 0) > 0;
+    },
+    enabled: !!isDriver && !!id,
+  });
+
   useEffect(() => {
     if (!isLoading && !job) {
       toast.error("Job not found.");
@@ -118,9 +134,15 @@ const JobDetail = () => {
 
             {/* Apply button */}
             <div className="shrink-0">
-              <Button onClick={handleApplyClick} size="lg">
-                Submit an Application
-              </Button>
+              {hasApplied ? (
+                <Button variant="outline" size="lg" disabled>
+                  Already Applied
+                </Button>
+              ) : (
+                <Button onClick={handleApplyClick} size="lg">
+                  Submit an Application
+                </Button>
+              )}
             </div>
           </div>
         </div>

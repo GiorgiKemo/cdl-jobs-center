@@ -1,10 +1,12 @@
 import { useState, useEffect, ReactNode } from "react";
 import { AuthContext, User } from "./auth";
 import { supabase } from "@/lib/supabase";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   const loadProfile = async (userId: string, userEmail: string) => {
     // Retry up to 4 times with 600ms delay — the DB trigger that creates the
@@ -81,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    queryClient.clear();
   };
 
   return (

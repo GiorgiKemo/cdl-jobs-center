@@ -11,7 +11,7 @@ import { useAuth } from "@/context/auth";
 import { useJobs } from "@/hooks/useJobs";
 import { Job } from "@/data/jobs";
 import { toast } from "sonner";
-import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload } from "lucide-react";
+import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload, Bell } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -319,7 +319,7 @@ const DashboardInner = () => {
         .from("applications")
         .select("*")
         .eq("company_id", user!.id)
-        .order("submitted_at", { ascending: false });
+        .order("updated_at", { ascending: false });
       if (error) throw error;
       return (data ?? []).map(rowToApp);
     },
@@ -416,7 +416,7 @@ const DashboardInner = () => {
     // Persist to DB
     const { error } = await supabase
       .from("applications")
-      .update({ pipeline_stage: stage })
+      .update({ pipeline_stage: stage, updated_at: new Date().toISOString() })
       .eq("id", appId);
     if (error) {
       toast.error("Failed to update stage.");
@@ -437,9 +437,11 @@ const DashboardInner = () => {
     e.target.value = "";
   };
 
+  const [savingProfile, setSavingProfile] = useState(false);
   const handleSaveProfile = async () => {
+    setSavingProfile(true);
     try {
-      const { error } = await supabase.from("company_profiles").upsert({
+      const payload = {
         id: user!.id,
         company_name: profileName,
         email: profileEmail,
@@ -447,19 +449,34 @@ const DashboardInner = () => {
         address: profileAddress,
         about: profileAbout,
         website: profileWebsite,
-        logo_url: profileLogo || null,
+        logo_url: profileLogo || "",
         updated_at: new Date().toISOString(),
-      });
-      if (error) throw error;
+      };
+      const { error } = await supabase.from("company_profiles").upsert(payload);
+      if (error) {
+        console.error("Save profile error:", error, "payload:", payload);
+        throw error;
+      }
       toast.success("Profile saved.");
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to save profile.");
+      const msg = err instanceof Error
+        ? err.message
+        : (err as { message?: string })?.message ?? "Failed to save profile.";
+      console.error("Save profile catch:", err);
+      toast.error(msg);
+    } finally {
+      setSavingProfile(false);
     }
   };
 
   const switchTab = (tab: Tab) => {
     setActiveTab(tab);
-    if (tab === "applications") setAppPage(0);
+    if (tab === "applications" || tab === "pipeline") {
+      setAppPage(0);
+      // Mark all current applications as "seen" so the navbar badge clears
+      localStorage.setItem(`cdl-apps-seen-${user!.id}`, new Date().toISOString());
+      qc.invalidateQueries({ queryKey: ["new-app-count", user!.id] });
+    }
   };
 
   const tabClass = (tab: Tab) =>
@@ -486,6 +503,25 @@ const DashboardInner = () => {
           <p className="text-sm opacity-70 mt-0.5">Company Dashboard</p>
         </div>
 
+        {/* New applications banner */}
+        {(() => {
+          const lastSeen = localStorage.getItem(`cdl-apps-seen-${user!.id}`) ?? "1970-01-01T00:00:00Z";
+          const unseenCount = applications.filter((a) => a.submittedAt > lastSeen).length;
+          if (unseenCount === 0) return null;
+          return (
+            <button
+              onClick={() => switchTab("applications")}
+              className="w-full flex items-center gap-3 px-5 py-3 mb-6 bg-primary/10 border border-primary/30 hover:bg-primary/15 transition-colors text-left"
+            >
+              <Bell className="h-5 w-5 text-primary shrink-0" />
+              <span className="text-sm font-medium text-foreground">
+                You have {unseenCount} new application{unseenCount > 1 ? "s" : ""} waiting for review
+              </span>
+              <span className="ml-auto text-xs text-primary font-medium">View &rarr;</span>
+            </button>
+          );
+        })()}
+
         {/* Tab bar */}
         <div className="border-b border-border mb-6 flex overflow-x-auto">
           <button className={tabClass("jobs")} onClick={() => switchTab("jobs")}>
@@ -493,6 +529,16 @@ const DashboardInner = () => {
           </button>
           <button className={tabClass("applications")} onClick={() => switchTab("applications")}>
             Applications ({applications.length})
+            {(() => {
+              const lastSeen = localStorage.getItem(`cdl-apps-seen-${user!.id}`) ?? "1970-01-01T00:00:00Z";
+              const unseen = applications.filter((a) => a.submittedAt > lastSeen).length;
+              if (unseen === 0) return null;
+              return (
+                <span className="ml-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white px-1">
+                  {unseen}
+                </span>
+              );
+            })()}
           </button>
           <button className={tabClass("pipeline")} onClick={() => switchTab("pipeline")}>
             Pipeline ({applications.length})
@@ -839,7 +885,7 @@ const DashboardInner = () => {
                     rows={5} className="resize-none" />
                 </div>
               </div>
-              <Button onClick={handleSaveProfile} className="px-8">Save Changes</Button>
+              <Button onClick={handleSaveProfile} disabled={savingProfile} className="px-8">{savingProfile ? "Saving…" : "Save Changes"}</Button>
             </div>
           </div>
         )}

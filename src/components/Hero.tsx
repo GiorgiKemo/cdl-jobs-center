@@ -2,11 +2,14 @@ import { motion } from "framer-motion";
 import { ArrowRight, Shield, Zap, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/context/auth";
 
 const heroImage = "/hero-truck.jpg";
 const heroVideo = "/mainvideo.mp4";
 
 const Hero = () => {
+  const { user } = useAuth();
+  const isCompany = user?.role === "company";
   return (
     <section className="relative overflow-hidden bg-secondary min-h-[90vh] flex items-center">
       {/* Background image */}
@@ -33,7 +36,7 @@ const Hero = () => {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-6"
             >
               <Zap className="h-4 w-4" />
-              AI-Powered Job Matching
+              {isCompany ? "AI-Powered Driver Matching" : "AI-Powered Job Matching"}
             </motion.div>
 
             <motion.h1
@@ -42,8 +45,8 @@ const Hero = () => {
               transition={{ duration: 0.6, delay: 0.1 }}
               className="font-display text-5xl md:text-7xl font-bold text-secondary-foreground leading-tight mb-6"
             >
-              Find the Trucking Job{" "}
-              <span className="text-gradient">You Deserve</span>
+              {isCompany ? "Find the CDL Drivers " : "Find the Trucking Job "}
+              <span className="text-gradient">{isCompany ? "You Need" : "You Deserve"}</span>
             </motion.h1>
 
             <motion.p
@@ -52,8 +55,9 @@ const Hero = () => {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="text-lg md:text-xl text-muted-foreground mb-8 max-w-lg"
             >
-              Apply once, get matched with top carriers instantly. Over 2,000
-              drivers placed and counting.
+              {isCompany
+                ? "Post once, get matched with qualified CDL drivers instantly. Over 150 carriers trust us."
+                : "Apply once, get matched with top carriers instantly. Over 2,000 drivers placed and counting."}
             </motion.p>
 
             <motion.div
@@ -67,8 +71,8 @@ const Hero = () => {
                 className="text-lg px-8 glow-orange group"
                 asChild
               >
-                <Link to="/apply">
-                  Apply Now
+                <Link to={isCompany ? "/dashboard" : "/apply"}>
+                  {isCompany ? "Post a Job" : "Apply Now"}
                   <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </Button>
@@ -78,7 +82,7 @@ const Hero = () => {
                 className="text-lg px-8 border-border/50 text-secondary-foreground hover:bg-muted/20 hover:text-secondary-foreground"
                 asChild
               >
-                <Link to="/jobs">Browse Jobs</Link>
+                <Link to={isCompany ? "/drivers" : "/jobs"}>{isCompany ? "Browse Drivers" : "Browse Jobs"}</Link>
               </Button>
             </motion.div>
 
@@ -91,11 +95,11 @@ const Hero = () => {
             >
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Shield className="h-5 w-5 text-primary" />
-                <span className="text-sm">Verified Companies</span>
+                <span className="text-sm">{isCompany ? "Verified Drivers" : "Verified Companies"}</span>
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Users className="h-5 w-5 text-primary" />
-                <span className="text-sm">2,000+ Drivers Placed</span>
+                <span className="text-sm">{isCompany ? "150+ Partner Companies" : "2,000+ Drivers Placed"}</span>
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Zap className="h-5 w-5 text-primary" />

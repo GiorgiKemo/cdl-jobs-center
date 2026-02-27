@@ -6,6 +6,7 @@ export interface DriverProfile {
   lastName: string;
   phone: string;
   cdlNumber: string;
+  driverType: string;
   licenseClass: string;
   yearsExp: string;
   licenseState: string;
@@ -33,6 +34,7 @@ export function useDriverProfile(driverId: string) {
         lastName: data.last_name ?? "",
         phone: data.phone ?? "",
         cdlNumber: data.cdl_number ?? "",
+        driverType: data.driver_type ?? "",
         licenseClass: data.license_class ?? "",
         yearsExp: data.years_exp ?? "",
         licenseState: data.license_state ?? "",
@@ -52,6 +54,7 @@ export function useDriverProfile(driverId: string) {
         last_name: profile.lastName,
         phone: profile.phone,
         cdl_number: profile.cdlNumber,
+        driver_type: profile.driverType,
         license_class: profile.licenseClass,
         years_exp: profile.yearsExp,
         license_state: profile.licenseState,

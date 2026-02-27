@@ -106,6 +106,7 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
     setCdlNumber(prev => prev || profile.cdlNumber);
     setLicenseClass(prev => prev || profile.licenseClass);
     setYearsExp(prev => prev || profile.yearsExp);
+    setDriverType(prev => prev || profile.driverType);
     setLicenseState(prev => prev || profile.licenseState);
     setZipCode(prev => prev || profile.zipCode);
     setDate(prev => prev || profile.dateOfBirth);
