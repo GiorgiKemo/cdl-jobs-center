@@ -171,7 +171,7 @@ const Jobs = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <div className="container mx-auto py-6">
+      <main className="container mx-auto py-6">
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-4">
           <Link to="/" className="text-primary hover:underline">Main</Link>
@@ -295,7 +295,7 @@ const Jobs = () => {
               filtered.map((job) => (
                 <div key={job.id} className="border border-border bg-card p-5 flex flex-col sm:flex-row gap-4">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-display font-semibold text-lg text-primary mb-1">{job.company}</h3>
+                    <h2 className="font-display font-semibold text-lg text-primary mb-1">{job.company}</h2>
                     <hr className="border-border mb-3" />
                     <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">{job.description}</p>
                   </div>
@@ -320,7 +320,7 @@ const Jobs = () => {
             )}
           </div>
         </div>
-      </div>
+      </main>
 
       <Footer />
     </div>

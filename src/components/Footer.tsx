@@ -9,7 +9,7 @@ const Footer = () => {
 
           {/* For Drivers */}
           <div>
-            <h4 className="font-display font-semibold text-secondary-foreground mb-4">For Drivers</h4>
+            <h3 className="font-display font-semibold text-secondary-foreground mb-4">For Drivers</h3>
             <div className="flex flex-col gap-2">
               {[
                 { label: "Trucking Job", path: "/jobs" },
@@ -27,7 +27,7 @@ const Footer = () => {
 
           {/* For Companies */}
           <div>
-            <h4 className="font-display font-semibold text-secondary-foreground mb-4">For Companies</h4>
+            <h3 className="font-display font-semibold text-secondary-foreground mb-4">For Companies</h3>
             <div className="flex flex-col gap-2">
               {[
                 { label: "Company Login", path: "/signin" },
@@ -45,32 +45,34 @@ const Footer = () => {
 
           {/* About + Follow Us */}
           <div>
-            <h4 className="font-display font-semibold text-secondary-foreground mb-4">About</h4>
+            <h3 className="font-display font-semibold text-secondary-foreground mb-4">About</h3>
             <p className="text-sm text-muted-foreground mb-6">CDL Job Center © - 2022</p>
-            <h4 className="font-display font-semibold text-secondary-foreground mb-3">Follow Us</h4>
+            <h3 className="font-display font-semibold text-secondary-foreground mb-3">Follow Us</h3>
             <div className="flex items-center gap-3">
               <a
                 href="https://www.facebook.com/people/CDL-Jobs-Center/100087223489567/"
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="Follow CDL Jobs Center on Facebook"
                 className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-all"
               >
-                <Facebook className="h-4 w-4" />
+                <Facebook className="h-4 w-4" aria-hidden="true" />
               </a>
               <a
                 href="https://www.instagram.com/cdljobscenter/"
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="Follow CDL Jobs Center on Instagram"
                 className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-all"
               >
-                <Instagram className="h-4 w-4" />
+                <Instagram className="h-4 w-4" aria-hidden="true" />
               </a>
             </div>
           </div>
 
           {/* Contact Us */}
           <div>
-            <h4 className="font-display font-semibold text-secondary-foreground mb-4">Contact Us</h4>
+            <h3 className="font-display font-semibold text-secondary-foreground mb-4">Contact Us</h3>
             <div className="flex flex-col gap-3">
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
                 <MapPin className="h-4 w-4 mt-0.5 shrink-0" />

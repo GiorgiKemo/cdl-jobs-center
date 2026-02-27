@@ -16,6 +16,7 @@ const Companies = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+      <main>
       <section className="py-20 bg-secondary">
         <div className="container mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center max-w-2xl mx-auto">
@@ -45,7 +46,7 @@ const Companies = () => {
                     {c.name.charAt(0)}
                   </div>
                   <div>
-                    <h3 className="font-display text-xl font-semibold">{c.name}</h3>
+                    <h2 className="font-display text-xl font-semibold">{c.name}</h2>
                     <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{c.location}</span>
                       <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{c.drivers}+ drivers</span>
@@ -76,6 +77,7 @@ const Companies = () => {
           </div>
         </div>
       </section>
+      </main>
       <Footer />
     </div>
   );

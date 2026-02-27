@@ -28,7 +28,7 @@
     --secondary-foreground: 220 100% 15%;
 
     --muted: 220 30% 94%;
-    --muted-foreground: 220 20% 50%;
+    --muted-foreground: 220 20% 38%;  /* Darkened for WCAG AA contrast on white */
 
     --accent: 352 68% 42%;            /* Old Glory Red #B22234 */
     --accent-foreground: 0 0% 100%;

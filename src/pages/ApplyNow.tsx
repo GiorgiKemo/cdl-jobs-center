@@ -102,7 +102,7 @@ const ApplyNow = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <div className="container mx-auto py-8 max-w-3xl">
+      <main className="container mx-auto py-8 max-w-3xl">
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-6">
           <Link to="/" className="text-primary hover:underline">Main</Link>
@@ -317,7 +317,7 @@ const ApplyNow = () => {
 
           </div>
         </form>
-      </div>
+      </main>
 
       <Footer />
     </div>

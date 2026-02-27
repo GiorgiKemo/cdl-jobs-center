@@ -18,6 +18,7 @@ const Drivers = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+      <main>
       <section className="py-20 bg-secondary">
         <div className="container mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center max-w-2xl mx-auto">
@@ -45,7 +46,7 @@ const Drivers = () => {
                 <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
                   <b.icon className="h-7 w-7 text-primary" />
                 </div>
-                <h3 className="font-display text-xl font-semibold mb-2">{b.title}</h3>
+                <h2 className="font-display text-xl font-semibold mb-2">{b.title}</h2>
                 <p className="text-muted-foreground leading-relaxed">{b.desc}</p>
               </motion.div>
             ))}
@@ -63,6 +64,7 @@ const Drivers = () => {
           </motion.div>
         </div>
       </section>
+      </main>
       <Footer />
     </div>
   );

@@ -51,7 +51,7 @@ const SignIn = () => {
       </div>
 
       {/* Form */}
-      <div className="flex-1 flex items-center justify-center py-12 px-4">
+      <main className="flex-1 flex items-center justify-center py-12 px-4">
         <div className="w-full max-w-md">
           {/* Breadcrumb */}
           <p className="text-sm text-muted-foreground mb-6">
@@ -119,7 +119,7 @@ const SignIn = () => {
             </form>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };
