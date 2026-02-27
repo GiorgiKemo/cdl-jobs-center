@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 type EasyApplyDialogProps = {
   trigger: React.ReactNode;
+  companyName?: string;
 };
 
 type OffOnToggleProps = {
@@ -40,7 +41,7 @@ const OffOnToggle = ({ checked, onChange }: OffOnToggleProps) => (
   </div>
 );
 
-const EasyApplyDialog = ({ trigger }: EasyApplyDialogProps) => {
+const EasyApplyDialog = ({ trigger, companyName = "General Application" }: EasyApplyDialogProps) => {
   const [open, setOpen] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -53,7 +54,30 @@ const EasyApplyDialog = ({ trigger }: EasyApplyDialogProps) => {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    toast.success("Application received. We'll match you with top companies.");
+    if (!firstName || !lastName || !email || !phone) {
+      toast.error("Please fill in your name, email, and phone.");
+      return;
+    }
+    const appId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const entry = {
+      id: appId, companyName,
+      firstName, lastName, email, phone, cdlNumber: cdl, driverType,
+      endorsements: { cdl: endorseCdl, ownerOperator },
+      submittedAt: new Date().toISOString(),
+    };
+    // Write to company's received applications
+    try {
+      const received = JSON.parse(localStorage.getItem("cdl-applications-received") ?? "[]");
+      received.push(entry);
+      localStorage.setItem("cdl-applications-received", JSON.stringify(received));
+    } catch {}
+    // Write to driver's own history
+    try {
+      const history = JSON.parse(localStorage.getItem("cdl-driver-applications") ?? "[]");
+      history.push(entry);
+      localStorage.setItem("cdl-driver-applications", JSON.stringify(history));
+    } catch {}
+    toast.success(`Application sent to ${companyName}!`);
     setOpen(false);
   };
 

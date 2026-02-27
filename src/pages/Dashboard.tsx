@@ -11,7 +11,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useJobs } from "@/hooks/useJobs";
 import { Job } from "@/data/jobs";
 import { toast } from "sonner";
-import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload, GripVertical } from "lucide-react";
+import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -85,7 +85,7 @@ const EMPTY_FORM = {
   status: "Active",
 };
 
-type Tab = "jobs" | "applications" | "pipeline" | "profile";
+type Tab = "jobs" | "applications" | "pipeline" | "profile" | "analytics";
 
 // ── Application card with expand/collapse ────────────────────────────────────
 const AppCard = ({ app }: { app: ReceivedApplication }) => {
@@ -157,23 +157,13 @@ const PipelineCard = ({
   return (
     <div
       ref={isDragOverlay ? undefined : setNodeRef}
-      className={`border border-border bg-card p-3 space-y-2 select-none transition-opacity ${
+      {...(!isDragOverlay ? listeners : {})}
+      {...(!isDragOverlay ? attributes : {})}
+      className={`border border-border bg-card p-3 space-y-2 select-none transition-opacity touch-none ${
         isDragging ? "opacity-30" : "opacity-100"
-      } ${isDragOverlay ? "shadow-2xl -rotate-1 opacity-95 cursor-grabbing" : ""}`}
+      } ${isDragOverlay ? "shadow-2xl -rotate-1 opacity-95 cursor-grabbing" : "cursor-grab active:cursor-grabbing"}`}
     >
       <div className="flex items-start gap-1.5">
-        {/* Drag handle */}
-        {!isDragOverlay && (
-          <button
-            {...listeners}
-            {...attributes}
-            className="cursor-grab active:cursor-grabbing mt-0.5 text-muted-foreground hover:text-foreground shrink-0 touch-none focus:outline-none"
-            tabIndex={-1}
-            aria-label="Drag to reorder"
-          >
-            <GripVertical className="h-4 w-4" />
-          </button>
-        )}
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm text-foreground leading-tight">
             {app.firstName} {app.lastName}
@@ -321,9 +311,10 @@ const Dashboard = () => {
   // Load profile settings
   useEffect(() => {
     try {
-      const stored = localStorage.getItem("cdl-company-profile");
+      const allProfiles = JSON.parse(localStorage.getItem("cdl-company-profiles") ?? "{}");
+      const stored = allProfiles[user?.name ?? ""] ?? null;
       if (stored) {
-        const p = JSON.parse(stored);
+        const p = stored;
         setProfileName(p.name ?? user?.name ?? "");
         setProfileEmail(p.email ?? user?.email ?? "");
         setProfilePhone(p.phone ?? "");
@@ -396,292 +387,6 @@ const Dashboard = () => {
     refreshJobs();
   };
 
-  const seedMockData = () => {
-    const KEY = "cdl-applications-received";
-    const existing: ReceivedApplication[] = (() => {
-      try { return JSON.parse(localStorage.getItem(KEY) ?? "[]"); } catch { return []; }
-    })();
-    // Clear any previously seeded mock data before re-seeding
-    const withoutMock = existing.filter((a) => !(a.id ?? "").startsWith("mock-"));
-    const now = Date.now();
-    const mockApps = [
-      {
-        id: `mock-1-${now}`,
-        firstName: "James", lastName: "Miller",
-        email: "james.miller@email.com", phone: "(312) 555-0142",
-        driverType: "Company Driver", yearsExp: "5+",
-        licenseClass: "a", licenseState: "Illinois",
-        cdlNumber: "CDL-IL-482931", soloTeam: "Solo",
-        notes: "Looking for steady OTR runs with good home time.",
-        prefs: { betterPay: true, betterHomeTime: true, healthInsurance: false, bonuses: false, newEquipment: true },
-        endorse: { doublesTriples: false, hazmat: true, tankVehicles: false, tankerHazmat: false },
-        hauler: { box: false, carHaul: false, dropAndHook: true, dryBulk: false, dryVan: true, flatbed: false, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: false, refrigerated: false, tanker: false },
-        route: { dedicated: false, local: false, ltl: false, otr: true, regional: false },
-        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: true },
-        companyName: user.name,
-        submittedAt: new Date(now - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: `mock-2-${now}`,
-        firstName: "Sandra", lastName: "Torres",
-        email: "storres@trucking.net", phone: "(713) 555-0889",
-        driverType: "Owner Operator", yearsExp: "3-5",
-        licenseClass: "a", licenseState: "Texas",
-        cdlNumber: "CDL-TX-773021", soloTeam: "Solo",
-        notes: "Own my Peterbilt 579, looking for good freight lanes in TX/OK.",
-        prefs: { betterPay: true, betterHomeTime: false, healthInsurance: false, bonuses: true, newEquipment: false },
-        endorse: { doublesTriples: false, hazmat: false, tankVehicles: true, tankerHazmat: false },
-        hauler: { box: false, carHaul: false, dropAndHook: false, dryBulk: false, dryVan: false, flatbed: true, hopperBottom: false, intermodal: false, oilField: true, oversizeLoad: false, refrigerated: false, tanker: false },
-        route: { dedicated: true, local: false, ltl: false, otr: false, regional: true },
-        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: false },
-        companyName: user.name,
-        submittedAt: new Date(now - 6 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: `mock-3-${now}`,
-        firstName: "Derek", lastName: "Nguyen",
-        email: "d.nguyen@gmail.com", phone: "(562) 555-0317",
-        driverType: "Student", yearsExp: "none",
-        licenseClass: "permit", licenseState: "California",
-        cdlNumber: "", soloTeam: "Solo",
-        notes: "Just finished CDL school, very motivated and ready to learn.",
-        prefs: { betterPay: false, betterHomeTime: false, healthInsurance: true, bonuses: false, newEquipment: false },
-        endorse: { doublesTriples: false, hazmat: false, tankVehicles: false, tankerHazmat: false },
-        hauler: { box: false, carHaul: false, dropAndHook: false, dryBulk: false, dryVan: true, flatbed: false, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: false, refrigerated: false, tanker: false },
-        route: { dedicated: false, local: true, ltl: false, otr: false, regional: true },
-        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: true },
-        companyName: user.name,
-        submittedAt: new Date(now - 1 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: `mock-4-${now}`,
-        firstName: "Marcus", lastName: "Johnson",
-        email: "mjohnson@roadrunner.com", phone: "(404) 555-0654",
-        driverType: "Company Driver", yearsExp: "1-3",
-        licenseClass: "a", licenseState: "Georgia",
-        cdlNumber: "CDL-GA-118842", soloTeam: "Team",
-        notes: "Currently driving for a small carrier but looking for better benefits and consistent miles.",
-        prefs: { betterPay: true, betterHomeTime: false, healthInsurance: true, bonuses: true, newEquipment: false },
-        endorse: { doublesTriples: true, hazmat: false, tankVehicles: false, tankerHazmat: false },
-        hauler: { box: false, carHaul: false, dropAndHook: true, dryBulk: false, dryVan: true, flatbed: false, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: false, refrigerated: true, tanker: false },
-        route: { dedicated: false, local: false, ltl: false, otr: true, regional: false },
-        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: false },
-        companyName: user.name,
-        submittedAt: new Date(now - 9 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: `mock-5-${now}`,
-        firstName: "Angela", lastName: "Reeves",
-        email: "angela.reeves@yahoo.com", phone: "(901) 555-0223",
-        driverType: "Company Driver", yearsExp: "5+",
-        licenseClass: "a", licenseState: "Tennessee",
-        cdlNumber: "CDL-TN-229847", soloTeam: "Solo",
-        notes: "15 years clean record. Looking for dedicated lanes near Memphis.",
-        prefs: { betterPay: false, betterHomeTime: true, healthInsurance: true, bonuses: false, newEquipment: true },
-        endorse: { doublesTriples: false, hazmat: true, tankVehicles: true, tankerHazmat: false },
-        hauler: { box: false, carHaul: false, dropAndHook: false, dryBulk: false, dryVan: true, flatbed: false, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: false, refrigerated: true, tanker: false },
-        route: { dedicated: true, local: true, ltl: false, otr: false, regional: true },
-        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: true },
-        companyName: user.name,
-        submittedAt: new Date(now - 12 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-    ];
-
-    const extraApps = [
-      {
-        id: `mock-6-${now}`,
-        firstName: "Tyler", lastName: "Brooks",
-        email: "tbrooks@freight.com", phone: "(214) 555-0761",
-        driverType: "Company Driver", yearsExp: "3-5",
-        licenseClass: "a", licenseState: "Texas",
-        cdlNumber: "CDL-TX-904112", soloTeam: "Solo",
-        notes: "Looking to move from regional to OTR for better pay.",
-        prefs: { betterPay: true, betterHomeTime: false, healthInsurance: true, bonuses: false, newEquipment: false },
-        endorse: { doublesTriples: false, hazmat: false, tankVehicles: false, tankerHazmat: false },
-        hauler: { box: false, carHaul: false, dropAndHook: true, dryBulk: false, dryVan: true, flatbed: false, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: false, refrigerated: false, tanker: false },
-        route: { dedicated: false, local: false, ltl: false, otr: true, regional: true },
-        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: false },
-        companyName: user.name,
-        submittedAt: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: `mock-7-${now}`,
-        firstName: "Maria", lastName: "Castillo",
-        email: "m.castillo@yahoo.com", phone: "(915) 555-0283",
-        driverType: "Owner Operator", yearsExp: "5+",
-        licenseClass: "a", licenseState: "New Mexico",
-        cdlNumber: "CDL-NM-336790", soloTeam: "Solo",
-        notes: "15+ years experience. Own a 2022 Kenworth T680. Looking for consistent freight.",
-        prefs: { betterPay: true, betterHomeTime: true, healthInsurance: false, bonuses: true, newEquipment: false },
-        endorse: { doublesTriples: false, hazmat: true, tankVehicles: true, tankerHazmat: false },
-        hauler: { box: false, carHaul: false, dropAndHook: false, dryBulk: true, dryVan: false, flatbed: false, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: false, refrigerated: false, tanker: true },
-        route: { dedicated: true, local: false, ltl: false, otr: true, regional: false },
-        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: true },
-        companyName: user.name,
-        submittedAt: new Date(now - 4 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: `mock-8-${now}`,
-        firstName: "Kevin", lastName: "Walsh",
-        email: "kwalsh@roadway.net", phone: "(617) 555-0498",
-        driverType: "Company Driver", yearsExp: "1-3",
-        licenseClass: "a", licenseState: "Massachusetts",
-        cdlNumber: "CDL-MA-551203", soloTeam: "Either",
-        notes: "Military veteran, very disciplined and punctual. Prefer dedicated lanes.",
-        prefs: { betterPay: false, betterHomeTime: true, healthInsurance: true, bonuses: false, newEquipment: true },
-        endorse: { doublesTriples: true, hazmat: false, tankVehicles: false, tankerHazmat: false },
-        hauler: { box: false, carHaul: false, dropAndHook: true, dryBulk: false, dryVan: true, flatbed: false, hopperBottom: false, intermodal: true, oilField: false, oversizeLoad: false, refrigerated: false, tanker: false },
-        route: { dedicated: true, local: false, ltl: true, otr: false, regional: true },
-        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: true },
-        companyName: user.name,
-        submittedAt: new Date(now - 5 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: `mock-9-${now}`,
-        firstName: "Darnell", lastName: "Washington",
-        email: "d.washington@truckermail.com", phone: "(404) 555-0112",
-        driverType: "Company Driver", yearsExp: "5+",
-        licenseClass: "a", licenseState: "Georgia",
-        cdlNumber: "CDL-GA-882044", soloTeam: "Solo",
-        notes: "10 years OTR, clean MVR. Ready for immediate start.",
-        prefs: { betterPay: true, betterHomeTime: false, healthInsurance: true, bonuses: true, newEquipment: false },
-        endorse: { doublesTriples: false, hazmat: true, tankVehicles: false, tankerHazmat: false },
-        hauler: { box: false, carHaul: false, dropAndHook: false, dryBulk: false, dryVan: true, flatbed: true, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: false, refrigerated: false, tanker: false },
-        route: { dedicated: false, local: false, ltl: false, otr: true, regional: false },
-        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: false },
-        companyName: user.name,
-        submittedAt: new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: `mock-10-${now}`,
-        firstName: "Heather", lastName: "Simmons",
-        email: "hsimmons@gmail.com", phone: "(502) 555-0664",
-        driverType: "Student", yearsExp: "none",
-        licenseClass: "permit", licenseState: "Kentucky",
-        cdlNumber: "", soloTeam: "Solo",
-        notes: "Currently enrolled in CDL training, graduating next month. Very eager.",
-        prefs: { betterPay: false, betterHomeTime: true, healthInsurance: true, bonuses: false, newEquipment: false },
-        endorse: { doublesTriples: false, hazmat: false, tankVehicles: false, tankerHazmat: false },
-        hauler: { box: false, carHaul: false, dropAndHook: false, dryBulk: false, dryVan: true, flatbed: false, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: false, refrigerated: false, tanker: false },
-        route: { dedicated: false, local: true, ltl: false, otr: false, regional: true },
-        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: true },
-        companyName: user.name,
-        submittedAt: new Date(now - 8 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: `mock-11-${now}`,
-        firstName: "Bobby", lastName: "Nguyen",
-        email: "bobby.n@fastfreight.com", phone: "(713) 555-0329",
-        driverType: "Owner Operator", yearsExp: "3-5",
-        licenseClass: "a", licenseState: "Texas",
-        cdlNumber: "CDL-TX-447821", soloTeam: "Solo",
-        notes: "Leasing a 2020 Freightliner Cascadia, looking for steady loads.",
-        prefs: { betterPay: true, betterHomeTime: false, healthInsurance: false, bonuses: true, newEquipment: false },
-        endorse: { doublesTriples: false, hazmat: false, tankVehicles: false, tankerHazmat: false },
-        hauler: { box: false, carHaul: false, dropAndHook: true, dryBulk: false, dryVan: true, flatbed: false, hopperBottom: false, intermodal: false, oilField: true, oversizeLoad: false, refrigerated: false, tanker: false },
-        route: { dedicated: false, local: false, ltl: false, otr: true, regional: true },
-        extra: { leasePurchase: true, accidents: false, suspended: false, newsletters: false },
-        companyName: user.name,
-        submittedAt: new Date(now - 10 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: `mock-12-${now}`,
-        firstName: "Patricia", lastName: "Evans",
-        email: "patricia.evans@email.com", phone: "(901) 555-0887",
-        driverType: "Company Driver", yearsExp: "5+",
-        licenseClass: "a", licenseState: "Tennessee",
-        cdlNumber: "CDL-TN-663910", soloTeam: "Either",
-        notes: "Experienced reefer driver, prefer Southeast lanes.",
-        prefs: { betterPay: false, betterHomeTime: true, healthInsurance: true, bonuses: false, newEquipment: true },
-        endorse: { doublesTriples: false, hazmat: false, tankVehicles: false, tankerHazmat: false },
-        hauler: { box: false, carHaul: false, dropAndHook: false, dryBulk: false, dryVan: false, flatbed: false, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: false, refrigerated: true, tanker: false },
-        route: { dedicated: true, local: false, ltl: false, otr: false, regional: true },
-        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: true },
-        companyName: user.name,
-        submittedAt: new Date(now - 11 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: `mock-13-${now}`,
-        firstName: "Carlos", lastName: "Rivera",
-        email: "c.rivera@trucking.us", phone: "(305) 555-0541",
-        driverType: "Company Driver", yearsExp: "1-3",
-        licenseClass: "a", licenseState: "Florida",
-        cdlNumber: "CDL-FL-229047", soloTeam: "Solo",
-        notes: "Bilingual (English/Spanish). 2 years flatbed experience.",
-        prefs: { betterPay: true, betterHomeTime: false, healthInsurance: true, bonuses: false, newEquipment: false },
-        endorse: { doublesTriples: false, hazmat: false, tankVehicles: false, tankerHazmat: false },
-        hauler: { box: false, carHaul: false, dropAndHook: false, dryBulk: false, dryVan: false, flatbed: true, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: true, refrigerated: false, tanker: false },
-        route: { dedicated: false, local: false, ltl: false, otr: true, regional: true },
-        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: false },
-        companyName: user.name,
-        submittedAt: new Date(now - 13 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: `mock-14-${now}`,
-        firstName: "Nathan", lastName: "Price",
-        email: "nprice@midwest.net", phone: "(312) 555-0978",
-        driverType: "Company Driver", yearsExp: "3-5",
-        licenseClass: "a", licenseState: "Illinois",
-        cdlNumber: "CDL-IL-774503", soloTeam: "Team",
-        notes: "Have a reliable co-driver. Prefer team runs coast to coast.",
-        prefs: { betterPay: true, betterHomeTime: false, healthInsurance: false, bonuses: true, newEquipment: true },
-        endorse: { doublesTriples: true, hazmat: false, tankVehicles: false, tankerHazmat: false },
-        hauler: { box: false, carHaul: false, dropAndHook: true, dryBulk: false, dryVan: true, flatbed: false, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: false, refrigerated: false, tanker: false },
-        route: { dedicated: false, local: false, ltl: false, otr: true, regional: false },
-        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: true },
-        companyName: user.name,
-        submittedAt: new Date(now - 14 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: `mock-15-${now}`,
-        firstName: "Lisa", lastName: "Hart",
-        email: "lisa.hart@drivermail.com", phone: "(614) 555-0230",
-        driverType: "Company Driver", yearsExp: "5+",
-        licenseClass: "a", licenseState: "Ohio",
-        cdlNumber: "CDL-OH-881234", soloTeam: "Solo",
-        notes: "12 years experience, zero accidents. Specializes in hazmat tanker.",
-        prefs: { betterPay: true, betterHomeTime: true, healthInsurance: true, bonuses: false, newEquipment: false },
-        endorse: { doublesTriples: false, hazmat: true, tankVehicles: true, tankerHazmat: true },
-        hauler: { box: false, carHaul: false, dropAndHook: false, dryBulk: false, dryVan: false, flatbed: false, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: false, refrigerated: false, tanker: true },
-        route: { dedicated: false, local: false, ltl: false, otr: true, regional: true },
-        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: true },
-        companyName: user.name,
-        submittedAt: new Date(now - 15 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-    ];
-
-    const allMockApps = [...mockApps, ...extraApps];
-    localStorage.setItem(KEY, JSON.stringify([...withoutMock, ...allMockApps]));
-    setApplications([
-      ...withoutMock.filter((a) => a.companyName === user.name),
-      ...allMockApps,
-    ]);
-
-    // Seed pipeline stages for variety
-    const stagesMap: Record<string, PipelineStage> = {
-      [`mock-1-${now}`]: "Reviewing",
-      [`mock-2-${now}`]: "Interview",
-      [`mock-3-${now}`]: "New",
-      [`mock-4-${now}`]: "Hired",
-      [`mock-5-${now}`]: "New",
-      [`mock-6-${now}`]: "Reviewing",
-      [`mock-7-${now}`]: "Interview",
-      [`mock-8-${now}`]: "New",
-      [`mock-9-${now}`]: "Hired",
-      [`mock-10-${now}`]: "New",
-      [`mock-11-${now}`]: "Reviewing",
-      [`mock-12-${now}`]: "Interview",
-      [`mock-13-${now}`]: "New",
-      [`mock-14-${now}`]: "Rejected",
-      [`mock-15-${now}`]: "Hired",
-    };
-    const updatedStages = { ...pipelineStages, ...stagesMap };
-    setPipelineStages(updatedStages);
-    localStorage.setItem("cdl-pipeline-stages", JSON.stringify(updatedStages));
-
-    toast.success("15 sample applicants loaded.");
-  };
-
   const updateAppStage = (appKey: string, stage: PipelineStage) => {
     const updated = { ...pipelineStages, [appKey]: stage };
     setPipelineStages(updated);
@@ -699,10 +404,12 @@ const Dashboard = () => {
   };
 
   const handleSaveProfile = () => {
-    localStorage.setItem("cdl-company-profile", JSON.stringify({
+    const allProfiles = (() => { try { return JSON.parse(localStorage.getItem("cdl-company-profiles") ?? "{}"); } catch { return {}; } })();
+    allProfiles[user?.name ?? profileName] = {
       name: profileName, email: profileEmail, phone: profilePhone,
       address: profileAddress, about: profileAbout, website: profileWebsite,
-    }));
+    };
+    localStorage.setItem("cdl-company-profiles", JSON.stringify(allProfiles));
     const logos = JSON.parse(localStorage.getItem("cdl-company-logos") ?? "{}");
     if (profileLogo) { logos[user.name] = profileLogo; } else { delete logos[user.name]; }
     localStorage.setItem("cdl-company-logos", JSON.stringify(logos));
@@ -751,6 +458,9 @@ const Dashboard = () => {
           </button>
           <button className={tabClass("profile")} onClick={() => switchTab("profile")}>
             Company Profile
+          </button>
+          <button className={tabClass("analytics")} onClick={() => switchTab("analytics")}>
+            Analytics
           </button>
         </div>
 
@@ -905,9 +615,6 @@ const Dashboard = () => {
             {applications.length === 0 ? (
               <div className="border border-border bg-card px-5 py-12 text-center text-muted-foreground text-sm">
                 <p>No applications received yet. Applications will appear here when drivers apply to your company.</p>
-                <Button variant="outline" size="sm" onClick={seedMockData} className="mt-4">
-                  Load sample data
-                </Button>
               </div>
             ) : (() => {
               const totalPages = Math.ceil(applications.length / APP_PAGE_SIZE);
@@ -952,9 +659,6 @@ const Dashboard = () => {
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <Button variant="outline" size="sm" onClick={seedMockData}>
-                  Load sample data
-                </Button>
                 {applications.length > 0 && (
                   <button
                     onClick={() => {
@@ -978,9 +682,6 @@ const Dashboard = () => {
             {applications.length === 0 ? (
               <div className="border border-border bg-card px-5 py-12 text-center text-muted-foreground text-sm">
                 <p>No applications received yet. The pipeline will show applicants as they apply.</p>
-                <Button variant="outline" size="sm" onClick={seedMockData} className="mt-4">
-                  Load sample data
-                </Button>
               </div>
             ) : (
               <DndContext
@@ -1102,6 +803,106 @@ const Dashboard = () => {
             </div>
           </div>
         )}
+
+        {/* ── Tab: Analytics ─────────────────────────────────────────────────── */}
+        {activeTab === "analytics" && (() => {
+          const total = applications.length;
+          const stageCounts = (["New", "Reviewing", "Interview", "Hired", "Rejected"] as PipelineStage[]).reduce<Record<string, number>>(
+            (acc, s) => {
+              acc[s] = applications.filter((a) => (pipelineStages[getAppKey(a)] ?? "New") === s).length;
+              return acc;
+            }, {}
+          );
+          const activeJobs = jobs.filter((j) => !j.status || j.status === "Active").length;
+          const hireRate = total > 0 ? Math.round((stageCounts["Hired"] / total) * 100) : 0;
+          const rejectRate = total > 0 ? Math.round((stageCounts["Rejected"] / total) * 100) : 0;
+
+          const StatCard = ({ label, value, sub }: { label: string; value: string | number; sub?: string }) => (
+            <div className="border border-border bg-card p-5">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{label}</p>
+              <p className="font-display font-bold text-3xl text-foreground">{value}</p>
+              {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+            </div>
+          );
+
+          return (
+            <div className="space-y-6">
+              <h2 className="font-display font-semibold text-base">Analytics Overview</h2>
+
+              {/* Summary stats */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <StatCard label="Total Applications" value={total} sub="all time" />
+                <StatCard label="Active Jobs" value={activeJobs} sub={`of ${jobs.length} total`} />
+                <StatCard label="Hire Rate" value={`${hireRate}%`} sub={`${stageCounts["Hired"]} hired`} />
+                <StatCard label="Rejection Rate" value={`${rejectRate}%`} sub={`${stageCounts["Rejected"]} rejected`} />
+              </div>
+
+              {/* Pipeline stage breakdown */}
+              <div className="border border-border bg-card p-5">
+                <p className="font-semibold text-sm mb-4">Pipeline Stage Breakdown</p>
+                <div className="space-y-3">
+                  {(["New", "Reviewing", "Interview", "Hired", "Rejected"] as PipelineStage[]).map((stage) => {
+                    const count = stageCounts[stage] ?? 0;
+                    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                    const colors: Record<string, string> = {
+                      New: "bg-slate-400",
+                      Reviewing: "bg-blue-500",
+                      Interview: "bg-yellow-500",
+                      Hired: "bg-green-500",
+                      Rejected: "bg-red-400",
+                    };
+                    return (
+                      <div key={stage}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="font-medium">{stage}</span>
+                          <span className="text-muted-foreground">{count} ({pct}%)</span>
+                        </div>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${colors[stage]}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Job status breakdown */}
+              <div className="border border-border bg-card p-5">
+                <p className="font-semibold text-sm mb-4">Job Status Breakdown</p>
+                {jobs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No jobs posted yet.</p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {(["Active", "Draft", "Paused", "Closed"] as const).map((status) => {
+                      const cnt = jobs.filter((j) => (j.status ?? "Active") === status).length;
+                      const badgeColor: Record<string, string> = {
+                        Active: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+                        Draft: "bg-muted text-muted-foreground",
+                        Paused: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+                        Closed: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+                      };
+                      return (
+                        <div key={status} className="border border-border p-3 text-center">
+                          <p className={`text-xs font-semibold px-2 py-0.5 inline-block rounded-full mb-2 ${badgeColor[status]}`}>{status}</p>
+                          <p className="font-display font-bold text-2xl">{cnt}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {total === 0 && (
+                <div className="border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+                  No data yet. Analytics will appear here as applications are received.
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </main>
       <Footer />
     </div>

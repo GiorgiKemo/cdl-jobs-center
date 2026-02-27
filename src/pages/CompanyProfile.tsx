@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -19,11 +19,23 @@ const CompanyProfile = () => {
 
   const company = COMPANIES.find((c) => c.slug === slug);
 
-  if (!company) {
-    toast.error("Company not found.");
-    navigate("/companies");
-    return null;
-  }
+  // Redirect if company not found — done in effect to avoid render-time navigation
+  useEffect(() => {
+    if (!company) {
+      toast.error("Company not found.");
+      navigate("/companies");
+    }
+  }, [company, navigate]);
+
+  // Load any dashboard-edited profile overrides for this company
+  const profileOverride = (() => {
+    try {
+      const all = JSON.parse(localStorage.getItem("cdl-company-profiles") ?? "{}");
+      return all[company?.name ?? ""] ?? null;
+    } catch { return null; }
+  })();
+
+  if (!company) return null;
 
   const handleApplyClick = () => {
     if (!user) {
@@ -66,20 +78,20 @@ const CompanyProfile = () => {
               );
             })()}
 
-            {/* Info */}
+            {/* Info — dashboard overrides take precedence over static data */}
             <div className="flex-1 min-w-0">
-              <h1 className="font-display font-bold text-primary text-lg mb-2">{company.name}</h1>
+              <h1 className="font-display font-bold text-primary text-lg mb-2">{profileOverride?.name ?? company.name}</h1>
               <p className="flex items-center gap-1.5 text-sm text-muted-foreground mb-1">
                 <Phone className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
-                {company.phone}
+                {profileOverride?.phone || company.phone}
               </p>
               <p className="flex items-start gap-1.5 text-sm text-muted-foreground mb-1">
                 <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" aria-hidden="true" />
-                {company.address}
+                {profileOverride?.address || company.address}
               </p>
-              {company.website && (
+              {(profileOverride?.website || company.website) && (
                 <a
-                  href={company.website}
+                  href={profileOverride?.website ?? company.website}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 text-sm text-primary hover:underline"
@@ -111,7 +123,7 @@ const CompanyProfile = () => {
         <div className="border border-border bg-card p-5 mb-4">
           <h2 className="font-display font-semibold text-base mb-2">About company</h2>
           <hr className="border-primary/20 mb-3" />
-          <p className="text-sm text-muted-foreground leading-relaxed">{company.about}</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">{profileOverride?.about || company.about}</p>
         </div>
 
         {/* Information panel */}

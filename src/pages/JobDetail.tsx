@@ -3,11 +3,10 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Phone, MapPin, ExternalLink, Truck } from "lucide-react";
-import { SEED_JOBS } from "@/data/jobs";
 import { useJobs } from "@/hooks/useJobs";
 import { COMPANIES } from "@/data/companies";
 import { useAuth } from "@/context/AuthContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ApplyModal } from "@/components/ApplyModal";
 import { SignInModal } from "@/components/SignInModal";
 import { toast } from "sonner";
@@ -20,14 +19,16 @@ const JobDetail = () => {
   const [applyOpen, setApplyOpen] = useState(false);
   const [signInOpen, setSignInOpen] = useState(false);
 
-  const allJobs = [...SEED_JOBS, ...loadAll()];
-  const job = allJobs.find((j) => j.id === id);
+  const job = loadAll().find((j) => j.id === id);
 
-  if (!job) {
-    toast.error("Job not found.");
-    navigate("/jobs");
-    return null;
-  }
+  useEffect(() => {
+    if (!job) {
+      toast.error("Job not found.");
+      navigate("/jobs");
+    }
+  }, [job, navigate]);
+
+  if (!job) return null;
 
   const company = COMPANIES.find(
     (c) => c.name.toLowerCase() === job.company.toLowerCase()
@@ -180,7 +181,7 @@ const JobDetail = () => {
       <Footer />
 
       {applyOpen && (
-        <ApplyModal companyName={job.company} onClose={() => setApplyOpen(false)} />
+        <ApplyModal companyName={job.company} jobId={job.id} jobTitle={job.title} onClose={() => setApplyOpen(false)} />
       )}
       {signInOpen && (
         <SignInModal onClose={() => setSignInOpen(false)} />

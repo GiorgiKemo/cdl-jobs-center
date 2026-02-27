@@ -1,12 +1,14 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link, useSearchParams } from "react-router-dom";
-import { Truck } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
-import { SEED_JOBS } from "@/data/jobs";
+import { Truck, Bookmark, BookmarkCheck, Search, Phone } from "lucide-react";
+import { useState, useMemo } from "react";
 import { useJobs } from "@/hooks/useJobs";
+import { useSavedJobs } from "@/hooks/useSavedJobs";
+import { toast } from "sonner";
 
 const urlTypeMap: Record<string, string> = {
   "dry-van": "Dry Van",
@@ -19,59 +21,95 @@ const urlTypeMap: Record<string, string> = {
   "students": "Students",
 };
 
+const PAGE_SIZE = 10;
+
 const Jobs = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { loadAll } = useJobs();
-  const allJobs = useMemo(() => [
-    ...SEED_JOBS,
-    ...loadAll().filter((j) => !j.status || j.status === "Active"),
-  ], []);
+  const savedJobs = useSavedJobs();
+  const [savedIds, setSavedIds] = useState<string[]>(() => savedJobs.load());
 
-  // Pending filter values (before Search is clicked)
-  const [pendingFreight, setPendingFreight] = useState("all");
-  const [pendingDriver, setPendingDriver] = useState("all");
-  const [pendingRoute, setPendingRoute] = useState("all");
-  const [pendingTeam, setPendingTeam] = useState("all");
+  // Load company profiles once for phone display on cards
+  const companyProfiles = useMemo<Record<string, { phone?: string }>>(() => {
+    try { return JSON.parse(localStorage.getItem("cdl-company-profiles") ?? "{}"); } catch { return {}; }
+  }, []);
 
-  // Applied filter values (after Search is clicked)
-  const [freightType, setFreightType] = useState("all");
-  const [driverType, setDriverType] = useState("all");
-  const [routeType, setRouteType] = useState("all");
-  const [teamDriving, setTeamDriving] = useState("all");
+  const allJobs = useMemo(
+    () => loadAll().filter((j) => !j.status || j.status === "Active"),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [loadAll]
+  );
 
-  // Sync freight type from URL param on load/navigation
-  useEffect(() => {
-    const typeParam = searchParams.get("type");
-    const mapped = typeParam && urlTypeMap[typeParam] ? urlTypeMap[typeParam] : "all";
-    setPendingFreight(mapped);
-    setFreightType(mapped);
-  }, [searchParams]);
+  // Initialize all filters from URL params on first render
+  const initialFreight = (() => {
+    const type = searchParams.get("type");
+    const freight = searchParams.get("freight");
+    return (type && urlTypeMap[type]) ? urlTypeMap[type] : (freight ?? "all");
+  })();
 
-  const applyFilters = () => {
-    setFreightType(pendingFreight);
-    setDriverType(pendingDriver);
-    setRouteType(pendingRoute);
-    setTeamDriving(pendingTeam);
+  const [freightType, setFreightType] = useState(initialFreight);
+  const [driverType, setDriverType] = useState(searchParams.get("driver") ?? "all");
+  const [routeType, setRouteType] = useState(searchParams.get("route") ?? "all");
+  const [teamDriving, setTeamDriving] = useState(searchParams.get("team") ?? "all");
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "");
+  const [sortBy, setSortBy] = useState("newest");
+  const [page, setPage] = useState(0);
+
+  // Sync a filter change to URL
+  const updateParam = (key: string, value: string) => {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.delete("type"); // clean up old slug format from nav links
+      if (value === "all" || value === "") p.delete(key);
+      else p.set(key, value);
+      return p;
+    }, { replace: true });
   };
 
-  const clearFilters = () => {
-    setPendingFreight("all");
-    setPendingDriver("all");
-    setPendingRoute("all");
-    setPendingTeam("all");
+  const setFreight = (v: string) => { setFreightType(v); setPage(0); updateParam("freight", v); };
+  const setDriver = (v: string) => { setDriverType(v); setPage(0); updateParam("driver", v); };
+  const setRoute = (v: string) => { setRouteType(v); setPage(0); updateParam("route", v); };
+  const setTeam = (v: string) => { setTeamDriving(v); setPage(0); updateParam("team", v); };
+  const setSearch = (v: string) => { setSearchQuery(v); setPage(0); updateParam("q", v); };
+
+  const resetFilters = () => {
     setFreightType("all");
     setDriverType("all");
     setRouteType("all");
     setTeamDriving("all");
+    setSearchQuery("");
+    setSortBy("newest");
+    setPage(0);
+    setSearchParams({}, { replace: true });
   };
 
-  const filtered = allJobs.filter((j) => {
-    const matchesFreight = freightType === "all" || j.type === freightType;
-    const matchesDriver = driverType === "all" || j.driverType === driverType;
-    const matchesRoute = routeType === "all" || j.routeType === routeType;
-    const matchesTeam = teamDriving === "all" || j.teamDriving === teamDriving;
-    return matchesFreight && matchesDriver && matchesRoute && matchesTeam;
-  });
+  const filtered = useMemo(() => {
+    let result = allJobs.filter((j) => {
+      const matchesFreight = freightType === "all" || j.type === freightType;
+      const matchesDriver = driverType === "all" || j.driverType === driverType;
+      const matchesRoute = routeType === "all" || j.routeType === routeType;
+      const matchesTeam = teamDriving === "all" || j.teamDriving === teamDriving;
+      const q = searchQuery.trim().toLowerCase();
+      const matchesSearch = !q || [j.title, j.company, j.location, j.description, j.type]
+        .some((f) => f?.toLowerCase().includes(q));
+      return matchesFreight && matchesDriver && matchesRoute && matchesTeam && matchesSearch;
+    });
+
+    if (sortBy === "company-az") result = [...result].sort((a, b) => a.company.localeCompare(b.company));
+    else if (sortBy === "company-za") result = [...result].sort((a, b) => b.company.localeCompare(a.company));
+    else if (sortBy === "title-az") result = [...result].sort((a, b) => a.title.localeCompare(b.title));
+
+    return result;
+  }, [allJobs, freightType, driverType, routeType, teamDriving, searchQuery, sortBy]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  const handleToggleSave = (id: string, company: string) => {
+    const nowSaved = savedJobs.toggle(id);
+    setSavedIds(savedJobs.load());
+    toast.success(nowSaved ? `Saved ${company}` : `Removed from saved jobs`);
+  };
 
   const pageTitle = freightType !== "all" ? freightType : "All Jobs";
 
@@ -93,9 +131,26 @@ const Jobs = () => {
           )}
         </p>
 
-        {/* Page title */}
-        <div className="flex items-center gap-3 mb-6 border-l-4 border-primary pl-3">
-          <h1 className="font-display text-2xl font-bold">{pageTitle}</h1>
+        {/* Page title + sort */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3 border-l-4 border-primary pl-3">
+            <h1 className="font-display text-2xl font-bold">{pageTitle}</h1>
+            <span className="text-sm text-muted-foreground">({filtered.length} jobs)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground hidden sm:block">Sort:</span>
+            <Select value={sortBy} onValueChange={(v) => { setSortBy(v); setPage(0); }}>
+              <SelectTrigger className="w-44 h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Default</SelectItem>
+                <SelectItem value="company-az">Company A–Z</SelectItem>
+                <SelectItem value="company-za">Company Z–A</SelectItem>
+                <SelectItem value="title-az">Title A–Z</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6 items-start">
@@ -105,10 +160,25 @@ const Jobs = () => {
               <p className="font-semibold text-sm">Filter jobs</p>
             </div>
             <div className="p-4 space-y-4">
+
+              {/* Keyword search */}
+              <div>
+                <label className="text-sm text-primary font-medium block mb-1">Search:</label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Company, title, location..."
+                    value={searchQuery}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-8 h-9 text-sm"
+                  />
+                </div>
+              </div>
+
               {/* Driver Type */}
               <div>
                 <label className="text-sm text-primary font-medium block mb-1">Driver Type:</label>
-                <Select value={pendingDriver} onValueChange={setPendingDriver}>
+                <Select value={driverType} onValueChange={setDriver}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Choose an option..." />
                   </SelectTrigger>
@@ -124,7 +194,7 @@ const Jobs = () => {
               {/* Freight Type */}
               <div>
                 <label className="text-sm text-primary font-medium block mb-1">Freight Type:</label>
-                <Select value={pendingFreight} onValueChange={setPendingFreight}>
+                <Select value={freightType} onValueChange={setFreight}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Choose an option..." />
                   </SelectTrigger>
@@ -150,7 +220,7 @@ const Jobs = () => {
               {/* Route Type */}
               <div>
                 <label className="text-sm text-primary font-medium block mb-1">Route Type:</label>
-                <Select value={pendingRoute} onValueChange={setPendingRoute}>
+                <Select value={routeType} onValueChange={setRoute}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Choose an option..." />
                   </SelectTrigger>
@@ -168,7 +238,7 @@ const Jobs = () => {
               {/* Team Driving */}
               <div>
                 <label className="text-sm text-primary font-medium block mb-1">Team Driving:</label>
-                <Select value={pendingTeam} onValueChange={setPendingTeam}>
+                <Select value={teamDriving} onValueChange={setTeam}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Choose an option..." />
                   </SelectTrigger>
@@ -181,17 +251,14 @@ const Jobs = () => {
                 </Select>
               </div>
 
-              {/* Buttons */}
-              <div className="flex gap-2 pt-2">
-                <Button onClick={applyFilters} className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90">
-                  Search
-                </Button>
+              {/* Reset button */}
+              <div className="pt-2">
                 <Button
-                  onClick={clearFilters}
+                  onClick={resetFilters}
                   variant="outline"
-                  className="flex-1 bg-amber-400 hover:bg-amber-500 text-black border-amber-400 hover:border-amber-500"
+                  className="w-full bg-amber-400 hover:bg-amber-500 text-black border-amber-400 hover:border-amber-500"
                 >
-                  Clear filter
+                  Reset Filters
                 </Button>
               </div>
             </div>
@@ -199,30 +266,90 @@ const Jobs = () => {
 
           {/* Job listings */}
           <div className="flex-1 space-y-4">
-            {filtered.length > 0 ? (
-              filtered.map((job) => (
-                <div key={job.id} className="border border-border bg-card p-5 flex flex-col sm:flex-row gap-4">
-                  <div className="flex-1 min-w-0">
-                    <h2 className="font-display font-semibold text-lg text-primary mb-1">{job.company}</h2>
-                    <hr className="border-border mb-3" />
-                    <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">{job.description}</p>
-                  </div>
-                  <div className="flex flex-col items-stretch gap-3 shrink-0 w-36">
-                    <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90 w-full">
-                      <Link to={`/jobs/${job.id}`}>View Job</Link>
-                    </Button>
-                    <div className="h-14 w-full border border-border flex items-center justify-center bg-muted/30">
-                      <Truck className="h-6 w-6 text-muted-foreground" />
+            {paginated.length > 0 ? (
+              <>
+                {paginated.map((job) => {
+                  const saved = savedIds.includes(job.id);
+                  const profile = companyProfiles[job.company];
+                  return (
+                    <div key={job.id} className="border border-border bg-card p-5 flex flex-col sm:flex-row gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-0.5">
+                          <h2 className="font-display font-semibold text-lg text-primary">{job.company}</h2>
+                          <button
+                            onClick={() => handleToggleSave(job.id, job.company)}
+                            aria-label={saved ? "Remove from saved" : "Save job"}
+                            className={`shrink-0 p-1 transition-colors ${saved ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
+                          >
+                            {saved ? <BookmarkCheck className="h-5 w-5" /> : <Bookmark className="h-5 w-5" />}
+                          </button>
+                        </div>
+                        {profile?.phone && (
+                          <p className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                            <Phone className="h-3 w-3 shrink-0" />
+                            {profile.phone}
+                          </p>
+                        )}
+                        <p className="text-sm font-medium text-foreground mb-1">{job.title}</p>
+                        <hr className="border-border mb-3" />
+                        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">{job.description}</p>
+                      </div>
+                      <div className="flex flex-col items-stretch gap-3 shrink-0 w-36">
+                        <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90 w-full">
+                          <Link to={`/jobs/${job.id}`}>View Job</Link>
+                        </Button>
+                        <div className="h-14 w-full border border-border flex items-center justify-center bg-muted/30">
+                          <Truck className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-2">
+                    <span className="text-sm text-muted-foreground">
+                      Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
+                    </span>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage((p) => p - 1)}
+                        disabled={page === 0}
+                      >
+                        Previous
+                      </Button>
+                      {Array.from({ length: totalPages }, (_, i) => (
+                        <Button
+                          key={i}
+                          variant={i === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setPage(i)}
+                          className="w-9"
+                        >
+                          {i + 1}
+                        </Button>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage((p) => p + 1)}
+                        disabled={page >= totalPages - 1}
+                      >
+                        Next
+                      </Button>
                     </div>
                   </div>
-                </div>
-              ))
+                )}
+              </>
             ) : (
               <div className="border border-border bg-card p-12 text-center">
                 <Truck className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
                 <p className="text-muted-foreground font-medium">No jobs match your filters.</p>
-                <button onClick={clearFilters} className="mt-3 text-primary text-sm underline hover:opacity-80">
-                  Clear all filters
+                <button onClick={resetFilters} className="mt-3 text-primary text-sm underline hover:opacity-80">
+                  Reset all filters
                 </button>
               </div>
             )}

@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Phone, Mail, Truck, ChevronDown, LogOut, User } from "lucide-react";
+import { Menu, X, Phone, Mail, Truck, ChevronDown, LogOut, User, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/context/AuthContext";
@@ -104,11 +104,23 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [jobsDropdownOpen, setJobsDropdownOpen] = useState(false);
   const [jobsMobileOpen, setJobsMobileOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [signInOpen, setSignInOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { isDark, toggle } = useTheme();
   const { user, signOut } = useAuth();
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleSignOut = () => {
     signOut();
@@ -141,7 +153,7 @@ const Navbar = () => {
         className="sticky top-0 z-50 glass border-b border-border/50"
       >
         <div className="container mx-auto flex items-center justify-between py-4">
-          <Link to="/" className="flex items-center gap-3">
+          <Link to="/" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
               <Truck className="h-6 w-6 text-primary-foreground" />
             </div>
@@ -154,7 +166,7 @@ const Navbar = () => {
 
           {/* Desktop links */}
           <div className="hidden lg:flex items-center gap-1">
-            {navLinks.map((link) =>
+            {navLinks.filter((link) => !(link.name === "Apply Now" && user?.role === "company") && !(link.name === "Drivers" && user?.role === "driver")).map((link) =>
               link.dropdown ? (
                 <div
                   key={link.path}
@@ -234,33 +246,45 @@ const Navbar = () => {
             <TruckToggle isDark={isDark} onClick={toggle} />
             {user ? (
               <>
-                {user.role === "company" && (
-                  <Link
-                    to="/dashboard"
-                    className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      location.pathname === "/dashboard"
-                        ? "text-primary"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
+                {/* Profile dropdown */}
+                <div className="relative" ref={profileRef}>
+                  <button
+                    onClick={() => setProfileOpen((o) => !o)}
+                    className="flex items-center gap-2 px-3 py-1.5 border border-border text-sm hover:border-primary/60 transition-colors"
                   >
-                    Dashboard
-                    {location.pathname === "/dashboard" && (
+                    <User className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-foreground font-medium">{user.name}</span>
+                    <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  <AnimatePresence>
+                    {profileOpen && (
                       <motion.div
-                        layoutId="activeTab"
-                        className="absolute inset-0 rounded-lg bg-primary/10"
-                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                      />
+                        initial={{ opacity: 0, y: -6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute right-0 top-full mt-1 w-48 bg-card border border-border shadow-md py-1 z-50"
+                      >
+                        <Link
+                          to={user.role === "company" ? "/dashboard" : "/driver-dashboard"}
+                          onClick={() => setProfileOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+                        >
+                          <LayoutDashboard className="h-3.5 w-3.5 shrink-0" />
+                          {user.role === "company" ? "Dashboard" : "My Dashboard"}
+                        </Link>
+                        <hr className="border-border my-1" />
+                        <button
+                          onClick={() => { handleSignOut(); setProfileOpen(false); }}
+                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+                        >
+                          <LogOut className="h-3.5 w-3.5 shrink-0" />
+                          Sign Out
+                        </button>
+                      </motion.div>
                     )}
-                  </Link>
-                )}
-                <div className="flex items-center gap-2 px-3 py-1.5 border border-border text-sm">
-                  <User className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-foreground font-medium">{user.name}</span>
+                  </AnimatePresence>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleSignOut} className="flex items-center gap-1.5">
-                  <LogOut className="h-3.5 w-3.5" />
-                  Sign Out
-                </Button>
               </>
             ) : (
               <>
@@ -296,7 +320,7 @@ const Navbar = () => {
               className="lg:hidden overflow-hidden border-t border-border/50"
             >
               <div className="container mx-auto py-4 flex flex-col gap-2">
-                {navLinks.map((link) =>
+                {navLinks.filter((link) => !(link.name === "Apply Now" && user?.role === "company") && !(link.name === "Drivers" && user?.role === "driver")).map((link) =>
                   link.dropdown ? (
                     <div key={link.path}>
                       <button
@@ -353,21 +377,20 @@ const Navbar = () => {
                 )}
                 {user ? (
                   <>
-                    {user.role === "company" && (
-                      <Link
-                        to="/dashboard"
-                        onClick={() => setIsOpen(false)}
-                        className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                          location.pathname === "/dashboard"
-                            ? "bg-primary/10 text-primary"
-                            : "hover:bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        Dashboard
-                      </Link>
-                    )}
-                    <div className="flex gap-2 pt-2 items-center">
-                      <div className="flex items-center gap-2 px-3 py-1.5 border border-border text-sm flex-1">
+                    <Link
+                      to={user.role === "company" ? "/dashboard" : "/driver-dashboard"}
+                      onClick={() => setIsOpen(false)}
+                      className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                        (location.pathname === "/dashboard" || location.pathname === "/driver-dashboard")
+                          ? "bg-primary/10 text-primary"
+                          : "hover:bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      <LayoutDashboard className="h-4 w-4 shrink-0" />
+                      {user.role === "company" ? "Dashboard" : "My Dashboard"}
+                    </Link>
+                    <div className="flex gap-2 pt-2 items-center border-t border-border/50 mt-1">
+                      <div className="flex items-center gap-2 px-3 py-1.5 text-sm flex-1 text-muted-foreground">
                         <User className="h-3.5 w-3.5 text-primary shrink-0" />
                         <span className="font-medium truncate">{user.name}</span>
                       </div>

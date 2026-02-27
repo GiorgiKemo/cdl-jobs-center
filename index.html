@@ -15,6 +15,23 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="CDL Jobs Center">
     <meta name="twitter:description" content="Find top CDL trucking jobs — AI-powered matching for drivers across the USA.">
+
+    <!-- Establish early connections to Google Fonts to reduce font hop latency -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Load fonts asynchronously (non-render-blocking) via preload + onload swap -->
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&family=Inter:wght@300;400;500;600;700&family=Lora:wght@400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&family=Work+Sans:wght@400;500;600;700&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'"
+    />
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&family=Inter:wght@300;400;500;600;700&family=Lora:wght@400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&family=Work+Sans:wght@400;500;600;700&display=swap" />
+    </noscript>
+
+    <!-- Preload LCP hero image with high priority so browser discovers it immediately -->
+    <link rel="preload" as="image" href="/hero-truck.jpg" fetchpriority="high" />
   </head>
 
   <body>

@@ -1,31 +1,33 @@
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import EasyApplyDialog from "@/components/EasyApplyDialog";
 
 const CTA = () => {
   return (
-    <section className="py-24 bg-muted/30 relative overflow-hidden">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[150px]" />
-      <div className="container mx-auto relative z-10">
+    <section className="relative overflow-hidden bg-muted/30 py-24">
+      <div className="absolute left-1/2 top-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/10 blur-[150px]" />
+      <div className="container relative z-10 mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="glass rounded-3xl p-12 md:p-16 text-center max-w-3xl mx-auto glow-orange"
+          className="glass glow-orange mx-auto max-w-3xl overflow-hidden rounded-3xl p-6 text-center sm:p-10 md:p-16"
         >
-          <h2 className="font-display text-4xl md:text-5xl font-bold mb-4">
+          <h2 className="mb-4 font-display text-3xl font-bold sm:text-4xl md:text-5xl">
             Ready to Hit the <span className="text-gradient">Road?</span>
           </h2>
-          <p className="text-muted-foreground text-lg mb-8 max-w-md mx-auto">
+          <p className="mx-auto mb-8 max-w-md text-base text-muted-foreground sm:text-lg">
             Join thousands of drivers who found their perfect match through CDL Jobs Center.
           </p>
-          <Button size="lg" className="text-lg px-10 group" asChild>
-            <Link to="/apply">
-              Apply Now — It's Free
-              <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-            </Link>
-          </Button>
+          <EasyApplyDialog
+            trigger={
+              <Button size="lg" className="group w-full px-6 text-base sm:w-auto sm:px-10 sm:text-lg">
+                Quick Apply - It's Free
+                <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
+              </Button>
+            }
+          />
         </motion.div>
       </div>
     </section>

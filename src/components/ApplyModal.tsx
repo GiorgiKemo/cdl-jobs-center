@@ -40,10 +40,12 @@ const SectionHeader = ({ children }: { children: React.ReactNode }) => (
 
 interface ApplyModalProps {
   companyName: string;
+  jobId?: string;
+  jobTitle?: string;
   onClose: () => void;
 }
 
-export function ApplyModal({ companyName, onClose }: ApplyModalProps) {
+export function ApplyModal({ companyName, jobId, jobTitle, onClose }: ApplyModalProps) {
   const { load, save } = useApplication();
   const saved = load();
 
@@ -86,11 +88,37 @@ export function ApplyModal({ companyName, onClose }: ApplyModalProps) {
     ...(saved.extra ?? {}),
   });
 
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
   const tog = <T extends Record<string, boolean>>(setter: React.Dispatch<React.SetStateAction<T>>, key: keyof T) =>
     (v: boolean) => setter((prev) => ({ ...prev, [key]: v }));
 
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!firstName.trim()) e.firstName = "First name is required";
+    if (!lastName.trim()) e.lastName = "Last name is required";
+    if (!email.trim()) e.email = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = "Enter a valid email";
+    if (!phone.trim()) e.phone = "Phone is required";
+    if (!cdlNumber.trim()) e.cdlNumber = "CDL number is required";
+    if (!zipCode.trim()) e.zipCode = "Zip code is required";
+    else if (!/^\d{5}(-\d{4})?$/.test(zipCode)) e.zipCode = "Enter a valid zip code";
+    if (!driverType) e.driverType = "Select a driver type";
+    if (!licenseClass) e.licenseClass = "Select a license class";
+    if (!yearsExp) e.yearsExp = "Select years of experience";
+    if (!licenseState) e.licenseState = "Select your license state";
+    return e;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const errs = validate();
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      toast.error("Please fix the errors before submitting.");
+      return;
+    }
+    setErrors({});
     const data = {
       firstName, lastName, email, phone, cdlNumber, zipCode, date,
       driverType, licenseClass, yearsExp, licenseState, soloTeam, notes,
@@ -98,12 +126,27 @@ export function ApplyModal({ companyName, onClose }: ApplyModalProps) {
     };
     save(data);
 
+    const appId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const appEntry = {
+      ...data,
+      id: appId,
+      companyName,
+      jobId: jobId ?? null,
+      jobTitle: jobTitle ?? null,
+      submittedAt: new Date().toISOString(),
+    };
+
     // Record received application for the company's dashboard
     const KEY_RECEIVED = "cdl-applications-received";
     const received = JSON.parse(localStorage.getItem(KEY_RECEIVED) ?? "[]");
-    const appId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    received.push({ ...data, id: appId, companyName, submittedAt: new Date().toISOString() });
+    received.push(appEntry);
     localStorage.setItem(KEY_RECEIVED, JSON.stringify(received));
+
+    // Also track in driver's own application history
+    const KEY_HISTORY = "cdl-driver-applications";
+    const history = JSON.parse(localStorage.getItem(KEY_HISTORY) ?? "[]");
+    history.push(appEntry);
+    localStorage.setItem(KEY_HISTORY, JSON.stringify(history));
 
     toast.success(`Application submitted to ${companyName}!`);
     onClose();
@@ -119,7 +162,9 @@ export function ApplyModal({ companyName, onClose }: ApplyModalProps) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <div>
             <h2 className="font-display font-bold text-base">Let's Get Started!</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Applying to {companyName}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Applying to {companyName}{jobTitle ? ` — ${jobTitle}` : ""}
+            </p>
           </div>
           <button onClick={onClose} className="p-1 hover:text-primary transition-colors" aria-label="Close">
             <X className="h-5 w-5" />
@@ -143,12 +188,30 @@ export function ApplyModal({ companyName, onClose }: ApplyModalProps) {
 
           {/* Basic info */}
           <div className="grid sm:grid-cols-2 gap-4">
-            <Input placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-            <Input placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
-            <Input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <Input placeholder="Phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
-            <Input placeholder="CDL #" value={cdlNumber} onChange={(e) => setCdlNumber(e.target.value)} />
-            <Input placeholder="Zip Code" value={zipCode} onChange={(e) => setZipCode(e.target.value)} />
+            <div className="space-y-1">
+              <Input placeholder="First name *" value={firstName} onChange={(e) => setFirstName(e.target.value)} className={errors.firstName ? "border-destructive" : ""} />
+              {errors.firstName && <p className="text-xs text-destructive">{errors.firstName}</p>}
+            </div>
+            <div className="space-y-1">
+              <Input placeholder="Last name *" value={lastName} onChange={(e) => setLastName(e.target.value)} className={errors.lastName ? "border-destructive" : ""} />
+              {errors.lastName && <p className="text-xs text-destructive">{errors.lastName}</p>}
+            </div>
+            <div className="space-y-1">
+              <Input placeholder="Email *" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={errors.email ? "border-destructive" : ""} />
+              {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+            </div>
+            <div className="space-y-1">
+              <Input placeholder="Phone *" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={errors.phone ? "border-destructive" : ""} />
+              {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
+            </div>
+            <div className="space-y-1">
+              <Input placeholder="CDL # *" value={cdlNumber} onChange={(e) => setCdlNumber(e.target.value)} className={errors.cdlNumber ? "border-destructive" : ""} />
+              {errors.cdlNumber && <p className="text-xs text-destructive">{errors.cdlNumber}</p>}
+            </div>
+            <div className="space-y-1">
+              <Input placeholder="Zip Code *" value={zipCode} onChange={(e) => setZipCode(e.target.value)} className={errors.zipCode ? "border-destructive" : ""} />
+              {errors.zipCode && <p className="text-xs text-destructive">{errors.zipCode}</p>}
+            </div>
             <Input placeholder="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
 
@@ -157,9 +220,9 @@ export function ApplyModal({ companyName, onClose }: ApplyModalProps) {
             <SectionHeader>Tell us about your driving experience.</SectionHeader>
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Driver Type</Label>
-                <Select value={driverType} onValueChange={setDriverType}>
-                  <SelectTrigger><SelectValue placeholder="Owner Operator" /></SelectTrigger>
+                <Label className="text-xs text-muted-foreground">Driver Type *</Label>
+                <Select value={driverType} onValueChange={(v) => { setDriverType(v); setErrors((p) => ({ ...p, driverType: "" })); }}>
+                  <SelectTrigger className={errors.driverType ? "border-destructive" : ""}><SelectValue placeholder="Owner Operator" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="company">Company Driver</SelectItem>
                     <SelectItem value="owner-operator">Owner Operator</SelectItem>
@@ -167,11 +230,12 @@ export function ApplyModal({ companyName, onClose }: ApplyModalProps) {
                     <SelectItem value="student">Student / Trainee</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.driverType && <p className="text-xs text-destructive">{errors.driverType}</p>}
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">License Class</Label>
-                <Select value={licenseClass} onValueChange={setLicenseClass}>
-                  <SelectTrigger><SelectValue placeholder="Class A" /></SelectTrigger>
+                <Label className="text-xs text-muted-foreground">License Class *</Label>
+                <Select value={licenseClass} onValueChange={(v) => { setLicenseClass(v); setErrors((p) => ({ ...p, licenseClass: "" })); }}>
+                  <SelectTrigger className={errors.licenseClass ? "border-destructive" : ""}><SelectValue placeholder="Class A" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="a">Class A</SelectItem>
                     <SelectItem value="b">Class B</SelectItem>
@@ -179,11 +243,12 @@ export function ApplyModal({ companyName, onClose }: ApplyModalProps) {
                     <SelectItem value="permit">Permit Only</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.licenseClass && <p className="text-xs text-destructive">{errors.licenseClass}</p>}
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Years Experience</Label>
-                <Select value={yearsExp} onValueChange={setYearsExp}>
-                  <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                <Label className="text-xs text-muted-foreground">Years Experience *</Label>
+                <Select value={yearsExp} onValueChange={(v) => { setYearsExp(v); setErrors((p) => ({ ...p, yearsExp: "" })); }}>
+                  <SelectTrigger className={errors.yearsExp ? "border-destructive" : ""}><SelectValue placeholder="None" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
                     <SelectItem value="less-1">Less than 1 year</SelectItem>
@@ -192,15 +257,17 @@ export function ApplyModal({ companyName, onClose }: ApplyModalProps) {
                     <SelectItem value="5+">5+ years</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.yearsExp && <p className="text-xs text-destructive">{errors.yearsExp}</p>}
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">License State</Label>
-                <Select value={licenseState} onValueChange={setLicenseState}>
-                  <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
+                <Label className="text-xs text-muted-foreground">License State *</Label>
+                <Select value={licenseState} onValueChange={(v) => { setLicenseState(v); setErrors((p) => ({ ...p, licenseState: "" })); }}>
+                  <SelectTrigger className={errors.licenseState ? "border-destructive" : ""}><SelectValue placeholder="Select state" /></SelectTrigger>
                   <SelectContent>
                     {US_STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                {errors.licenseState && <p className="text-xs text-destructive">{errors.licenseState}</p>}
               </div>
             </div>
           </div>
@@ -221,7 +288,7 @@ export function ApplyModal({ companyName, onClose }: ApplyModalProps) {
             <SectionHeader>Hauler Experience:</SectionHeader>
             <div className="grid sm:grid-cols-3 gap-x-8 gap-y-1">
               <ToggleRow label="Box" checked={hauler.box} onChange={tog(setHauler, "box")} />
-              <ToggleRow label="Car Haul" checked={hauler.carHaul} onChange={tog(setHauler, "carHaul")} />
+              <ToggleRow label="Car Hauler" checked={hauler.carHaul} onChange={tog(setHauler, "carHaul")} />
               <ToggleRow label="Drop and Hook" checked={hauler.dropAndHook} onChange={tog(setHauler, "dropAndHook")} />
               <ToggleRow label="Dry Bulk" checked={hauler.dryBulk} onChange={tog(setHauler, "dryBulk")} />
               <ToggleRow label="Dry Van" checked={hauler.dryVan} onChange={tog(setHauler, "dryVan")} />
@@ -269,31 +336,23 @@ export function ApplyModal({ companyName, onClose }: ApplyModalProps) {
           </div>
 
           {/* Notes */}
-          <div className="border border-border">
-            <div className="flex items-center gap-4 border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground flex-wrap">
-              {["Edit","Insert","Format","Table","View"].map((m) => (
-                <button key={m} type="button" className="hover:text-foreground transition-colors">{m}</button>
-              ))}
-              <span className="border-l border-border h-4 mx-1" />
-              {["B","I","U","S"].map((f) => (
-                <button key={f} type="button" className="font-medium hover:text-foreground transition-colors">{f}</button>
-              ))}
-            </div>
+          <div>
+            <Label className="text-sm font-medium mb-2 block">Message to {companyName} (optional):</Label>
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Additional notes..."
+              placeholder="Tell them about yourself, your experience, or anything else you'd like them to know..."
               rows={5}
-              className="border-0 rounded-none resize-none focus-visible:ring-0 focus-visible:ring-offset-0"
+              className="resize-none"
             />
-            <div className="flex justify-end border-t border-border px-3 py-1 text-xs text-muted-foreground">
-              {notes.trim() ? notes.trim().split(/\s+/).length : 0} WORDS
-            </div>
+            <p className="text-xs text-muted-foreground mt-1 text-right">
+              {notes.trim() ? notes.trim().split(/\s+/).length : 0} words
+            </p>
           </div>
 
           {/* Submit */}
           <div className="flex items-center gap-3 pb-2">
-            <Button type="submit" className="px-8">Send</Button>
+            <Button type="submit" className="px-8">Send Application</Button>
             <Button type="button" variant="outline" className="px-8" onClick={onClose}>Cancel</Button>
           </div>
         </form>

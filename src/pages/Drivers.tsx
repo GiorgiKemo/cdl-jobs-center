@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Eye, Heart, Lock } from "lucide-react";
@@ -43,6 +43,7 @@ const mockDrivers: Driver[] = [
 
 const Drivers = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [typeFilter, setTypeFilter] = useState("All");
   const [classFilter, setClassFilter] = useState("All");
@@ -94,18 +95,26 @@ const Drivers = () => {
               <div>
                 <p className="font-display font-semibold text-lg">Company Access Only</p>
                 <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                  The driver directory is available exclusively to verified company accounts.
-                  Sign in or register as a company to browse driver profiles.
+                  {user?.role === "driver"
+                    ? "The driver directory is available to company accounts only. Your driver account does not have access to this section."
+                    : "The driver directory is available exclusively to verified company accounts. Sign in or register as a company to browse driver profiles."}
                 </p>
               </div>
-              <div className="flex gap-3 mt-2">
-                <Button asChild>
-                  <Link to="/">Sign In as Company</Link>
+              {!user && (
+                <div className="flex gap-3 mt-2">
+                  <Button asChild>
+                    <Link to="/">Sign In as Company</Link>
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <Link to="/apply">Apply as Driver</Link>
+                  </Button>
+                </div>
+              )}
+              {user?.role === "driver" && (
+                <Button asChild className="mt-2">
+                  <Link to="/driver-dashboard">Go to My Dashboard</Link>
                 </Button>
-                <Button variant="outline" asChild>
-                  <Link to="/apply">Apply as Driver</Link>
-                </Button>
-              </div>
+              )}
             </div>
           </div>
         </main>
@@ -209,7 +218,7 @@ const Drivers = () => {
                   <div className="flex items-start justify-between mb-3">
                     <button
                       className="font-display font-semibold text-primary hover:underline text-left"
-                      onClick={() => toast.info("Driver profile coming soon.")}
+                      onClick={() => navigate(`/drivers/${driver.id}`)}
                     >
                       {driver.name}
                     </button>

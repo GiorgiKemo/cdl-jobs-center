@@ -45,19 +45,19 @@ const TopCompanies = () => {
             >
               <Link
                 to="/companies"
-                className="glass rounded-2xl p-6 block hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group"
+                className="glass rounded-2xl p-6 block hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group text-center sm:text-left"
               >
-                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/20 to-cdl-amber/20 flex items-center justify-center mb-4 text-2xl font-display font-bold text-primary">
+                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/20 to-cdl-amber/20 flex items-center justify-center mb-4 text-2xl font-display font-bold text-primary mx-auto sm:mx-0">
                   {company.name.charAt(0)}
                 </div>
                 <h3 className="font-display font-semibold text-lg mb-2">{company.name}</h3>
-                <div className="flex items-center gap-1 mb-3">
+                <div className="flex items-center justify-center sm:justify-start gap-1 mb-3">
                   {Array.from({ length: company.rating }).map((_, j) => (
                     <Star key={j} className="h-4 w-4 fill-cdl-amber text-cdl-amber" />
                   ))}
                 </div>
                 {company.verified && (
-                  <div className="flex items-center gap-1.5 text-sm text-primary">
+                  <div className="flex items-center justify-center sm:justify-start gap-1.5 text-sm text-primary">
                     <BadgeCheck className="h-4 w-4" />
                     Verified Company
                   </div>
