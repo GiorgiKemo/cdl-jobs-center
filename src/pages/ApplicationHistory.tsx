@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { ClipboardList, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/auth";
 
 interface Application {
   id: string;
@@ -21,13 +24,33 @@ interface Application {
 }
 
 const ApplicationHistory = () => {
-  const applications: Application[] = (() => {
-    try {
-      return JSON.parse(localStorage.getItem("cdl-driver-applications") ?? "[]");
-    } catch {
-      return [];
-    }
-  })();
+  const { user } = useAuth();
+  const { data: applications = [], isLoading } = useQuery({
+    queryKey: ["driver-applications-history", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("applications")
+        .select("*")
+        .eq("driver_id", user!.id)
+        .order("submitted_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map((row): Application => ({
+        id: row.id as string,
+        companyName: (row.company_name ?? "") as string,
+        submittedAt: (row.submitted_at ?? "") as string,
+        firstName: (row.first_name ?? "") as string,
+        lastName: (row.last_name ?? "") as string,
+        email: (row.email ?? "") as string,
+        phone: (row.phone ?? "") as string,
+        driverType: (row.driver_type ?? "") as string,
+        licenseClass: (row.license_class ?? "") as string,
+        yearsExp: (row.years_exp ?? "") as string,
+        licenseState: (row.license_state ?? "") as string,
+        notes: row.notes as string | undefined,
+      }));
+    },
+    enabled: !!user?.id,
+  });
 
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -61,7 +84,11 @@ const ApplicationHistory = () => {
           <span className="text-sm text-muted-foreground">({applications.length})</span>
         </div>
 
-        {applications.length === 0 ? (
+        {isLoading ? (
+          <div className="border border-border bg-card p-12 text-center text-muted-foreground text-sm">
+            Loading…
+          </div>
+        ) : applications.length === 0 ? (
           <div className="border border-border bg-card p-12 text-center">
             <ClipboardList className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
             <p className="font-medium text-foreground mb-1">No applications yet</p>
@@ -74,7 +101,7 @@ const ApplicationHistory = () => {
           </div>
         ) : (
           <div className="border border-border bg-card divide-y divide-border">
-            {[...applications].reverse().map((app) => {
+            {applications.map((app) => {
               const isOpen = expanded === app.id;
               return (
                 <div key={app.id} className="p-5">

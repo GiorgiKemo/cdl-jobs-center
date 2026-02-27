@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/auth";
 
 type EasyApplyDialogProps = {
   trigger: React.ReactNode;
@@ -42,7 +44,9 @@ const OffOnToggle = ({ checked, onChange }: OffOnToggleProps) => (
 );
 
 const EasyApplyDialog = ({ trigger, companyName = "General Application" }: EasyApplyDialogProps) => {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [cdl, setCdl] = useState("");
@@ -52,33 +56,38 @@ const EasyApplyDialog = ({ trigger, companyName = "General Application" }: EasyA
   const [endorseCdl, setEndorseCdl] = useState(false);
   const [ownerOperator, setOwnerOperator] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!firstName || !lastName || !email || !phone) {
       toast.error("Please fill in your name, email, and phone.");
       return;
     }
-    const appId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    const entry = {
-      id: appId, companyName,
-      firstName, lastName, email, phone, cdlNumber: cdl, driverType,
-      endorsements: { cdl: endorseCdl, ownerOperator },
-      submittedAt: new Date().toISOString(),
-    };
-    // Write to company's received applications
+    if (!user || user.role !== "driver") {
+      toast.error("You must be signed in as a driver to apply.");
+      return;
+    }
+    setSubmitting(true);
     try {
-      const received = JSON.parse(localStorage.getItem("cdl-applications-received") ?? "[]");
-      received.push(entry);
-      localStorage.setItem("cdl-applications-received", JSON.stringify(received));
-    } catch {}
-    // Write to driver's own history
-    try {
-      const history = JSON.parse(localStorage.getItem("cdl-driver-applications") ?? "[]");
-      history.push(entry);
-      localStorage.setItem("cdl-driver-applications", JSON.stringify(history));
-    } catch {}
-    toast.success(`Application sent to ${companyName}!`);
-    setOpen(false);
+      const { error } = await supabase.from("applications").insert({
+        driver_id: user.id,
+        company_name: companyName,
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        phone,
+        cdl_number: cdl,
+        driver_type: driverType,
+        endorse: { cdl: endorseCdl, ownerOperator },
+        submitted_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+      toast.success(`Application sent to ${companyName}!`);
+      setOpen(false);
+    } catch {
+      toast.error("Failed to submit application. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -129,8 +138,12 @@ const EasyApplyDialog = ({ trigger, companyName = "General Application" }: EasyA
           </div>
 
           <div className="p-4 sm:p-5">
-            <Button type="submit" className="h-12 rounded-md bg-accent px-9 text-3xl font-semibold text-accent-foreground hover:bg-accent/90">
-              Send
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="h-12 rounded-md bg-accent px-9 text-3xl font-semibold text-accent-foreground hover:bg-accent/90"
+            >
+              {submitting ? "Sending…" : "Send"}
             </Button>
           </div>
         </form>

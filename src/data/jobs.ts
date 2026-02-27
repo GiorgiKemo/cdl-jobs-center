@@ -1,6 +1,7 @@
 export interface Job {
   id: string;
   company: string;
+  companyId?: string;  // uuid from profiles / jobs table
   title: string;
   description: string;
   type: string;        // freight type
@@ -11,6 +12,7 @@ export interface Job {
   pay: string;
   postedAt?: string;
   status?: "Draft" | "Active" | "Paused" | "Closed";
+  logoUrl?: string;    // company logo URL from Supabase Storage
 }
 
 // Jobs are loaded from the database — no seed data

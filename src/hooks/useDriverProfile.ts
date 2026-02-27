@@ -1,5 +1,5 @@
-const KEY = "cdl-driver-profile";
-const APP_KEY = "cdl-application";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 
 export interface DriverProfile {
   firstName: string;
@@ -12,33 +12,57 @@ export interface DriverProfile {
   about: string;
 }
 
-export function useDriverProfile() {
-  const load = (): Partial<DriverProfile> => {
-    try {
-      return JSON.parse(localStorage.getItem(KEY) ?? "{}");
-    } catch {
-      return {};
-    }
-  };
+export function useDriverProfile(driverId: string) {
+  const qc = useQueryClient();
+  const key = ["driver_profile", driverId];
 
-  const save = (data: DriverProfile) => {
-    localStorage.setItem(KEY, JSON.stringify(data));
-    // Also seed the application form so future apply forms pre-fill automatically
-    try {
-      const existing = JSON.parse(localStorage.getItem(APP_KEY) ?? "{}");
-      const updated = {
-        ...existing,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phone: data.phone,
-        cdlNumber: data.cdlNumber,
-        licenseClass: data.licenseClass,
-        yearsExp: data.yearsExp,
-        licenseState: data.licenseState,
-      };
-      localStorage.setItem(APP_KEY, JSON.stringify(updated));
-    } catch {}
-  };
+  const { data, isLoading } = useQuery({
+    queryKey: key,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("driver_profiles")
+        .select("*")
+        .eq("id", driverId)
+        .single();
+      // PGRST116 = no rows found (new driver with no profile yet)
+      if (error && error.code !== "PGRST116") throw error;
+      if (!data) return null;
+      return {
+        firstName: data.first_name ?? "",
+        lastName: data.last_name ?? "",
+        phone: data.phone ?? "",
+        cdlNumber: data.cdl_number ?? "",
+        licenseClass: data.license_class ?? "",
+        yearsExp: data.years_exp ?? "",
+        licenseState: data.license_state ?? "",
+        about: data.about ?? "",
+      } as DriverProfile;
+    },
+    enabled: !!driverId,
+  });
 
-  return { load, save };
+  const saveMutation = useMutation({
+    mutationFn: async (profile: DriverProfile) => {
+      const { error } = await supabase.from("driver_profiles").upsert({
+        id: driverId,
+        first_name: profile.firstName,
+        last_name: profile.lastName,
+        phone: profile.phone,
+        cdl_number: profile.cdlNumber,
+        license_class: profile.licenseClass,
+        years_exp: profile.yearsExp,
+        license_state: profile.licenseState,
+        about: profile.about,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: key }),
+  });
+
+  return {
+    profile: data ?? null,
+    isLoading,
+    saveProfile: (p: DriverProfile) => saveMutation.mutateAsync(p),
+  };
 }

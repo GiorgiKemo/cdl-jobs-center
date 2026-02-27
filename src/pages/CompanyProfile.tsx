@@ -8,6 +8,8 @@ import { useAuth } from "@/context/auth";
 import { ApplyModal } from "@/components/ApplyModal";
 import { SignInModal } from "@/components/SignInModal";
 import { COMPANIES } from "@/data/companies";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
 const CompanyProfile = () => {
@@ -27,13 +29,19 @@ const CompanyProfile = () => {
     }
   }, [company, navigate]);
 
-  // Load any dashboard-edited profile overrides for this company
-  const profileOverride = (() => {
-    try {
-      const all = JSON.parse(localStorage.getItem("cdl-company-profiles") ?? "{}");
-      return all[company?.name ?? ""] ?? null;
-    } catch { return null; }
-  })();
+  // Load Supabase profile overrides for this company
+  const { data: dbProfile } = useQuery({
+    queryKey: ["company-profile-by-name", company?.name],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("company_profiles")
+        .select("company_name, phone, address, website, about, logo_url")
+        .eq("company_name", company!.name)
+        .maybeSingle();
+      return data ?? null;
+    },
+    enabled: !!company?.name,
+  });
 
   if (!company) return null;
 
@@ -46,6 +54,8 @@ const CompanyProfile = () => {
       setApplyOpen(true);
     }
   };
+
+  const logoUrl = dbProfile?.logo_url as string | undefined;
 
   return (
     <div className="min-h-screen bg-background">
@@ -64,34 +74,30 @@ const CompanyProfile = () => {
         <div className="border border-border bg-card p-5 mb-4">
           <div className="flex flex-col sm:flex-row items-start gap-5">
             {/* Logo */}
-            {(() => {
-              let logo = "";
-              try { logo = JSON.parse(localStorage.getItem("cdl-company-logos") ?? "{}")[company.name] ?? ""; } catch {}
-              return (
-                <div className="shrink-0 h-20 w-20 bg-muted flex items-center justify-center font-display text-3xl font-bold text-primary border border-border overflow-hidden">
-                  {logo ? (
-                    <img src={logo} alt={company.name} className="h-full w-full object-contain p-1" />
-                  ) : (
-                    company.name.charAt(0)
-                  )}
-                </div>
-              );
-            })()}
+            <div className="shrink-0 h-20 w-20 bg-muted flex items-center justify-center font-display text-3xl font-bold text-primary border border-border overflow-hidden">
+              {logoUrl ? (
+                <img src={logoUrl} alt={company.name} className="h-full w-full object-contain p-1" />
+              ) : (
+                company.name.charAt(0)
+              )}
+            </div>
 
-            {/* Info — dashboard overrides take precedence over static data */}
+            {/* Info — Supabase overrides take precedence over static data */}
             <div className="flex-1 min-w-0">
-              <h1 className="font-display font-bold text-primary text-lg mb-2">{profileOverride?.name ?? company.name}</h1>
+              <h1 className="font-display font-bold text-primary text-lg mb-2">
+                {(dbProfile?.company_name as string | undefined) ?? company.name}
+              </h1>
               <p className="flex items-center gap-1.5 text-sm text-muted-foreground mb-1">
                 <Phone className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
-                {profileOverride?.phone || company.phone}
+                {(dbProfile?.phone as string | undefined) || company.phone}
               </p>
               <p className="flex items-start gap-1.5 text-sm text-muted-foreground mb-1">
                 <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" aria-hidden="true" />
-                {profileOverride?.address || company.address}
+                {(dbProfile?.address as string | undefined) || company.address}
               </p>
-              {(profileOverride?.website || company.website) && (
+              {((dbProfile?.website as string | undefined) || company.website) && (
                 <a
-                  href={profileOverride?.website ?? company.website}
+                  href={(dbProfile?.website as string | undefined) ?? company.website}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 text-sm text-primary hover:underline"
@@ -123,7 +129,9 @@ const CompanyProfile = () => {
         <div className="border border-border bg-card p-5 mb-4">
           <h2 className="font-display font-semibold text-base mb-2">About company</h2>
           <hr className="border-primary/20 mb-3" />
-          <p className="text-sm text-muted-foreground leading-relaxed">{profileOverride?.about || company.about}</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {(dbProfile?.about as string | undefined) || company.about}
+          </p>
         </div>
 
         {/* Information panel */}

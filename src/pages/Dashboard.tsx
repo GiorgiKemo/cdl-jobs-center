@@ -12,6 +12,8 @@ import { useJobs } from "@/hooks/useJobs";
 import { Job } from "@/data/jobs";
 import { toast } from "sonner";
 import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
   DragOverlay,
@@ -49,7 +51,7 @@ const JOB_STATUS_BADGE: Record<string, string> = {
 };
 
 interface ReceivedApplication {
-  id?: string;
+  id: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -68,10 +70,35 @@ interface ReceivedApplication {
   extra: Record<string, boolean>;
   companyName: string;
   submittedAt: string;
+  pipeline_stage: PipelineStage;
 }
 
-const getAppKey = (app: ReceivedApplication): string =>
-  app.id ?? `${app.firstName}-${app.lastName}-${app.submittedAt}`;
+// Map Supabase row → ReceivedApplication
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToApp(row: Record<string, any>): ReceivedApplication {
+  return {
+    id: row.id,
+    firstName: row.first_name ?? "",
+    lastName: row.last_name ?? "",
+    email: row.email ?? "",
+    phone: row.phone ?? "",
+    driverType: row.driver_type ?? "",
+    yearsExp: row.years_exp ?? "",
+    licenseClass: row.license_class ?? "",
+    licenseState: row.license_state ?? "",
+    cdlNumber: row.cdl_number ?? "",
+    soloTeam: row.solo_team ?? "Solo",
+    notes: row.notes ?? "",
+    prefs: row.prefs ?? {},
+    endorse: row.endorse ?? {},
+    hauler: row.hauler ?? {},
+    route: row.route ?? {},
+    extra: row.extra ?? {},
+    companyName: row.company_name ?? "",
+    submittedAt: row.submitted_at ?? "",
+    pipeline_stage: (row.pipeline_stage ?? "New") as PipelineStage,
+  };
+}
 
 const EMPTY_FORM = {
   title: "",
@@ -153,7 +180,7 @@ const PipelineCard = ({
   onStageChange: (s: PipelineStage) => void;
   isDragOverlay?: boolean;
 }) => {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: getAppKey(app) });
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: app.id });
   return (
     <div
       ref={isDragOverlay ? undefined : setNodeRef}
@@ -199,26 +226,22 @@ const PipelineColumn = ({
   label,
   headerClass,
   apps,
-  pipelineStages,
   onStageChange,
 }: {
   label: PipelineStage;
   headerClass: string;
   apps: ReceivedApplication[];
-  pipelineStages: Record<string, PipelineStage>;
-  onStageChange: (key: string, s: PipelineStage) => void;
+  onStageChange: (appId: string, s: PipelineStage) => void;
 }) => {
   const { setNodeRef, isOver } = useDroppable({ id: label });
   return (
     <div className="flex-1" style={{ minWidth: "200px" }}>
-      {/* Column header */}
       <div className={`border ${headerClass} px-3 py-2 flex items-center justify-between mb-2`}>
         <span className="font-semibold text-sm">{label}</span>
         <span className="text-xs bg-foreground/10 dark:bg-white/10 px-1.5 py-0.5 rounded-full font-medium">
           {apps.length}
         </span>
       </div>
-      {/* Drop zone */}
       <div
         ref={setNodeRef}
         className={`scrollbar-thin space-y-2 min-h-[120px] max-h-[540px] overflow-y-auto p-1 rounded-sm transition-colors ${
@@ -234,10 +257,10 @@ const PipelineColumn = ({
         ) : (
           apps.map((app) => (
             <PipelineCard
-              key={getAppKey(app)}
+              key={app.id}
               app={app}
-              stage={(pipelineStages[getAppKey(app)] ?? "New") as PipelineStage}
-              onStageChange={(s) => onStageChange(getAppKey(app), s)}
+              stage={app.pipeline_stage}
+              onStageChange={(s) => onStageChange(app.id, s)}
             />
           ))
         )}
@@ -248,93 +271,78 @@ const PipelineColumn = ({
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const { loadAll, add, update, remove } = useJobs();
+
+  useEffect(() => {
+    if (!loading && (!user || user.role !== "company")) {
+      toast.error("Dashboard is available for company accounts only.");
+      navigate("/");
+    }
+  }, [loading, user, navigate]);
+
+  if (loading || !user || user.role !== "company") return null;
+
+  return <DashboardInner />;
+};
+
+// Inner component (only renders after auth is resolved and user is a company)
+const DashboardInner = () => {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const { jobs, addJob, updateJob, removeJob } = useJobs(user!.id);
 
   const [activeTab, setActiveTab] = useState<Tab>("jobs");
   const [appPage, setAppPage] = useState(0);
   const APP_PAGE_SIZE = 10;
-  const [jobs, setJobs] = useState<Job[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [dragActiveId, setDragActiveId] = useState<string | null>(null);
 
-  const [applications, setApplications] = useState<ReceivedApplication[]>([]);
-  const [pipelineStages, setPipelineStages] = useState<Record<string, PipelineStage>>({});
-  const [dragActiveKey, setDragActiveKey] = useState<string | null>(null);
-
-  const [profileName, setProfileName] = useState("");
-  const [profileEmail, setProfileEmail] = useState("");
+  // Company profile state
+  const [profileName, setProfileName] = useState(user!.name);
+  const [profileEmail, setProfileEmail] = useState(user!.email ?? "");
   const [profilePhone, setProfilePhone] = useState("");
   const [profileAddress, setProfileAddress] = useState("");
   const [profileAbout, setProfileAbout] = useState("");
   const [profileWebsite, setProfileWebsite] = useState("");
   const [profileLogo, setProfileLogo] = useState("");
 
-  // Access guard — company only
-  useEffect(() => {
-    if (!user || user.role !== "company") {
-      toast.error("Dashboard is available for company accounts only.");
-      navigate("/");
-    }
-  }, [user, navigate]);
+  // Fetch applications for this company
+  const appsKey = ["company-applications", user!.id];
+  const { data: applications = [], refetch: refetchApps } = useQuery({
+    queryKey: appsKey,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("applications")
+        .select("*")
+        .eq("company_id", user!.id)
+        .order("submitted_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map(rowToApp);
+    },
+  });
 
-  // Load jobs for this company
+  // Load company profile on mount
   useEffect(() => {
-    if (user) setJobs(loadAll().filter((j) => j.company === user.name));
+    supabase
+      .from("company_profiles")
+      .select("*")
+      .eq("id", user!.id)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setProfileName(data.company_name ?? user!.name);
+          setProfileEmail(data.email ?? user!.email ?? "");
+          setProfilePhone(data.phone ?? "");
+          setProfileAddress(data.address ?? "");
+          setProfileAbout(data.about ?? "");
+          setProfileWebsite(data.website ?? "");
+          setProfileLogo(data.logo_url ?? "");
+        }
+      });
   }, [user]);
-
-  // Load applications for this company
-  useEffect(() => {
-    if (user) {
-      try {
-        const stored = localStorage.getItem("cdl-applications-received");
-        const all: ReceivedApplication[] = stored ? JSON.parse(stored) : [];
-        setApplications(all.filter((a) => a.companyName === user.name));
-      } catch {
-        setApplications([]);
-      }
-    }
-  }, [user]);
-
-  // Load pipeline stages
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("cdl-pipeline-stages");
-      setPipelineStages(stored ? JSON.parse(stored) : {});
-    } catch {
-      setPipelineStages({});
-    }
-  }, []);
-
-  // Load profile settings
-  useEffect(() => {
-    try {
-      const allProfiles = JSON.parse(localStorage.getItem("cdl-company-profiles") ?? "{}");
-      const stored = allProfiles[user?.name ?? ""] ?? null;
-      if (stored) {
-        const p = stored;
-        setProfileName(p.name ?? user?.name ?? "");
-        setProfileEmail(p.email ?? user?.email ?? "");
-        setProfilePhone(p.phone ?? "");
-        setProfileAddress(p.address ?? "");
-        setProfileAbout(p.about ?? "");
-        setProfileWebsite(p.website ?? "");
-      } else if (user) {
-        setProfileName(user.name);
-        setProfileEmail(user.email ?? "");
-      }
-      const logos = JSON.parse(localStorage.getItem("cdl-company-logos") ?? "{}");
-      setProfileLogo(logos[user?.name ?? ""] ?? "");
-    } catch {
-      if (user) setProfileName(user.name);
-    }
-  }, [user]);
-
-  if (!user || user.role !== "company") return null;
-
-  const refreshJobs = () => setJobs(loadAll().filter((j) => j.company === user.name));
 
   const handleFormChange = (field: string, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -361,59 +369,84 @@ const Dashboard = () => {
     setShowForm(true);
   };
 
-  const handleSaveJob = () => {
+  const handleSaveJob = async () => {
     if (!form.title.trim()) { toast.error("Job title is required."); return; }
-    if (editingId) {
-      update(editingId, { ...form });
-      toast.success("Job updated.");
-    } else {
-      add({ ...form, company: user.name });
-      toast.success("Job posted successfully.");
+    try {
+      if (editingId) {
+        await updateJob(editingId, { ...form });
+        toast.success("Job updated.");
+      } else {
+        await addJob({ ...form, company: user!.name, companyName: user!.name });
+        toast.success("Job posted successfully.");
+      }
+      setShowForm(false);
+      setEditingId(null);
+      setForm(EMPTY_FORM);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to save job.");
     }
-    setShowForm(false);
-    setEditingId(null);
-    setForm(EMPTY_FORM);
-    refreshJobs();
   };
 
-  const handleDeleteJob = (id: string) => {
-    remove(id);
-    refreshJobs();
-    toast.success("Job removed.");
+  const handleDeleteJob = async (id: string) => {
+    try {
+      await removeJob(id);
+      toast.success("Job removed.");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete job.");
+    }
   };
 
-  const handleQuickStatus = (jobId: string, status: string) => {
-    update(jobId, { status });
-    refreshJobs();
+  const handleQuickStatus = async (jobId: string, status: string) => {
+    await updateJob(jobId, { status: status as Job["status"] });
   };
 
-  const updateAppStage = (appKey: string, stage: PipelineStage) => {
-    const updated = { ...pipelineStages, [appKey]: stage };
-    setPipelineStages(updated);
-    localStorage.setItem("cdl-pipeline-stages", JSON.stringify(updated));
+  const updateAppStage = async (appId: string, stage: PipelineStage) => {
+    // Optimistic local update
+    qc.setQueryData<ReceivedApplication[]>(appsKey, (prev) =>
+      (prev ?? []).map((a) => a.id === appId ? { ...a, pipeline_stage: stage } : a)
+    );
+    // Persist to DB
+    const { error } = await supabase
+      .from("applications")
+      .update({ pipeline_stage: stage })
+      .eq("id", appId);
+    if (error) {
+      toast.error("Failed to update stage.");
+      refetchApps();
+    }
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) { toast.error("Logo must be under 2MB."); return; }
-    const reader = new FileReader();
-    reader.onload = () => setProfileLogo(reader.result as string);
-    reader.readAsDataURL(file);
+    const ext = file.name.split(".").pop() ?? "png";
+    const path = `${user!.id}/logo.${ext}`;
+    const { error } = await supabase.storage.from("company-logos").upload(path, file, { upsert: true });
+    if (error) { toast.error("Upload failed: " + error.message); return; }
+    const { data: { publicUrl } } = supabase.storage.from("company-logos").getPublicUrl(path);
+    setProfileLogo(publicUrl);
     e.target.value = "";
   };
 
-  const handleSaveProfile = () => {
-    const allProfiles = (() => { try { return JSON.parse(localStorage.getItem("cdl-company-profiles") ?? "{}"); } catch { return {}; } })();
-    allProfiles[user?.name ?? profileName] = {
-      name: profileName, email: profileEmail, phone: profilePhone,
-      address: profileAddress, about: profileAbout, website: profileWebsite,
-    };
-    localStorage.setItem("cdl-company-profiles", JSON.stringify(allProfiles));
-    const logos = JSON.parse(localStorage.getItem("cdl-company-logos") ?? "{}");
-    if (profileLogo) { logos[user.name] = profileLogo; } else { delete logos[user.name]; }
-    localStorage.setItem("cdl-company-logos", JSON.stringify(logos));
-    toast.success("Profile saved.");
+  const handleSaveProfile = async () => {
+    try {
+      const { error } = await supabase.from("company_profiles").upsert({
+        id: user!.id,
+        company_name: profileName,
+        email: profileEmail,
+        phone: profilePhone,
+        address: profileAddress,
+        about: profileAbout,
+        website: profileWebsite,
+        logo_url: profileLogo || null,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+      toast.success("Profile saved.");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to save profile.");
+    }
   };
 
   const switchTab = (tab: Tab) => {
@@ -441,7 +474,7 @@ const Dashboard = () => {
 
         {/* Welcome header */}
         <div className="bg-foreground text-background dark:bg-muted dark:text-foreground border border-border px-5 py-4 mb-6">
-          <h1 className="font-display font-bold text-lg">Welcome, {user.name}</h1>
+          <h1 className="font-display font-bold text-lg">Welcome, {user!.name}</h1>
           <p className="text-sm opacity-70 mt-0.5">Company Dashboard</p>
         </div>
 
@@ -622,7 +655,7 @@ const Dashboard = () => {
               return (
                 <>
                   <div className="space-y-3">
-                    {pageApps.map((app, i) => <AppCard key={i} app={app} />)}
+                    {pageApps.map((app) => <AppCard key={app.id} app={app} />)}
                   </div>
                   {totalPages > 1 && (
                     <div className="flex items-center justify-between mt-4 text-sm">
@@ -661,15 +694,17 @@ const Dashboard = () => {
               <div className="flex items-center gap-2 shrink-0">
                 {applications.length > 0 && (
                   <button
-                    onClick={() => {
-                      const KEY = "cdl-applications-received";
-                      const all: ReceivedApplication[] = (() => {
-                        try { return JSON.parse(localStorage.getItem(KEY) ?? "[]"); } catch { return []; }
-                      })();
-                      const kept = all.filter((a) => a.companyName !== user.name);
-                      localStorage.setItem(KEY, JSON.stringify(kept));
-                      setApplications([]);
-                      toast.success("All applications cleared.");
+                    onClick={async () => {
+                      const { error } = await supabase
+                        .from("applications")
+                        .delete()
+                        .eq("company_id", user!.id);
+                      if (!error) {
+                        qc.setQueryData(appsKey, []);
+                        toast.success("All applications cleared.");
+                      } else {
+                        toast.error("Failed to clear applications.");
+                      }
                     }}
                     className="text-xs text-muted-foreground hover:text-red-500 transition-colors"
                   >
@@ -686,9 +721,9 @@ const Dashboard = () => {
             ) : (
               <DndContext
                 collisionDetection={pointerWithin}
-                onDragStart={(e) => setDragActiveKey(e.active.id as string)}
+                onDragStart={(e) => setDragActiveId(e.active.id as string)}
                 onDragEnd={(e) => {
-                  setDragActiveKey(null);
+                  setDragActiveId(null);
                   const { active, over } = e;
                   if (!over) return;
                   const targetStage = over.id as PipelineStage;
@@ -696,21 +731,18 @@ const Dashboard = () => {
                     updateAppStage(active.id as string, targetStage);
                   }
                 }}
-                onDragCancel={() => setDragActiveKey(null)}
+                onDragCancel={() => setDragActiveId(null)}
               >
                 <div className="overflow-x-auto pb-4">
                   <div className="flex gap-3" style={{ minWidth: `${PIPELINE_STAGES.length * 210}px` }}>
                     {PIPELINE_STAGES.map(({ label, headerClass }) => {
-                      const stageApps = applications.filter(
-                        (app) => (pipelineStages[getAppKey(app)] ?? "New") === label
-                      );
+                      const stageApps = applications.filter((app) => app.pipeline_stage === label);
                       return (
                         <PipelineColumn
                           key={label}
                           label={label}
                           headerClass={headerClass}
                           apps={stageApps}
-                          pipelineStages={pipelineStages}
                           onStageChange={updateAppStage}
                         />
                       );
@@ -719,13 +751,13 @@ const Dashboard = () => {
                 </div>
 
                 <DragOverlay dropAnimation={null}>
-                  {dragActiveKey ? (() => {
-                    const activeApp = applications.find((a) => getAppKey(a) === dragActiveKey);
+                  {dragActiveId ? (() => {
+                    const activeApp = applications.find((a) => a.id === dragActiveId);
                     if (!activeApp) return null;
                     return (
                       <PipelineCard
                         app={activeApp}
-                        stage={(pipelineStages[dragActiveKey] ?? "New") as PipelineStage}
+                        stage={activeApp.pipeline_stage}
                         onStageChange={() => {}}
                         isDragOverlay
                       />
@@ -751,7 +783,7 @@ const Dashboard = () => {
                       {profileLogo ? (
                         <img src={profileLogo} alt="Company logo" className="h-full w-full object-contain p-1" />
                       ) : (
-                        <span className="font-display text-3xl font-bold text-primary">{user.name.charAt(0)}</span>
+                        <span className="font-display text-3xl font-bold text-primary">{user!.name.charAt(0)}</span>
                       )}
                     </div>
                     <div className="space-y-2">
@@ -809,7 +841,7 @@ const Dashboard = () => {
           const total = applications.length;
           const stageCounts = (["New", "Reviewing", "Interview", "Hired", "Rejected"] as PipelineStage[]).reduce<Record<string, number>>(
             (acc, s) => {
-              acc[s] = applications.filter((a) => (pipelineStages[getAppKey(a)] ?? "New") === s).length;
+              acc[s] = applications.filter((a) => a.pipeline_stage === s).length;
               return acc;
             }, {}
           );

@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link, useSearchParams } from "react-router-dom";
-import { Truck, Bookmark, BookmarkCheck, Search, Phone } from "lucide-react";
+import { Truck, Bookmark, BookmarkCheck, Search } from "lucide-react";
 import { useState, useMemo } from "react";
-import { useJobs } from "@/hooks/useJobs";
+import { useActiveJobs } from "@/hooks/useJobs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
+import { useAuth } from "@/context/auth";
 import { toast } from "sonner";
 
 const urlTypeMap: Record<string, string> = {
@@ -25,20 +26,10 @@ const PAGE_SIZE = 10;
 
 const Jobs = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { loadAll } = useJobs();
-  const savedJobs = useSavedJobs();
-  const [savedIds, setSavedIds] = useState<string[]>(() => savedJobs.load());
-
-  // Load company profiles once for phone display on cards
-  const companyProfiles = useMemo<Record<string, { phone?: string }>>(() => {
-    try { return JSON.parse(localStorage.getItem("cdl-company-profiles") ?? "{}"); } catch { return {}; }
-  }, []);
-
-  const allJobs = useMemo(
-    () => loadAll().filter((j) => !j.status || j.status === "Active"),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loadAll]
-  );
+  const { user } = useAuth();
+  const { jobs: allActiveJobs } = useActiveJobs();
+  const driverId = user?.role === "driver" ? user.id : "";
+  const { savedIds, isSaved, toggle } = useSavedJobs(driverId);
 
   // Initialize all filters from URL params on first render
   const initialFreight = (() => {
@@ -84,7 +75,7 @@ const Jobs = () => {
   };
 
   const filtered = useMemo(() => {
-    let result = allJobs.filter((j) => {
+    let result = allActiveJobs.filter((j) => {
       const matchesFreight = freightType === "all" || j.type === freightType;
       const matchesDriver = driverType === "all" || j.driverType === driverType;
       const matchesRoute = routeType === "all" || j.routeType === routeType;
@@ -100,15 +91,19 @@ const Jobs = () => {
     else if (sortBy === "title-az") result = [...result].sort((a, b) => a.title.localeCompare(b.title));
 
     return result;
-  }, [allJobs, freightType, driverType, routeType, teamDriving, searchQuery, sortBy]);
+  }, [allActiveJobs, freightType, driverType, routeType, teamDriving, searchQuery, sortBy]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const handleToggleSave = (id: string, company: string) => {
-    const nowSaved = savedJobs.toggle(id);
-    setSavedIds(savedJobs.load());
-    toast.success(nowSaved ? `Saved ${company}` : `Removed from saved jobs`);
+  const handleToggleSave = async (id: string, company: string) => {
+    if (!user || user.role !== "driver") {
+      toast.error("Sign in as a driver to save jobs.");
+      return;
+    }
+    const wasSaved = isSaved(id);
+    await toggle(id);
+    toast.success(wasSaved ? `Removed from saved jobs` : `Saved ${company}`);
   };
 
   const pageTitle = freightType !== "all" ? freightType : "All Jobs";
@@ -270,7 +265,6 @@ const Jobs = () => {
               <>
                 {paginated.map((job) => {
                   const saved = savedIds.includes(job.id);
-                  const profile = companyProfiles[job.company];
                   return (
                     <div key={job.id} className="border border-border bg-card p-5 flex flex-col sm:flex-row gap-4">
                       <div className="flex-1 min-w-0">
@@ -284,12 +278,6 @@ const Jobs = () => {
                             {saved ? <BookmarkCheck className="h-5 w-5" /> : <Bookmark className="h-5 w-5" />}
                           </button>
                         </div>
-                        {profile?.phone && (
-                          <p className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
-                            <Phone className="h-3 w-3 shrink-0" />
-                            {profile.phone}
-                          </p>
-                        )}
                         <p className="text-sm font-medium text-foreground mb-1">{job.title}</p>
                         <hr className="border-border mb-3" />
                         <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">{job.description}</p>
@@ -298,8 +286,12 @@ const Jobs = () => {
                         <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90 w-full">
                           <Link to={`/jobs/${job.id}`}>View Job</Link>
                         </Button>
-                        <div className="h-14 w-full border border-border flex items-center justify-center bg-muted/30">
-                          <Truck className="h-6 w-6 text-muted-foreground" />
+                        <div className="h-14 w-full border border-border flex items-center justify-center bg-muted/30 overflow-hidden">
+                          {job.logoUrl ? (
+                            <img src={job.logoUrl} alt={job.company} className="h-full w-full object-contain p-1" />
+                          ) : (
+                            <Truck className="h-6 w-6 text-muted-foreground" />
+                          )}
                         </div>
                       </div>
                     </div>

@@ -9,10 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useAuth } from "@/context/auth";
-import { useJobs } from "@/hooks/useJobs";
+import { useActiveJobs } from "@/hooks/useJobs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { useDriverProfile, DriverProfile } from "@/hooks/useDriverProfile";
 import { Truck, Briefcase, Bookmark, User, BarChart3, ChevronDown, ChevronUp, MapPin, DollarSign } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useQuery } from "@tanstack/react-query";
 
 type Tab = "overview" | "applications" | "saved" | "profile";
 type PipelineStage = "New" | "Reviewing" | "Interview" | "Hired" | "Rejected";
@@ -32,6 +34,29 @@ interface StoredApplication {
   licenseState: string;
   notes?: string;
   submittedAt: string;
+  pipeline_stage: PipelineStage;
+}
+
+// Map Supabase row → StoredApplication
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToApp(row: Record<string, any>): StoredApplication {
+  return {
+    id: row.id,
+    companyName: row.company_name ?? "",
+    jobTitle: row.job_title ?? null,
+    jobId: row.job_id ?? null,
+    firstName: row.first_name ?? "",
+    lastName: row.last_name ?? "",
+    email: row.email ?? "",
+    phone: row.phone ?? "",
+    driverType: row.driver_type ?? "",
+    licenseClass: row.license_class ?? "",
+    yearsExp: row.years_exp ?? "",
+    licenseState: row.license_state ?? "",
+    notes: row.notes ?? "",
+    submittedAt: row.submitted_at ?? "",
+    pipeline_stage: (row.pipeline_stage ?? "New") as PipelineStage,
+  };
 }
 
 const US_STATES = [
@@ -72,75 +97,92 @@ const StageBadge = ({ stage }: { stage?: PipelineStage }) => {
 };
 
 const DriverDashboard = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const { loadAll } = useJobs();
-  const savedJobsHook = useSavedJobs();
-  const { load: loadProfile, save: saveProfile } = useDriverProfile();
-
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
-
-  // Applications
-  const [applications, setApplications] = useState<StoredApplication[]>([]);
-  const [pipelineStages, setPipelineStages] = useState<Record<string, PipelineStage>>({});
-  const [expandedApp, setExpandedApp] = useState<string | null>(null);
-
-  // Saved jobs
-  const [savedIds, setSavedIds] = useState<string[]>(() => savedJobsHook.load());
-
-  // Profile form
-  const profile = loadProfile();
-  const [firstName, setFirstName] = useState(profile.firstName ?? "");
-  const [lastName, setLastName] = useState(profile.lastName ?? "");
-  const [phone, setPhone] = useState(profile.phone ?? "");
-  const [cdlNumber, setCdlNumber] = useState(profile.cdlNumber ?? "");
-  const [licenseClass, setLicenseClass] = useState(profile.licenseClass ?? "");
-  const [yearsExp, setYearsExp] = useState(profile.yearsExp ?? "");
-  const [licenseState, setLicenseState] = useState(profile.licenseState ?? "");
-  const [about, setAbout] = useState(profile.about ?? "");
 
   useEffect(() => {
-    if (!user || user.role !== "driver") {
+    if (!loading && (!user || user.role !== "driver")) {
       toast.error("Driver accounts only.");
       navigate("/");
-      return;
     }
-    // Load applications
-    try {
-      const stored: StoredApplication[] = JSON.parse(localStorage.getItem("cdl-driver-applications") ?? "[]");
-      setApplications([...stored].reverse());
-    } catch { setApplications([]); }
+  }, [loading, user, navigate]);
 
-    // Load pipeline stages
-    try {
-      setPipelineStages(JSON.parse(localStorage.getItem("cdl-pipeline-stages") ?? "{}"));
-    } catch { setPipelineStages({}); }
-  }, [user, navigate]);
+  if (loading || !user || user.role !== "driver") return null;
 
-  if (!user || user.role !== "driver") return null;
+  return <DriverDashboardInner />;
+};
+
+// Inner component — only renders when auth is confirmed as driver
+const DriverDashboardInner = () => {
+  const { user } = useAuth();
+  const { jobs: allActiveJobs } = useActiveJobs();
+  const { savedIds, toggle: toggleSave } = useSavedJobs(user!.id);
+  const { profile, isLoading: profileLoading, saveProfile } = useDriverProfile(user!.id);
+
+  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [expandedApp, setExpandedApp] = useState<string | null>(null);
+
+  // Fetch driver's applications
+  const { data: applications = [] } = useQuery({
+    queryKey: ["driver-applications", user!.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("applications")
+        .select("*")
+        .eq("driver_id", user!.id)
+        .order("submitted_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map(rowToApp);
+    },
+  });
+
+  // Profile form state — initialized from DB once loaded
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [cdlNumber, setCdlNumber] = useState("");
+  const [licenseClass, setLicenseClass] = useState("");
+  const [yearsExp, setYearsExp] = useState("");
+  const [licenseState, setLicenseState] = useState("");
+  const [about, setAbout] = useState("");
+  const [profileInit, setProfileInit] = useState(false);
+
+  // Populate form once profile loads
+  useEffect(() => {
+    if (!profileLoading && profile && !profileInit) {
+      setFirstName(profile.firstName);
+      setLastName(profile.lastName);
+      setPhone(profile.phone);
+      setCdlNumber(profile.cdlNumber);
+      setLicenseClass(profile.licenseClass);
+      setYearsExp(profile.yearsExp);
+      setLicenseState(profile.licenseState);
+      setAbout(profile.about);
+      setProfileInit(true);
+    }
+  }, [profile, profileLoading, profileInit]);
 
   // Stats
   const totalApps = applications.length;
-  const activeApps = applications.filter((a) => {
-    const stage = pipelineStages[a.id] as PipelineStage | undefined;
-    return !stage || (stage !== "Hired" && stage !== "Rejected");
-  }).length;
-  const interviews = applications.filter((a) => pipelineStages[a.id] === "Interview").length;
+  const activeApps = applications.filter((a) => a.pipeline_stage !== "Hired" && a.pipeline_stage !== "Rejected").length;
+  const interviews = applications.filter((a) => a.pipeline_stage === "Interview").length;
   const savedCount = savedIds.length;
 
-  // Saved jobs data
-  const allJobs = loadAll().filter((j) => !j.status || j.status === "Active");
-  const savedJobs = allJobs.filter((j) => savedIds.includes(j.id));
+  // Saved jobs data — full job objects for the saved tab
+  const savedJobs = allActiveJobs.filter((j) => savedIds.includes(j.id));
 
-  const handleRemoveSaved = (id: string) => {
-    savedJobsHook.toggle(id);
-    setSavedIds(savedJobsHook.load());
+  const handleRemoveSaved = async (id: string) => {
+    await toggleSave(id);
     toast.success("Removed from saved jobs");
   };
 
-  const handleSaveProfile = () => {
-    saveProfile({ firstName, lastName, phone, cdlNumber, licenseClass, yearsExp, licenseState, about } as DriverProfile);
-    toast.success("Profile saved. Your application form will pre-fill next time.");
+  const handleSaveProfile = async () => {
+    try {
+      await saveProfile({ firstName, lastName, phone, cdlNumber, licenseClass, yearsExp, licenseState, about } as DriverProfile);
+      toast.success("Profile saved. Your application form will pre-fill next time.");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to save profile.");
+    }
   };
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -163,7 +205,7 @@ const DriverDashboard = () => {
 
         {/* Welcome header */}
         <div className="bg-foreground text-background dark:bg-muted dark:text-foreground border-l-4 border-primary px-5 py-4 mb-6">
-          <p className="font-display font-bold text-lg">Welcome back, {user.name}</p>
+          <p className="font-display font-bold text-lg">Welcome back, {user!.name}</p>
           <p className="text-sm opacity-70 mt-0.5">Driver Dashboard</p>
         </div>
 
@@ -232,7 +274,7 @@ const DriverDashboard = () => {
                         <p className="font-medium text-sm truncate">{app.jobTitle && app.jobTitle !== "General Application" ? app.jobTitle : app.companyName}</p>
                         <p className="text-xs text-muted-foreground">{app.companyName} &middot; {formatRelativeDate(app.submittedAt)}</p>
                       </div>
-                      <StageBadge stage={pipelineStages[app.id] as PipelineStage | undefined} />
+                      <StageBadge stage={app.pipeline_stage} />
                     </div>
                   ))}
                 </div>
@@ -268,7 +310,6 @@ const DriverDashboard = () => {
             ) : (
               <div className="space-y-3">
                 {applications.map((app) => {
-                  const stage = pipelineStages[app.id] as PipelineStage | undefined;
                   const isExpanded = expandedApp === app.id;
                   const displayTitle = app.jobTitle && app.jobTitle !== "General Application"
                     ? app.jobTitle
@@ -286,7 +327,7 @@ const DriverDashboard = () => {
                           </p>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
-                          <StageBadge stage={stage} />
+                          <StageBadge stage={app.pipeline_stage} />
                           {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                         </div>
                       </div>
@@ -323,7 +364,7 @@ const DriverDashboard = () => {
                             </div>
                             <div>
                               <p className="text-xs text-muted-foreground uppercase tracking-wide">Status</p>
-                              <StageBadge stage={stage} />
+                              <StageBadge stage={app.pipeline_stage} />
                             </div>
                           </div>
                           {app.notes && (

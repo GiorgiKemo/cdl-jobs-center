@@ -14,6 +14,7 @@ import { useApplication } from "@/hooks/useApplication";
 import { useAuth } from "@/context/auth";
 import { SignInModal } from "@/components/SignInModal";
 import { Truck, CheckCircle2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 const US_STATES = [
   "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware",
@@ -60,12 +61,13 @@ const SectionHeader = ({ children }: { children: React.ReactNode }) => (
 
 const ApplyNow = () => {
   // All hooks must be declared before any conditional return
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [signInOpen, setSignInOpen] = useState(false);
   const { load, save } = useApplication();
   const saved = load();
 
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [firstName, setFirstName] = useState(saved.firstName ?? "");
   const [lastName, setLastName] = useState(saved.lastName ?? "");
   const [email, setEmail] = useState(saved.email ?? "");
@@ -108,6 +110,9 @@ const ApplyNow = () => {
     ...(saved.extra ?? {}),
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Loading guard — wait for auth session to resolve
+  if (loading) return null;
 
   // Auth gate — guests and company accounts cannot use this form
   if (!user || user.role === "company") {
@@ -204,7 +209,7 @@ const ApplyNow = () => {
     return e;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length > 0) {
@@ -213,6 +218,8 @@ const ApplyNow = () => {
       return;
     }
     setErrors({});
+    setSubmitting(true);
+
     const data = {
       firstName, lastName, email, phone, cdlNumber, zipCode, date,
       driverType, licenseClass, yearsExp, licenseState, soloTeam, notes,
@@ -220,14 +227,41 @@ const ApplyNow = () => {
     };
     save(data);
 
-    // Track in driver's own application history
-    const KEY_HISTORY = "cdl-driver-applications";
-    const history = JSON.parse(localStorage.getItem(KEY_HISTORY) ?? "[]");
-    const appId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    history.push({ ...data, id: appId, companyName: "General Application", jobId: null, jobTitle: "General Application", submittedAt: new Date().toISOString() });
-    localStorage.setItem(KEY_HISTORY, JSON.stringify(history));
-
-    setSubmitted(true);
+    try {
+      const { error } = await supabase.from("applications").insert({
+        driver_id: user.id,
+        company_id: null,
+        job_id: null,
+        company_name: "General Application",
+        job_title: "General Application",
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        phone,
+        cdl_number: cdlNumber,
+        zip_code: zipCode,
+        available_date: date || null,
+        driver_type: driverType,
+        license_class: licenseClass,
+        years_exp: yearsExp,
+        license_state: licenseState,
+        solo_team: soloTeam,
+        notes,
+        prefs,
+        endorse,
+        hauler,
+        route,
+        extra,
+        pipeline_stage: "New",
+      });
+      if (error) throw error;
+      setSubmitted(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Submission failed.";
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -432,7 +466,9 @@ const ApplyNow = () => {
 
             {/* Submit buttons */}
             <div className="flex items-center gap-3">
-              <Button type="submit" className="px-8">Send Application</Button>
+              <Button type="submit" className="px-8" disabled={submitting}>
+                {submitting ? "Submitting..." : "Send Application"}
+              </Button>
             </div>
 
           </div>

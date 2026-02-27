@@ -3,43 +3,48 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Phone, MapPin, ExternalLink, Truck } from "lucide-react";
-import { useJobs } from "@/hooks/useJobs";
-import { COMPANIES } from "@/data/companies";
+import { useJobById } from "@/hooks/useJobs";
 import { useAuth } from "@/context/auth";
 import { useState, useEffect } from "react";
 import { ApplyModal } from "@/components/ApplyModal";
 import { SignInModal } from "@/components/SignInModal";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 
 const JobDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { loadAll } = useJobs();
+  const { job, isLoading } = useJobById(id);
   const [applyOpen, setApplyOpen] = useState(false);
   const [signInOpen, setSignInOpen] = useState(false);
 
-  const job = loadAll().find((j) => j.id === id);
+  // Fetch company profile (phone, address, website, logo)
+  const { data: companyProfile } = useQuery({
+    queryKey: ["company_profile_detail", job?.companyId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("company_profiles")
+        .select("phone, address, website, logo_url")
+        .eq("id", job!.companyId!)
+        .single();
+      return data;
+    },
+    enabled: !!job?.companyId,
+  });
 
   useEffect(() => {
-    if (!job) {
+    if (!isLoading && !job) {
       toast.error("Job not found.");
       navigate("/jobs");
     }
-  }, [job, navigate]);
+  }, [job, isLoading, navigate]);
 
+  if (isLoading) return null;
   if (!job) return null;
 
-  const company = COMPANIES.find(
-    (c) => c.name.toLowerCase() === job.company.toLowerCase()
-  );
-
-  // Load company logo from the shared logos map saved via dashboard
-  const logos: Record<string, string> = (() => {
-    try { return JSON.parse(localStorage.getItem("cdl-company-logos") ?? "{}"); }
-    catch { return {}; }
-  })();
-  const companyLogo = logos[job.company];
+  const companyLogo = job.logoUrl ?? companyProfile?.logo_url;
 
   const handleApplyClick = () => {
     if (!user) {
@@ -76,10 +81,8 @@ const JobDetail = () => {
             <div className="shrink-0 h-20 w-20 bg-muted flex items-center justify-center font-display text-3xl font-bold text-primary border border-border overflow-hidden">
               {companyLogo ? (
                 <img src={companyLogo} alt={job.company} className="h-full w-full object-contain p-1" />
-              ) : company ? (
-                <span>{company.name.charAt(0)}</span>
               ) : (
-                <Truck className="h-8 w-8 text-muted-foreground" />
+                <span>{job.company.charAt(0)}</span>
               )}
             </div>
 
@@ -88,21 +91,21 @@ const JobDetail = () => {
               <h2 className="font-display font-bold text-primary text-lg mb-2">
                 {job.company}
               </h2>
-              {company?.phone && (
+              {companyProfile?.phone && (
                 <p className="flex items-center gap-1.5 text-sm text-muted-foreground mb-1">
                   <Phone className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
-                  {company.phone}
+                  {companyProfile.phone}
                 </p>
               )}
-              {company?.address && (
+              {companyProfile?.address && (
                 <p className="flex items-start gap-1.5 text-sm text-muted-foreground mb-1">
                   <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" aria-hidden="true" />
-                  {company.address}
+                  {companyProfile.address}
                 </p>
               )}
-              {company?.website && (
+              {companyProfile?.website && (
                 <a
-                  href={company.website}
+                  href={companyProfile.website}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 text-sm text-primary hover:underline"
@@ -181,7 +184,13 @@ const JobDetail = () => {
       <Footer />
 
       {applyOpen && (
-        <ApplyModal companyName={job.company} jobId={job.id} jobTitle={job.title} onClose={() => setApplyOpen(false)} />
+        <ApplyModal
+          companyName={job.company}
+          companyId={job.companyId}
+          jobId={job.id}
+          jobTitle={job.title}
+          onClose={() => setApplyOpen(false)}
+        />
       )}
       {signInOpen && (
         <SignInModal onClose={() => setSignInOpen(false)} />

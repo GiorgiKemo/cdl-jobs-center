@@ -10,6 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useApplication } from "@/hooks/useApplication";
+import { useAuth } from "@/context/auth";
+import { supabase } from "@/lib/supabase";
 
 const US_STATES = [
   "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware",
@@ -40,12 +42,14 @@ const SectionHeader = ({ children }: { children: React.ReactNode }) => (
 
 interface ApplyModalProps {
   companyName: string;
+  companyId?: string;
   jobId?: string;
   jobTitle?: string;
   onClose: () => void;
 }
 
-export function ApplyModal({ companyName, jobId, jobTitle, onClose }: ApplyModalProps) {
+export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }: ApplyModalProps) {
+  const { user } = useAuth();
   const { load, save } = useApplication();
   const saved = load();
 
@@ -89,6 +93,7 @@ export function ApplyModal({ companyName, jobId, jobTitle, onClose }: ApplyModal
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
 
   const tog = <T extends Record<string, boolean>>(setter: React.Dispatch<React.SetStateAction<T>>, key: keyof T) =>
     (v: boolean) => setter((prev) => ({ ...prev, [key]: v }));
@@ -110,7 +115,7 @@ export function ApplyModal({ companyName, jobId, jobTitle, onClose }: ApplyModal
     return e;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length > 0) {
@@ -119,37 +124,52 @@ export function ApplyModal({ companyName, jobId, jobTitle, onClose }: ApplyModal
       return;
     }
     setErrors({});
+    setSubmitting(true);
+
     const data = {
       firstName, lastName, email, phone, cdlNumber, zipCode, date,
       driverType, licenseClass, yearsExp, licenseState, soloTeam, notes,
       prefs, endorse, hauler, route, extra,
     };
+    // Save form draft for next time
     save(data);
 
-    const appId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    const appEntry = {
-      ...data,
-      id: appId,
-      companyName,
-      jobId: jobId ?? null,
-      jobTitle: jobTitle ?? null,
-      submittedAt: new Date().toISOString(),
-    };
-
-    // Record received application for the company's dashboard
-    const KEY_RECEIVED = "cdl-applications-received";
-    const received = JSON.parse(localStorage.getItem(KEY_RECEIVED) ?? "[]");
-    received.push(appEntry);
-    localStorage.setItem(KEY_RECEIVED, JSON.stringify(received));
-
-    // Also track in driver's own application history
-    const KEY_HISTORY = "cdl-driver-applications";
-    const history = JSON.parse(localStorage.getItem(KEY_HISTORY) ?? "[]");
-    history.push(appEntry);
-    localStorage.setItem(KEY_HISTORY, JSON.stringify(history));
-
-    toast.success(`Application submitted to ${companyName}!`);
-    onClose();
+    try {
+      const { error } = await supabase.from("applications").insert({
+        driver_id: user?.id ?? null,
+        company_id: companyId ?? null,
+        job_id: jobId ?? null,
+        company_name: companyName,
+        job_title: jobTitle ?? null,
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        phone,
+        cdl_number: cdlNumber,
+        zip_code: zipCode,
+        available_date: date || null,
+        driver_type: driverType,
+        license_class: licenseClass,
+        years_exp: yearsExp,
+        license_state: licenseState,
+        solo_team: soloTeam,
+        notes,
+        prefs,
+        endorse,
+        hauler,
+        route,
+        extra,
+        pipeline_stage: "New",
+      });
+      if (error) throw error;
+      toast.success(`Application submitted to ${companyName}!`);
+      onClose();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Submission failed.";
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const modal = (
@@ -352,7 +372,9 @@ export function ApplyModal({ companyName, jobId, jobTitle, onClose }: ApplyModal
 
           {/* Submit */}
           <div className="flex items-center gap-3 pb-2">
-            <Button type="submit" className="px-8">Send Application</Button>
+            <Button type="submit" className="px-8" disabled={submitting}>
+              {submitting ? "Submitting..." : "Send Application"}
+            </Button>
             <Button type="button" variant="outline" className="px-8" onClick={onClose}>Cancel</Button>
           </div>
         </form>

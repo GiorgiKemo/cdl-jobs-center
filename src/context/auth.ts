@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 
 export interface User {
+  id: string;
   email: string;
   name: string;
   role: "driver" | "company";
@@ -8,9 +9,10 @@ export interface User {
 
 export interface AuthContextType {
   user: User | null;
-  signIn: (username: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string, role: "driver" | "company") => Promise<void>;
-  signOut: () => void;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string, role: "driver" | "company") => Promise<void>;
+  signOut: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null);
