@@ -174,6 +174,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
           last_name: rest.join(" ") || "",
           phone: driverPhone || "",
           cdl_number: cdlNumber || "",
+          zip_code: zipCode || "",
         });
       }
       toast.success("Account created! You're now signed in.");

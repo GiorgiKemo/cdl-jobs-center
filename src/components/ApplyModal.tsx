@@ -107,6 +107,8 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
     setLicenseClass(prev => prev || profile.licenseClass);
     setYearsExp(prev => prev || profile.yearsExp);
     setLicenseState(prev => prev || profile.licenseState);
+    setZipCode(prev => prev || profile.zipCode);
+    setDate(prev => prev || profile.dateOfBirth);
   }, [profile]);
 
   // Pre-fill email from auth user

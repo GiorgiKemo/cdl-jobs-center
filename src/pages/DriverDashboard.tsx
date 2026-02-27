@@ -144,6 +144,8 @@ const DriverDashboardInner = () => {
   const [licenseClass, setLicenseClass] = useState("");
   const [yearsExp, setYearsExp] = useState("");
   const [licenseState, setLicenseState] = useState("");
+  const [zipCode, setZipCode] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [about, setAbout] = useState("");
   const [profileInit, setProfileInit] = useState(false);
 
@@ -157,6 +159,8 @@ const DriverDashboardInner = () => {
       setLicenseClass(profile.licenseClass);
       setYearsExp(profile.yearsExp);
       setLicenseState(profile.licenseState);
+      setZipCode(profile.zipCode);
+      setDateOfBirth(profile.dateOfBirth);
       setAbout(profile.about);
       setProfileInit(true);
     }
@@ -178,7 +182,7 @@ const DriverDashboardInner = () => {
 
   const handleSaveProfile = async () => {
     try {
-      await saveProfile({ firstName, lastName, phone, cdlNumber, licenseClass, yearsExp, licenseState, about } as DriverProfile);
+      await saveProfile({ firstName, lastName, phone, cdlNumber, licenseClass, yearsExp, licenseState, zipCode, dateOfBirth, about } as DriverProfile);
       toast.success("Profile saved. Your application form will pre-fill next time.");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to save profile.");
@@ -468,6 +472,14 @@ const DriverDashboardInner = () => {
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">CDL Number</Label>
                   <Input value={cdlNumber} onChange={(e) => setCdlNumber(e.target.value)} placeholder="CDL-XX-000000" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Zip Code</Label>
+                  <Input value={zipCode} onChange={(e) => setZipCode(e.target.value)} placeholder="00000" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Date of Birth</Label>
+                  <Input value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} type="date" />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">License Class</Label>

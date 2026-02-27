@@ -9,6 +9,8 @@ export interface DriverProfile {
   licenseClass: string;
   yearsExp: string;
   licenseState: string;
+  zipCode: string;
+  dateOfBirth: string;
   about: string;
 }
 
@@ -34,6 +36,8 @@ export function useDriverProfile(driverId: string) {
         licenseClass: data.license_class ?? "",
         yearsExp: data.years_exp ?? "",
         licenseState: data.license_state ?? "",
+        zipCode: data.zip_code ?? "",
+        dateOfBirth: data.date_of_birth ?? "",
         about: data.about ?? "",
       } as DriverProfile;
     },
@@ -51,6 +55,8 @@ export function useDriverProfile(driverId: string) {
         license_class: profile.licenseClass,
         years_exp: profile.yearsExp,
         license_state: profile.licenseState,
+        zip_code: profile.zipCode,
+        date_of_birth: profile.dateOfBirth,
         about: profile.about,
         updated_at: new Date().toISOString(),
       });
