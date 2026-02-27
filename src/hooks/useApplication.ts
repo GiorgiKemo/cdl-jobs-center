@@ -32,7 +32,12 @@ export function useApplication() {
   };
 
   const save = (data: ApplicationData) => {
-    localStorage.setItem(KEY, JSON.stringify(data));
+    try {
+      localStorage.setItem(KEY, JSON.stringify(data));
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   return { load, save };

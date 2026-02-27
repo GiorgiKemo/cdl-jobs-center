@@ -130,46 +130,50 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
     setErrors({});
     setSubmitting(true);
 
-    const data = {
-      firstName, lastName, email, phone, cdlNumber, zipCode, date,
-      driverType, licenseClass, yearsExp, licenseState, soloTeam, notes,
-      prefs, endorse, hauler, route, extra,
-    };
-    // Save form draft for next time
-    save(data);
-
-    const insertPromise = supabase.from("applications").insert({
-      driver_id: user.id,
-      company_id: companyId ?? null,
-      job_id: jobId ?? null,
-      company_name: companyName,
-      job_title: jobTitle ?? null,
-      first_name: firstName,
-      last_name: lastName,
-      email,
-      phone,
-      cdl_number: cdlNumber,
-      zip_code: zipCode,
-      available_date: date || null,
-      driver_type: driverType,
-      license_class: licenseClass,
-      years_exp: yearsExp,
-      license_state: licenseState,
-      solo_team: soloTeam,
-      notes,
-      prefs,
-      endorse,
-      hauler,
-      route,
-      extra,
-      pipeline_stage: "New",
-    });
-
-    const timeoutPromise = new Promise<{ error: Error }>((_res, reject) =>
-      setTimeout(() => reject(new Error("Request timed out. Check your connection and try again.")), 30000)
-    );
-
     try {
+      const data = {
+        firstName, lastName, email, phone, cdlNumber, zipCode, date,
+        driverType, licenseClass, yearsExp, licenseState, soloTeam, notes,
+        prefs, endorse, hauler, route, extra,
+      };
+
+      // Save form draft for next time, but do not block submit if storage fails.
+      const savedOk = save(data);
+      if (!savedOk) {
+        console.warn("Could not save application draft to localStorage.");
+      }
+
+      const insertPromise = supabase.from("applications").insert({
+        driver_id: user.id,
+        company_id: companyId ?? null,
+        job_id: jobId ?? null,
+        company_name: companyName,
+        job_title: jobTitle ?? null,
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        phone,
+        cdl_number: cdlNumber,
+        zip_code: zipCode,
+        available_date: date || null,
+        driver_type: driverType,
+        license_class: licenseClass,
+        years_exp: yearsExp,
+        license_state: licenseState,
+        solo_team: soloTeam,
+        notes,
+        prefs,
+        endorse,
+        hauler,
+        route,
+        extra,
+        pipeline_stage: "New",
+      });
+
+      const timeoutPromise = new Promise<never>((_res, reject) =>
+        setTimeout(() => reject(new Error("Request timed out. Check your connection and try again.")), 30000)
+      );
+
       const { error } = await Promise.race([insertPromise, timeoutPromise]) as { error: unknown };
       if (error) {
         const msg =

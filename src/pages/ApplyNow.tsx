@@ -220,14 +220,18 @@ const ApplyNow = () => {
     setErrors({});
     setSubmitting(true);
 
-    const data = {
-      firstName, lastName, email, phone, cdlNumber, zipCode, date,
-      driverType, licenseClass, yearsExp, licenseState, soloTeam, notes,
-      prefs, endorse, hauler, route, extra,
-    };
-    save(data);
-
     try {
+      const data = {
+        firstName, lastName, email, phone, cdlNumber, zipCode, date,
+        driverType, licenseClass, yearsExp, licenseState, soloTeam, notes,
+        prefs, endorse, hauler, route, extra,
+      };
+
+      const savedOk = save(data);
+      if (!savedOk) {
+        console.warn("Could not save application draft to localStorage.");
+      }
+
       const { error } = await supabase.from("applications").insert({
         driver_id: user.id,
         company_id: null,
