@@ -7,11 +7,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const loadProfile = async (userId: string, userEmail: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, name, role")
-      .eq("id", userId)
-      .maybeSingle();
+    // Retry up to 4 times with 600ms delay — the DB trigger that creates the
+    // profiles row runs asynchronously and may not be committed yet on the
+    // first attempt (especially right after signUp).
+    let data = null;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const { data: row } = await supabase
+        .from("profiles")
+        .select("id, name, role")
+        .eq("id", userId)
+        .maybeSingle();
+      if (row) { data = row; break; }
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 600));
+    }
 
     if (data) {
       setUser({

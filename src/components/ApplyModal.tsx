@@ -138,38 +138,53 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
     // Save form draft for next time
     save(data);
 
+    const insertPromise = supabase.from("applications").insert({
+      driver_id: user.id,
+      company_id: companyId ?? null,
+      job_id: jobId ?? null,
+      company_name: companyName,
+      job_title: jobTitle ?? null,
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      phone,
+      cdl_number: cdlNumber,
+      zip_code: zipCode,
+      available_date: date || null,
+      driver_type: driverType,
+      license_class: licenseClass,
+      years_exp: yearsExp,
+      license_state: licenseState,
+      solo_team: soloTeam,
+      notes,
+      prefs,
+      endorse,
+      hauler,
+      route,
+      extra,
+      pipeline_stage: "New",
+    });
+
+    const timeoutPromise = new Promise<{ error: Error }>((_res, reject) =>
+      setTimeout(() => reject(new Error("Request timed out. Check your connection and try again.")), 30000)
+    );
+
     try {
-      const { error } = await supabase.from("applications").insert({
-        driver_id: user?.id ?? null,
-        company_id: companyId ?? null,
-        job_id: jobId ?? null,
-        company_name: companyName,
-        job_title: jobTitle ?? null,
-        first_name: firstName,
-        last_name: lastName,
-        email,
-        phone,
-        cdl_number: cdlNumber,
-        zip_code: zipCode,
-        available_date: date || null,
-        driver_type: driverType,
-        license_class: licenseClass,
-        years_exp: yearsExp,
-        license_state: licenseState,
-        solo_team: soloTeam,
-        notes,
-        prefs,
-        endorse,
-        hauler,
-        route,
-        extra,
-        pipeline_stage: "New",
-      });
-      if (error) throw error;
+      const { error } = await Promise.race([insertPromise, timeoutPromise]) as { error: unknown };
+      if (error) {
+        const msg =
+          error instanceof Error
+            ? error.message
+            : (error as { message?: string })?.message ?? "Submission failed.";
+        console.error("Application insert error:", error);
+        toast.error(msg);
+        return;
+      }
       toast.success(`Application submitted to ${companyName}!`);
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Submission failed.";
+      const msg = err instanceof Error ? err.message : "Submission failed. Please try again.";
+      console.error("Application submit error:", err);
       toast.error(msg);
     } finally {
       setSubmitting(false);
