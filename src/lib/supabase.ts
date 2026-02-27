@@ -7,4 +7,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY — add them to .env.local");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    // Bypass the Web Locks API to avoid "orphaned lock" warnings that fire
+    // on tab visibility changes.  Safe for single-tab usage; the Supabase
+    // client handles token refresh internally regardless.
+    lock: async (_name: string, _acquireTimeout: number, fn: () => Promise<unknown>) => {
+      return await fn();
+    },
+  },
+});
