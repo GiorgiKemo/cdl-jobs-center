@@ -36,6 +36,26 @@ const COMPANY_GOALS = [
   "Use CDL Jobs Center Recruiting team to help you hire drivers",
 ];
 
+const DRIVER_INTERESTS = [
+  "Lease purchase",
+  "Company driver",
+  "Owner operator",
+  "Team driving",
+  "Local routes",
+  "Regional routes",
+  "OTR (Over the road)",
+];
+
+const DRIVER_NEXT_JOB = [
+  "Higher pay",
+  "Better home time",
+  "Sign-on bonus",
+  "Health benefits",
+  "Stable routes",
+  "Career growth",
+  "Newer equipment",
+];
+
 interface SignInModalProps {
   onClose: () => void;
 }
@@ -56,6 +76,15 @@ export function SignInModal({ onClose }: SignInModalProps) {
 
   // Driver-specific
   const [regUsername, setRegUsername] = useState("");
+  const [driverName, setDriverName] = useState("");
+  const [homeAddress, setHomeAddress] = useState("");
+  const [zipCode, setZipCode] = useState("");
+  const [driverPhone, setDriverPhone] = useState("");
+  const [cdlNumber, setCdlNumber] = useState("");
+  const [interestedIn, setInterestedIn] = useState(DRIVER_INTERESTS[0]);
+  const [nextJobWant, setNextJobWant] = useState(DRIVER_NEXT_JOB[0]);
+  const [hasAccidents, setHasAccidents] = useState("No");
+  const [wantsContact, setWantsContact] = useState("Yes");
 
   // Company-specific
   const [contactName, setContactName] = useState("");
@@ -216,32 +245,102 @@ export function SignInModal({ onClose }: SignInModalProps) {
             {role === "driver" && (
               <form onSubmit={handleDriverRegister} className="px-5 py-4 space-y-3 overflow-y-auto flex-1">
                 <Input
-                  placeholder="Username"
+                  placeholder="Username *"
                   value={regUsername}
                   onChange={(e) => setRegUsername(e.target.value)}
                   autoComplete="username"
                 />
                 <Input
+                  type="email"
+                  placeholder="Your e-mail *"
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  autoComplete="email"
+                />
+                <Input
                   type="password"
-                  placeholder="Password"
+                  placeholder="Password *"
                   value={regPassword}
                   onChange={(e) => setRegPassword(e.target.value)}
                   autoComplete="new-password"
                 />
                 <Input
                   type="password"
-                  placeholder="Confirm password"
+                  placeholder="Confirm password *"
                   value={regConfirm}
                   onChange={(e) => setRegConfirm(e.target.value)}
                   autoComplete="new-password"
                 />
+                <hr className="border-border" />
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Driver Profile</p>
                 <Input
-                  type="email"
-                  placeholder="Your e-mail"
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                  autoComplete="email"
+                  placeholder="Your name"
+                  value={driverName}
+                  onChange={(e) => setDriverName(e.target.value)}
+                  autoComplete="name"
                 />
+                <Input
+                  placeholder="Home Address"
+                  value={homeAddress}
+                  onChange={(e) => setHomeAddress(e.target.value)}
+                  autoComplete="street-address"
+                />
+                <Input
+                  placeholder="Zip Code"
+                  value={zipCode}
+                  onChange={(e) => setZipCode(e.target.value)}
+                  autoComplete="postal-code"
+                />
+                <Input
+                  placeholder="Phone Number"
+                  type="tel"
+                  value={driverPhone}
+                  onChange={(e) => setDriverPhone(e.target.value)}
+                  autoComplete="tel"
+                />
+                <Input
+                  placeholder="CDL Number"
+                  value={cdlNumber}
+                  onChange={(e) => setCdlNumber(e.target.value)}
+                />
+                <div>
+                  <label className="text-sm text-primary font-medium block mb-1">I am interested in:</label>
+                  <Select value={interestedIn} onValueChange={setInterestedIn}>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {DRIVER_INTERESTS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm text-primary font-medium block mb-1">In my next job I want:</label>
+                  <Select value={nextJobWant} onValueChange={setNextJobWant}>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {DRIVER_NEXT_JOB.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm text-primary font-medium block mb-1">Any accidents or violations in the last 2 years?</label>
+                  <Select value={hasAccidents} onValueChange={setHasAccidents}>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="No">No</SelectItem>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm text-primary font-medium block mb-1">I want CDL Jobs Center staff to contact me with employment offers</label>
+                  <Select value={wantsContact} onValueChange={setWantsContact}>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Button type="submit" className="w-full">Submit</Button>
                 <button type="button" onClick={() => setView("login")} className="w-full text-center text-sm text-primary hover:underline">
                   ← Back to login
