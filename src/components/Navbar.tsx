@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Phone, Mail, Truck, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTheme } from "@/hooks/useTheme";
 
 const jobDropdownItems = [
   { name: "Dry Van", path: "/jobs?type=dry-van" },
@@ -23,11 +24,85 @@ const navLinks = [
   { name: "Companies", path: "/companies" },
 ];
 
+// Truck front-view SVG — headlights off in light mode, glowing amber in dark mode
+const TruckToggle = ({ isDark, onClick }: { isDark: boolean; onClick: () => void }) => (
+  <button
+    onClick={onClick}
+    title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+    className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+    aria-label="Toggle dark mode"
+  >
+    <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+      {/* Cab roof */}
+      <path
+        d="M4 9 L4 5.5 Q15 2.5 26 5.5 L26 9 Z"
+        className="fill-primary dark:fill-slate-400 transition-colors duration-300"
+      />
+      {/* Windshield */}
+      <rect x="5.5" y="9" width="19" height="6.5" rx="0.5"
+        className="fill-sky-200 dark:fill-slate-800 transition-colors duration-300"
+      />
+      {/* Main body / hood */}
+      <rect x="3" y="15.5" width="24" height="10" rx="0.5"
+        className="fill-primary dark:fill-slate-700 transition-colors duration-300"
+      />
+      {/* Grille center section */}
+      <rect x="11.5" y="16.5" width="7" height="8" rx="0.5"
+        className="fill-primary/60 dark:fill-slate-600 transition-colors duration-300"
+      />
+      {/* Grille lines */}
+      <line x1="11.5" y1="18.5" x2="18.5" y2="18.5"
+        className="stroke-white/20 dark:stroke-slate-500"
+        strokeWidth="0.6"
+      />
+      <line x1="11.5" y1="20.5" x2="18.5" y2="20.5"
+        className="stroke-white/20 dark:stroke-slate-500"
+        strokeWidth="0.6"
+      />
+      <line x1="11.5" y1="22.5" x2="18.5" y2="22.5"
+        className="stroke-white/20 dark:stroke-slate-500"
+        strokeWidth="0.6"
+      />
+      {/* Left headlight housing */}
+      <rect x="3.5" y="16.5" width="7" height="7" rx="0.5"
+        className="fill-primary/75 dark:fill-slate-600 transition-colors duration-300"
+      />
+      {/* Right headlight housing */}
+      <rect x="19.5" y="16.5" width="7" height="7" rx="0.5"
+        className="fill-primary/75 dark:fill-slate-600 transition-colors duration-300"
+      />
+      {/* Left headlight bulb */}
+      <circle
+        cx="7"
+        cy="20"
+        r="2.4"
+        fill={isDark ? "#fbbf24" : "#4b5563"}
+        style={isDark ? { filter: "drop-shadow(0 0 4px #fbbf24) drop-shadow(0 0 10px #f59e0b)" } : undefined}
+        className="transition-colors duration-300"
+      />
+      {/* Right headlight bulb */}
+      <circle
+        cx="23"
+        cy="20"
+        r="2.4"
+        fill={isDark ? "#fbbf24" : "#4b5563"}
+        style={isDark ? { filter: "drop-shadow(0 0 4px #fbbf24) drop-shadow(0 0 10px #f59e0b)" } : undefined}
+        className="transition-colors duration-300"
+      />
+      {/* Bumper */}
+      <rect x="2" y="25.5" width="26" height="2.5" rx="0.5"
+        className="fill-primary/50 dark:fill-slate-500 transition-colors duration-300"
+      />
+    </svg>
+  </button>
+);
+
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [jobsDropdownOpen, setJobsDropdownOpen] = useState(false);
   const [jobsMobileOpen, setJobsMobileOpen] = useState(false);
   const location = useLocation();
+  const { isDark, toggle } = useTheme();
 
   return (
     <>
@@ -145,6 +220,7 @@ const Navbar = () => {
           </div>
 
           <div className="hidden lg:flex items-center gap-3">
+            <TruckToggle isDark={isDark} onClick={toggle} />
             <Button variant="outline" size="sm" asChild>
               <Link to="/signin">Sign In</Link>
             </Button>
@@ -227,7 +303,8 @@ const Navbar = () => {
                     </Link>
                   )
                 )}
-                <div className="flex gap-2 pt-2">
+                <div className="flex gap-2 pt-2 items-center">
+                  <TruckToggle isDark={isDark} onClick={toggle} />
                   <Button variant="outline" size="sm" className="flex-1" asChild>
                     <Link to="/signin">Sign In</Link>
                   </Button>

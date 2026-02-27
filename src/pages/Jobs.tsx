@@ -193,7 +193,7 @@ const Jobs = () => {
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           {/* Sidebar filter */}
           <div className="w-full lg:w-72 shrink-0 border border-border">
-            <div className="bg-foreground text-background px-4 py-3 border-l-4 border-primary">
+            <div className="bg-foreground text-background dark:bg-muted dark:text-foreground px-4 py-3 border-l-4 border-primary">
               <p className="font-semibold text-sm">Filter jobs</p>
             </div>
             <div className="p-4 space-y-4">
