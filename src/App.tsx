@@ -9,6 +9,8 @@ import Jobs from "./pages/Jobs";
 import Drivers from "./pages/Drivers";
 import Companies from "./pages/Companies";
 import SignIn from "./pages/SignIn";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./context/AuthContext";
 
@@ -28,6 +30,8 @@ const App = () => (
             <Route path="/drivers" element={<Drivers />} />
             <Route path="/companies" element={<Companies />} />
             <Route path="/signin" element={<SignIn />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
