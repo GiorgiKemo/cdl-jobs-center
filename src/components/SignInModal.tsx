@@ -28,6 +28,14 @@ If you violate the rules you may be given a warning. In some cases, you may be b
 
 Insulting administrators and moderators is also punishable by a ban — Respect other people's labor.`;
 
+const COMPANY_GOALS = [
+  "Acquire more driver leads",
+  "Hire more CDL Class A drivers",
+  "Post Jobs to attract applicants",
+  "Receive driver exposure",
+  "Use CDL Jobs Center Recruiting team to help you hire drivers",
+];
+
 interface SignInModalProps {
   onClose: () => void;
 }
@@ -40,12 +48,22 @@ export function SignInModal({ onClose }: SignInModalProps) {
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
-  // Register state
+  // Shared register state
   const [role, setRole] = useState<"driver" | "company">("driver");
-  const [regUsername, setRegUsername] = useState("");
+  const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regConfirm, setRegConfirm] = useState("");
-  const [regEmail, setRegEmail] = useState("");
+
+  // Driver-specific
+  const [regUsername, setRegUsername] = useState("");
+
+  // Company-specific
+  const [contactName, setContactName] = useState("");
+  const [contactTitle, setContactTitle] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [companyAddress, setCompanyAddress] = useState("");
+  const [companyPhone, setCompanyPhone] = useState("");
+  const [companyGoal, setCompanyGoal] = useState(COMPANY_GOALS[0]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,7 +76,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
     onClose();
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleDriverRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!regUsername || !regPassword || !regEmail) {
       toast.error("Please fill in all fields.");
@@ -68,24 +86,51 @@ export function SignInModal({ onClose }: SignInModalProps) {
       toast.error("Passwords do not match.");
       return;
     }
-    await register(regUsername, regEmail, regPassword, role);
+    await register(regUsername, regEmail, regPassword, "driver");
     toast.success("Account created! Welcome to CDL Jobs Center.");
     onClose();
   };
+
+  const handleCompanyRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!contactName || !companyName || !regEmail || !regPassword) {
+      toast.error("Please fill in all required fields.");
+      return;
+    }
+    if (regPassword !== regConfirm) {
+      toast.error("Passwords do not match.");
+      return;
+    }
+    await register(companyName, regEmail, regPassword, "company");
+    toast.success("Company account created! Welcome to CDL Jobs Center.");
+    onClose();
+  };
+
+  const ModalHeader = ({ title }: { title: string }) => (
+    <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+      <div className="flex items-center gap-3">
+        <div className="w-1 h-5 bg-primary shrink-0" />
+        <h2 className="font-display font-bold text-base">{title}</h2>
+      </div>
+      <button onClick={onClose} className="p-1 hover:text-primary transition-colors" aria-label="Close">
+        <X className="h-5 w-5" />
+      </button>
+    </div>
+  );
 
   const modal = (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-background border border-border w-full max-w-md shadow-lg">
+      <div className="bg-background border border-border w-full max-w-md shadow-lg max-h-[90vh] flex flex-col">
 
         {/* ── LOGIN VIEW ── */}
         {view === "login" && (
           <>
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
               <h2 className="font-display font-bold text-lg">Login</h2>
-              <button onClick={onClose} className="p-1 hover:text-primary transition-colors">
+              <button onClick={onClose} className="p-1 hover:text-primary transition-colors" aria-label="Close">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -129,23 +174,15 @@ export function SignInModal({ onClose }: SignInModalProps) {
         {/* ── RULES VIEW ── */}
         {view === "rules" && (
           <>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-              <div className="flex items-center gap-3">
-                <div className="w-1 h-5 bg-primary" />
-                <h2 className="font-display font-bold text-base">General rules on the website</h2>
-              </div>
-              <button onClick={onClose} className="p-1 hover:text-primary transition-colors">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="px-5 py-4 max-h-96 overflow-y-auto">
+            <ModalHeader title="General rules on the website" />
+            <div className="px-5 py-4 overflow-y-auto flex-1">
               {RULES_TEXT.split("\n\n").map((para, i) => (
                 <p key={i} className="text-sm text-muted-foreground mb-3 leading-relaxed whitespace-pre-line">
                   {para}
                 </p>
               ))}
             </div>
-            <div className="flex gap-3 px-5 py-4 border-t border-border">
+            <div className="flex gap-3 px-5 py-4 border-t border-border shrink-0">
               <Button className="flex-1" onClick={() => setView("register")}>
                 Accept
               </Button>
@@ -159,64 +196,132 @@ export function SignInModal({ onClose }: SignInModalProps) {
         {/* ── REGISTER VIEW ── */}
         {view === "register" && (
           <>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-              <div className="flex items-center gap-3">
-                <div className="w-1 h-5 bg-primary" />
-                <h2 className="font-display font-bold text-base">New user registration</h2>
-              </div>
-              <button onClick={onClose} className="p-1 hover:text-primary transition-colors">
-                <X className="h-5 w-5" />
-              </button>
+            <ModalHeader title="New user registration" />
+
+            {/* Role selector — always visible at top */}
+            <div className="px-5 pt-4 pb-2 border-b border-border shrink-0">
+              <label className="text-sm text-primary font-medium block mb-1">Who are you?</label>
+              <Select value={role} onValueChange={(v) => setRole(v as "driver" | "company")}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="driver">Driver</SelectItem>
+                  <SelectItem value="company">Company</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <form onSubmit={handleRegister} className="px-5 py-5 space-y-3">
-              <div>
-                <label className="text-sm text-primary font-medium block mb-1">Who are you?</label>
-                <Select value={role} onValueChange={(v) => setRole(v as "driver" | "company")}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="driver">Driver</SelectItem>
-                    <SelectItem value="company">Company</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Input
-                placeholder="Username"
-                value={regUsername}
-                onChange={(e) => setRegUsername(e.target.value)}
-                autoComplete="username"
-              />
-              <Input
-                type="password"
-                placeholder="Password"
-                value={regPassword}
-                onChange={(e) => setRegPassword(e.target.value)}
-                autoComplete="new-password"
-              />
-              <Input
-                type="password"
-                placeholder="Confirm password"
-                value={regConfirm}
-                onChange={(e) => setRegConfirm(e.target.value)}
-                autoComplete="new-password"
-              />
-              <Input
-                type="email"
-                placeholder="Your e-mail"
-                value={regEmail}
-                onChange={(e) => setRegEmail(e.target.value)}
-                autoComplete="email"
-              />
-              <Button type="submit" className="w-full">Submit</Button>
-              <button
-                type="button"
-                onClick={() => setView("login")}
-                className="w-full text-center text-sm text-primary hover:underline"
-              >
-                ← Back to login
-              </button>
-            </form>
+
+            {/* ── DRIVER FORM ── */}
+            {role === "driver" && (
+              <form onSubmit={handleDriverRegister} className="px-5 py-4 space-y-3 overflow-y-auto flex-1">
+                <Input
+                  placeholder="Username"
+                  value={regUsername}
+                  onChange={(e) => setRegUsername(e.target.value)}
+                  autoComplete="username"
+                />
+                <Input
+                  type="password"
+                  placeholder="Password"
+                  value={regPassword}
+                  onChange={(e) => setRegPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+                <Input
+                  type="password"
+                  placeholder="Confirm password"
+                  value={regConfirm}
+                  onChange={(e) => setRegConfirm(e.target.value)}
+                  autoComplete="new-password"
+                />
+                <Input
+                  type="email"
+                  placeholder="Your e-mail"
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  autoComplete="email"
+                />
+                <Button type="submit" className="w-full">Submit</Button>
+                <button type="button" onClick={() => setView("login")} className="w-full text-center text-sm text-primary hover:underline">
+                  ← Back to login
+                </button>
+              </form>
+            )}
+
+            {/* ── COMPANY FORM ── */}
+            {role === "company" && (
+              <form onSubmit={handleCompanyRegister} className="px-5 py-4 space-y-3 overflow-y-auto flex-1">
+                <Input
+                  type="email"
+                  placeholder="Your e-mail *"
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  autoComplete="email"
+                />
+                <Input
+                  type="password"
+                  placeholder="Password *"
+                  value={regPassword}
+                  onChange={(e) => setRegPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+                <Input
+                  type="password"
+                  placeholder="Confirm password *"
+                  value={regConfirm}
+                  onChange={(e) => setRegConfirm(e.target.value)}
+                  autoComplete="new-password"
+                />
+                <hr className="border-border" />
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Company Profile</p>
+                <Input
+                  placeholder="Your name *"
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
+                />
+                <Input
+                  placeholder="Your title"
+                  value={contactTitle}
+                  onChange={(e) => setContactTitle(e.target.value)}
+                />
+                <Input
+                  placeholder="Company Name *"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                />
+                <Input
+                  placeholder="Company Address"
+                  value={companyAddress}
+                  onChange={(e) => setCompanyAddress(e.target.value)}
+                />
+                <Input
+                  placeholder="Company phone number"
+                  type="tel"
+                  value={companyPhone}
+                  onChange={(e) => setCompanyPhone(e.target.value)}
+                />
+                <div>
+                  <label className="text-sm text-primary font-medium block mb-1">
+                    What do you want to accomplish by using CDL Jobs Center?
+                  </label>
+                  <Select value={companyGoal} onValueChange={setCompanyGoal}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COMPANY_GOALS.map((g) => (
+                        <SelectItem key={g} value={g}>{g}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button type="submit" className="w-full">Submit</Button>
+                <button type="button" onClick={() => setView("login")} className="w-full text-center text-sm text-primary hover:underline">
+                  ← Back to login
+                </button>
+              </form>
+            )}
           </>
         )}
 
