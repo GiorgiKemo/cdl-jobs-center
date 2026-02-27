@@ -1,6 +1,6 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { useApplication } from "@/hooks/useApplication";
 import { useAuth } from "@/context/auth";
+import { useDriverProfile } from "@/hooks/useDriverProfile";
 import { SignInModal } from "@/components/SignInModal";
 import { Truck, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -65,6 +66,7 @@ const ApplyNow = () => {
   const [signInOpen, setSignInOpen] = useState(false);
   const { load, save } = useApplication();
   const saved = load();
+  const { profile } = useDriverProfile(user?.id ?? "");
 
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -110,6 +112,23 @@ const ApplyNow = () => {
     ...(saved.extra ?? {}),
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Pre-fill empty fields from driver profile (Supabase)
+  useEffect(() => {
+    if (!profile) return;
+    setFirstName(prev => prev || profile.firstName);
+    setLastName(prev => prev || profile.lastName);
+    setPhone(prev => prev || profile.phone);
+    setCdlNumber(prev => prev || profile.cdlNumber);
+    setLicenseClass(prev => prev || profile.licenseClass);
+    setYearsExp(prev => prev || profile.yearsExp);
+    setLicenseState(prev => prev || profile.licenseState);
+  }, [profile]);
+
+  // Pre-fill email from auth user
+  useEffect(() => {
+    if (user?.email) setEmail(prev => prev || user.email);
+  }, [user]);
 
   // Loading guard — wait for auth session to resolve
   if (loading) return null;

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useApplication } from "@/hooks/useApplication";
 import { useAuth } from "@/context/auth";
+import { useDriverProfile } from "@/hooks/useDriverProfile";
 import { supabase } from "@/lib/supabase";
 
 const US_STATES = [
@@ -52,6 +53,7 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
   const { user } = useAuth();
   const { load, save } = useApplication();
   const saved = load();
+  const { profile } = useDriverProfile(user?.id ?? "");
 
   // Basic info — pre-fill from saved
   const [firstName, setFirstName] = useState(saved.firstName ?? "");
@@ -94,6 +96,23 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+
+  // Pre-fill empty fields from driver profile (Supabase)
+  useEffect(() => {
+    if (!profile) return;
+    setFirstName(prev => prev || profile.firstName);
+    setLastName(prev => prev || profile.lastName);
+    setPhone(prev => prev || profile.phone);
+    setCdlNumber(prev => prev || profile.cdlNumber);
+    setLicenseClass(prev => prev || profile.licenseClass);
+    setYearsExp(prev => prev || profile.yearsExp);
+    setLicenseState(prev => prev || profile.licenseState);
+  }, [profile]);
+
+  // Pre-fill email from auth user
+  useEffect(() => {
+    if (user?.email) setEmail(prev => prev || user.email);
+  }, [user]);
 
   const tog = <T extends Record<string, boolean>>(setter: React.Dispatch<React.SetStateAction<T>>, key: keyof T) =>
     (v: boolean) => setter((prev) => ({ ...prev, [key]: v }));
