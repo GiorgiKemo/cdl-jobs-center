@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Phone, Mail, Truck, ChevronDown } from "lucide-react";
+import { Menu, X, Phone, Mail, Truck, ChevronDown, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/context/AuthContext";
 
 const jobDropdownItems = [
   { name: "Dry Van", path: "/jobs?type=dry-van" },
@@ -102,7 +103,14 @@ const Navbar = () => {
   const [jobsDropdownOpen, setJobsDropdownOpen] = useState(false);
   const [jobsMobileOpen, setJobsMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const { isDark, toggle } = useTheme();
+  const { user, signOut } = useAuth();
+
+  const handleSignOut = () => {
+    signOut();
+    navigate("/");
+  };
 
   return (
     <>
@@ -221,12 +229,27 @@ const Navbar = () => {
 
           <div className="hidden lg:flex items-center gap-3">
             <TruckToggle isDark={isDark} onClick={toggle} />
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/signin">Sign In</Link>
-            </Button>
-            <Button size="sm" className="glow-orange" asChild>
-              <Link to="/apply">Apply Now</Link>
-            </Button>
+            {user ? (
+              <>
+                <div className="flex items-center gap-2 px-3 py-1.5 border border-border text-sm">
+                  <User className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-foreground font-medium">{user.name}</span>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleSignOut} className="flex items-center gap-1.5">
+                  <LogOut className="h-3.5 w-3.5" />
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" asChild>
+                  <Link to="/signin">Sign In</Link>
+                </Button>
+                <Button size="sm" className="glow-orange" asChild>
+                  <Link to="/apply">Apply Now</Link>
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Mobile: truck toggle + burger */}
@@ -306,14 +329,27 @@ const Navbar = () => {
                     </Link>
                   )
                 )}
-                <div className="flex gap-2 pt-2">
-                  <Button variant="outline" size="sm" className="flex-1" asChild>
-                    <Link to="/signin">Sign In</Link>
-                  </Button>
-                  <Button size="sm" className="flex-1" asChild>
-                    <Link to="/apply">Apply Now</Link>
-                  </Button>
-                </div>
+                {user ? (
+                  <div className="flex gap-2 pt-2 items-center">
+                    <div className="flex items-center gap-2 px-3 py-1.5 border border-border text-sm flex-1">
+                      <User className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <span className="font-medium truncate">{user.name}</span>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => { handleSignOut(); setIsOpen(false); }} className="flex items-center gap-1.5">
+                      <LogOut className="h-3.5 w-3.5" />
+                      Sign Out
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2 pt-2">
+                    <Button variant="outline" size="sm" className="flex-1" asChild>
+                      <Link to="/signin" onClick={() => setIsOpen(false)}>Sign In</Link>
+                    </Button>
+                    <Button size="sm" className="flex-1" asChild>
+                      <Link to="/apply" onClick={() => setIsOpen(false)}>Apply Now</Link>
+                    </Button>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
