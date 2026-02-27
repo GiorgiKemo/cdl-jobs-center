@@ -60,6 +60,18 @@ interface SignInModalProps {
   onClose: () => void;
 }
 
+const ModalHeader = ({ title, onClose }: { title: string; onClose: () => void }) => (
+  <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+    <div className="flex items-center gap-3">
+      <div className="w-1 h-5 bg-primary shrink-0" />
+      <h2 className="font-display font-bold text-base">{title}</h2>
+    </div>
+    <button onClick={onClose} className="p-1 hover:text-primary transition-colors" aria-label="Close">
+      <X className="h-5 w-5" />
+    </button>
+  </div>
+);
+
 export function SignInModal({ onClose }: SignInModalProps) {
   const [view, setView] = useState<View>("login");
   const { signIn, register } = useAuth();
@@ -147,18 +159,6 @@ export function SignInModal({ onClose }: SignInModalProps) {
     }
   };
 
-  const ModalHeader = ({ title }: { title: string }) => (
-    <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-      <div className="flex items-center gap-3">
-        <div className="w-1 h-5 bg-primary shrink-0" />
-        <h2 className="font-display font-bold text-base">{title}</h2>
-      </div>
-      <button onClick={onClose} className="p-1 hover:text-primary transition-colors" aria-label="Close">
-        <X className="h-5 w-5" />
-      </button>
-    </div>
-  );
-
   const modal = (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
@@ -220,7 +220,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
         {/* ── RULES VIEW ── */}
         {view === "rules" && (
           <>
-            <ModalHeader title="General rules on the website" />
+            <ModalHeader title="General rules on the website" onClose={onClose} />
             <div className="px-5 py-4 overflow-y-auto flex-1">
               {RULES_TEXT.split("\n\n").map((para, i) => (
                 <p key={i} className="text-sm text-muted-foreground mb-3 leading-relaxed whitespace-pre-line">
@@ -242,7 +242,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
         {/* ── REGISTER VIEW ── */}
         {view === "register" && (
           <>
-            <ModalHeader title="New user registration" />
+            <ModalHeader title="New user registration" onClose={onClose} />
 
             {/* Role selector — always visible at top */}
             <div className="px-5 pt-4 pb-2 border-b border-border shrink-0">
