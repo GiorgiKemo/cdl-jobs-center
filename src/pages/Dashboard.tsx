@@ -11,7 +11,14 @@ import { useAuth } from "@/context/AuthContext";
 import { useJobs } from "@/hooks/useJobs";
 import { Job } from "@/data/jobs";
 import { toast } from "sonner";
-import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload } from "lucide-react";
+import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload, GripVertical } from "lucide-react";
+import {
+  DndContext,
+  DragOverlay,
+  pointerWithin,
+  useDraggable,
+  useDroppable,
+} from "@dnd-kit/core";
 
 const FREIGHT_TYPES = [
   "Box", "Car Hauler", "Drop and Hook", "Dry Bulk", "Dry Van", "Flatbed",
@@ -134,40 +141,120 @@ const AppCard = ({ app }: { app: ReceivedApplication }) => {
   );
 };
 
-// ── Pipeline card ─────────────────────────────────────────────────────────────
+// ── Pipeline draggable card ───────────────────────────────────────────────────
 const PipelineCard = ({
   app,
   stage,
   onStageChange,
+  isDragOverlay = false,
 }: {
   app: ReceivedApplication;
   stage: PipelineStage;
   onStageChange: (s: PipelineStage) => void;
-}) => (
-  <div className="border border-border bg-card p-3 space-y-2">
-    <p className="font-semibold text-sm text-foreground leading-tight">
-      {app.firstName} {app.lastName}
-    </p>
-    <p className="text-xs text-muted-foreground">
-      {app.driverType || "Driver"}{app.yearsExp ? ` · ${app.yearsExp} exp` : ""}
-    </p>
-    {app.submittedAt && (
-      <p className="text-xs text-muted-foreground">
-        Applied {new Date(app.submittedAt).toLocaleDateString()}
-      </p>
-    )}
-    <Select value={stage} onValueChange={(v) => onStageChange(v as PipelineStage)}>
-      <SelectTrigger className="h-7 text-xs">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {(["New", "Reviewing", "Interview", "Hired", "Rejected"] as PipelineStage[]).map((s) => (
-          <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  </div>
-);
+  isDragOverlay?: boolean;
+}) => {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: getAppKey(app) });
+  return (
+    <div
+      ref={isDragOverlay ? undefined : setNodeRef}
+      className={`border border-border bg-card p-3 space-y-2 select-none transition-opacity ${
+        isDragging ? "opacity-30" : "opacity-100"
+      } ${isDragOverlay ? "shadow-2xl -rotate-1 opacity-95 cursor-grabbing" : ""}`}
+    >
+      <div className="flex items-start gap-1.5">
+        {/* Drag handle */}
+        {!isDragOverlay && (
+          <button
+            {...listeners}
+            {...attributes}
+            className="cursor-grab active:cursor-grabbing mt-0.5 text-muted-foreground hover:text-foreground shrink-0 touch-none focus:outline-none"
+            tabIndex={-1}
+            aria-label="Drag to reorder"
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm text-foreground leading-tight">
+            {app.firstName} {app.lastName}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {app.driverType || "Driver"}{app.yearsExp ? ` · ${app.yearsExp} exp` : ""}
+          </p>
+          {app.submittedAt && (
+            <p className="text-xs text-muted-foreground">
+              Applied {new Date(app.submittedAt).toLocaleDateString()}
+            </p>
+          )}
+        </div>
+      </div>
+      {!isDragOverlay && (
+        <Select value={stage} onValueChange={(v) => onStageChange(v as PipelineStage)}>
+          <SelectTrigger className="h-7 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(["New", "Reviewing", "Interview", "Hired", "Rejected"] as PipelineStage[]).map((s) => (
+              <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </div>
+  );
+};
+
+// ── Pipeline droppable column ─────────────────────────────────────────────────
+const PipelineColumn = ({
+  label,
+  headerClass,
+  apps,
+  pipelineStages,
+  onStageChange,
+}: {
+  label: PipelineStage;
+  headerClass: string;
+  apps: ReceivedApplication[];
+  pipelineStages: Record<string, PipelineStage>;
+  onStageChange: (key: string, s: PipelineStage) => void;
+}) => {
+  const { setNodeRef, isOver } = useDroppable({ id: label });
+  return (
+    <div className="flex-1" style={{ minWidth: "200px" }}>
+      {/* Column header */}
+      <div className={`border ${headerClass} px-3 py-2 flex items-center justify-between mb-2`}>
+        <span className="font-semibold text-sm">{label}</span>
+        <span className="text-xs bg-foreground/10 dark:bg-white/10 px-1.5 py-0.5 rounded-full font-medium">
+          {apps.length}
+        </span>
+      </div>
+      {/* Drop zone */}
+      <div
+        ref={setNodeRef}
+        className={`scrollbar-thin space-y-2 min-h-[120px] max-h-[540px] overflow-y-auto p-1 rounded-sm transition-colors ${
+          isOver ? "bg-primary/5 ring-1 ring-primary/30" : ""
+        }`}
+      >
+        {apps.length === 0 ? (
+          <div className={`border border-dashed p-4 text-center text-xs text-muted-foreground transition-colors ${
+            isOver ? "border-primary/50 text-primary" : "border-border"
+          }`}>
+            {isOver ? "Drop here" : "Empty"}
+          </div>
+        ) : (
+          apps.map((app) => (
+            <PipelineCard
+              key={getAppKey(app)}
+              app={app}
+              stage={(pipelineStages[getAppKey(app)] ?? "New") as PipelineStage}
+              onStageChange={(s) => onStageChange(getAppKey(app), s)}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 const Dashboard = () => {
@@ -176,6 +263,8 @@ const Dashboard = () => {
   const { loadAll, add, update, remove } = useJobs();
 
   const [activeTab, setActiveTab] = useState<Tab>("jobs");
+  const [appPage, setAppPage] = useState(0);
+  const APP_PAGE_SIZE = 10;
   const [jobs, setJobs] = useState<Job[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -183,8 +272,10 @@ const Dashboard = () => {
 
   const [applications, setApplications] = useState<ReceivedApplication[]>([]);
   const [pipelineStages, setPipelineStages] = useState<Record<string, PipelineStage>>({});
+  const [dragActiveKey, setDragActiveKey] = useState<string | null>(null);
 
   const [profileName, setProfileName] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
   const [profilePhone, setProfilePhone] = useState("");
   const [profileAddress, setProfileAddress] = useState("");
   const [profileAbout, setProfileAbout] = useState("");
@@ -234,12 +325,14 @@ const Dashboard = () => {
       if (stored) {
         const p = JSON.parse(stored);
         setProfileName(p.name ?? user?.name ?? "");
+        setProfileEmail(p.email ?? user?.email ?? "");
         setProfilePhone(p.phone ?? "");
         setProfileAddress(p.address ?? "");
         setProfileAbout(p.about ?? "");
         setProfileWebsite(p.website ?? "");
       } else if (user) {
         setProfileName(user.name);
+        setProfileEmail(user.email ?? "");
       }
       const logos = JSON.parse(localStorage.getItem("cdl-company-logos") ?? "{}");
       setProfileLogo(logos[user?.name ?? ""] ?? "");
@@ -304,6 +397,12 @@ const Dashboard = () => {
   };
 
   const seedMockData = () => {
+    const KEY = "cdl-applications-received";
+    const existing: ReceivedApplication[] = (() => {
+      try { return JSON.parse(localStorage.getItem(KEY) ?? "[]"); } catch { return []; }
+    })();
+    // Clear any previously seeded mock data before re-seeding
+    const withoutMock = existing.filter((a) => !(a.id ?? "").startsWith("mock-"));
     const now = Date.now();
     const mockApps = [
       {
@@ -388,26 +487,199 @@ const Dashboard = () => {
       },
     ];
 
-    const KEY = "cdl-applications-received";
-    const existing: ReceivedApplication[] = (() => {
-      try { return JSON.parse(localStorage.getItem(KEY) ?? "[]"); } catch { return []; }
-    })();
-    localStorage.setItem(KEY, JSON.stringify([...existing, ...mockApps]));
-    setApplications((prev) => [...prev, ...mockApps]);
+    const extraApps = [
+      {
+        id: `mock-6-${now}`,
+        firstName: "Tyler", lastName: "Brooks",
+        email: "tbrooks@freight.com", phone: "(214) 555-0761",
+        driverType: "Company Driver", yearsExp: "3-5",
+        licenseClass: "a", licenseState: "Texas",
+        cdlNumber: "CDL-TX-904112", soloTeam: "Solo",
+        notes: "Looking to move from regional to OTR for better pay.",
+        prefs: { betterPay: true, betterHomeTime: false, healthInsurance: true, bonuses: false, newEquipment: false },
+        endorse: { doublesTriples: false, hazmat: false, tankVehicles: false, tankerHazmat: false },
+        hauler: { box: false, carHaul: false, dropAndHook: true, dryBulk: false, dryVan: true, flatbed: false, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: false, refrigerated: false, tanker: false },
+        route: { dedicated: false, local: false, ltl: false, otr: true, regional: true },
+        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: false },
+        companyName: user.name,
+        submittedAt: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: `mock-7-${now}`,
+        firstName: "Maria", lastName: "Castillo",
+        email: "m.castillo@yahoo.com", phone: "(915) 555-0283",
+        driverType: "Owner Operator", yearsExp: "5+",
+        licenseClass: "a", licenseState: "New Mexico",
+        cdlNumber: "CDL-NM-336790", soloTeam: "Solo",
+        notes: "15+ years experience. Own a 2022 Kenworth T680. Looking for consistent freight.",
+        prefs: { betterPay: true, betterHomeTime: true, healthInsurance: false, bonuses: true, newEquipment: false },
+        endorse: { doublesTriples: false, hazmat: true, tankVehicles: true, tankerHazmat: false },
+        hauler: { box: false, carHaul: false, dropAndHook: false, dryBulk: true, dryVan: false, flatbed: false, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: false, refrigerated: false, tanker: true },
+        route: { dedicated: true, local: false, ltl: false, otr: true, regional: false },
+        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: true },
+        companyName: user.name,
+        submittedAt: new Date(now - 4 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: `mock-8-${now}`,
+        firstName: "Kevin", lastName: "Walsh",
+        email: "kwalsh@roadway.net", phone: "(617) 555-0498",
+        driverType: "Company Driver", yearsExp: "1-3",
+        licenseClass: "a", licenseState: "Massachusetts",
+        cdlNumber: "CDL-MA-551203", soloTeam: "Either",
+        notes: "Military veteran, very disciplined and punctual. Prefer dedicated lanes.",
+        prefs: { betterPay: false, betterHomeTime: true, healthInsurance: true, bonuses: false, newEquipment: true },
+        endorse: { doublesTriples: true, hazmat: false, tankVehicles: false, tankerHazmat: false },
+        hauler: { box: false, carHaul: false, dropAndHook: true, dryBulk: false, dryVan: true, flatbed: false, hopperBottom: false, intermodal: true, oilField: false, oversizeLoad: false, refrigerated: false, tanker: false },
+        route: { dedicated: true, local: false, ltl: true, otr: false, regional: true },
+        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: true },
+        companyName: user.name,
+        submittedAt: new Date(now - 5 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: `mock-9-${now}`,
+        firstName: "Darnell", lastName: "Washington",
+        email: "d.washington@truckermail.com", phone: "(404) 555-0112",
+        driverType: "Company Driver", yearsExp: "5+",
+        licenseClass: "a", licenseState: "Georgia",
+        cdlNumber: "CDL-GA-882044", soloTeam: "Solo",
+        notes: "10 years OTR, clean MVR. Ready for immediate start.",
+        prefs: { betterPay: true, betterHomeTime: false, healthInsurance: true, bonuses: true, newEquipment: false },
+        endorse: { doublesTriples: false, hazmat: true, tankVehicles: false, tankerHazmat: false },
+        hauler: { box: false, carHaul: false, dropAndHook: false, dryBulk: false, dryVan: true, flatbed: true, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: false, refrigerated: false, tanker: false },
+        route: { dedicated: false, local: false, ltl: false, otr: true, regional: false },
+        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: false },
+        companyName: user.name,
+        submittedAt: new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: `mock-10-${now}`,
+        firstName: "Heather", lastName: "Simmons",
+        email: "hsimmons@gmail.com", phone: "(502) 555-0664",
+        driverType: "Student", yearsExp: "none",
+        licenseClass: "permit", licenseState: "Kentucky",
+        cdlNumber: "", soloTeam: "Solo",
+        notes: "Currently enrolled in CDL training, graduating next month. Very eager.",
+        prefs: { betterPay: false, betterHomeTime: true, healthInsurance: true, bonuses: false, newEquipment: false },
+        endorse: { doublesTriples: false, hazmat: false, tankVehicles: false, tankerHazmat: false },
+        hauler: { box: false, carHaul: false, dropAndHook: false, dryBulk: false, dryVan: true, flatbed: false, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: false, refrigerated: false, tanker: false },
+        route: { dedicated: false, local: true, ltl: false, otr: false, regional: true },
+        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: true },
+        companyName: user.name,
+        submittedAt: new Date(now - 8 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: `mock-11-${now}`,
+        firstName: "Bobby", lastName: "Nguyen",
+        email: "bobby.n@fastfreight.com", phone: "(713) 555-0329",
+        driverType: "Owner Operator", yearsExp: "3-5",
+        licenseClass: "a", licenseState: "Texas",
+        cdlNumber: "CDL-TX-447821", soloTeam: "Solo",
+        notes: "Leasing a 2020 Freightliner Cascadia, looking for steady loads.",
+        prefs: { betterPay: true, betterHomeTime: false, healthInsurance: false, bonuses: true, newEquipment: false },
+        endorse: { doublesTriples: false, hazmat: false, tankVehicles: false, tankerHazmat: false },
+        hauler: { box: false, carHaul: false, dropAndHook: true, dryBulk: false, dryVan: true, flatbed: false, hopperBottom: false, intermodal: false, oilField: true, oversizeLoad: false, refrigerated: false, tanker: false },
+        route: { dedicated: false, local: false, ltl: false, otr: true, regional: true },
+        extra: { leasePurchase: true, accidents: false, suspended: false, newsletters: false },
+        companyName: user.name,
+        submittedAt: new Date(now - 10 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: `mock-12-${now}`,
+        firstName: "Patricia", lastName: "Evans",
+        email: "patricia.evans@email.com", phone: "(901) 555-0887",
+        driverType: "Company Driver", yearsExp: "5+",
+        licenseClass: "a", licenseState: "Tennessee",
+        cdlNumber: "CDL-TN-663910", soloTeam: "Either",
+        notes: "Experienced reefer driver, prefer Southeast lanes.",
+        prefs: { betterPay: false, betterHomeTime: true, healthInsurance: true, bonuses: false, newEquipment: true },
+        endorse: { doublesTriples: false, hazmat: false, tankVehicles: false, tankerHazmat: false },
+        hauler: { box: false, carHaul: false, dropAndHook: false, dryBulk: false, dryVan: false, flatbed: false, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: false, refrigerated: true, tanker: false },
+        route: { dedicated: true, local: false, ltl: false, otr: false, regional: true },
+        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: true },
+        companyName: user.name,
+        submittedAt: new Date(now - 11 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: `mock-13-${now}`,
+        firstName: "Carlos", lastName: "Rivera",
+        email: "c.rivera@trucking.us", phone: "(305) 555-0541",
+        driverType: "Company Driver", yearsExp: "1-3",
+        licenseClass: "a", licenseState: "Florida",
+        cdlNumber: "CDL-FL-229047", soloTeam: "Solo",
+        notes: "Bilingual (English/Spanish). 2 years flatbed experience.",
+        prefs: { betterPay: true, betterHomeTime: false, healthInsurance: true, bonuses: false, newEquipment: false },
+        endorse: { doublesTriples: false, hazmat: false, tankVehicles: false, tankerHazmat: false },
+        hauler: { box: false, carHaul: false, dropAndHook: false, dryBulk: false, dryVan: false, flatbed: true, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: true, refrigerated: false, tanker: false },
+        route: { dedicated: false, local: false, ltl: false, otr: true, regional: true },
+        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: false },
+        companyName: user.name,
+        submittedAt: new Date(now - 13 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: `mock-14-${now}`,
+        firstName: "Nathan", lastName: "Price",
+        email: "nprice@midwest.net", phone: "(312) 555-0978",
+        driverType: "Company Driver", yearsExp: "3-5",
+        licenseClass: "a", licenseState: "Illinois",
+        cdlNumber: "CDL-IL-774503", soloTeam: "Team",
+        notes: "Have a reliable co-driver. Prefer team runs coast to coast.",
+        prefs: { betterPay: true, betterHomeTime: false, healthInsurance: false, bonuses: true, newEquipment: true },
+        endorse: { doublesTriples: true, hazmat: false, tankVehicles: false, tankerHazmat: false },
+        hauler: { box: false, carHaul: false, dropAndHook: true, dryBulk: false, dryVan: true, flatbed: false, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: false, refrigerated: false, tanker: false },
+        route: { dedicated: false, local: false, ltl: false, otr: true, regional: false },
+        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: true },
+        companyName: user.name,
+        submittedAt: new Date(now - 14 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: `mock-15-${now}`,
+        firstName: "Lisa", lastName: "Hart",
+        email: "lisa.hart@drivermail.com", phone: "(614) 555-0230",
+        driverType: "Company Driver", yearsExp: "5+",
+        licenseClass: "a", licenseState: "Ohio",
+        cdlNumber: "CDL-OH-881234", soloTeam: "Solo",
+        notes: "12 years experience, zero accidents. Specializes in hazmat tanker.",
+        prefs: { betterPay: true, betterHomeTime: true, healthInsurance: true, bonuses: false, newEquipment: false },
+        endorse: { doublesTriples: false, hazmat: true, tankVehicles: true, tankerHazmat: true },
+        hauler: { box: false, carHaul: false, dropAndHook: false, dryBulk: false, dryVan: false, flatbed: false, hopperBottom: false, intermodal: false, oilField: false, oversizeLoad: false, refrigerated: false, tanker: true },
+        route: { dedicated: false, local: false, ltl: false, otr: true, regional: true },
+        extra: { leasePurchase: false, accidents: false, suspended: false, newsletters: true },
+        companyName: user.name,
+        submittedAt: new Date(now - 15 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    ];
 
-    // Seed some pipeline stages for variety
+    const allMockApps = [...mockApps, ...extraApps];
+    localStorage.setItem(KEY, JSON.stringify([...withoutMock, ...allMockApps]));
+    setApplications([
+      ...withoutMock.filter((a) => a.companyName === user.name),
+      ...allMockApps,
+    ]);
+
+    // Seed pipeline stages for variety
     const stagesMap: Record<string, PipelineStage> = {
       [`mock-1-${now}`]: "Reviewing",
       [`mock-2-${now}`]: "Interview",
       [`mock-3-${now}`]: "New",
       [`mock-4-${now}`]: "Hired",
       [`mock-5-${now}`]: "New",
+      [`mock-6-${now}`]: "Reviewing",
+      [`mock-7-${now}`]: "Interview",
+      [`mock-8-${now}`]: "New",
+      [`mock-9-${now}`]: "Hired",
+      [`mock-10-${now}`]: "New",
+      [`mock-11-${now}`]: "Reviewing",
+      [`mock-12-${now}`]: "Interview",
+      [`mock-13-${now}`]: "New",
+      [`mock-14-${now}`]: "Rejected",
+      [`mock-15-${now}`]: "Hired",
     };
     const updatedStages = { ...pipelineStages, ...stagesMap };
     setPipelineStages(updatedStages);
     localStorage.setItem("cdl-pipeline-stages", JSON.stringify(updatedStages));
 
-    toast.success("5 sample applicants loaded.");
+    toast.success("15 sample applicants loaded.");
   };
 
   const updateAppStage = (appKey: string, stage: PipelineStage) => {
@@ -428,13 +700,18 @@ const Dashboard = () => {
 
   const handleSaveProfile = () => {
     localStorage.setItem("cdl-company-profile", JSON.stringify({
-      name: profileName, phone: profilePhone, address: profileAddress,
-      about: profileAbout, website: profileWebsite,
+      name: profileName, email: profileEmail, phone: profilePhone,
+      address: profileAddress, about: profileAbout, website: profileWebsite,
     }));
     const logos = JSON.parse(localStorage.getItem("cdl-company-logos") ?? "{}");
     if (profileLogo) { logos[user.name] = profileLogo; } else { delete logos[user.name]; }
     localStorage.setItem("cdl-company-logos", JSON.stringify(logos));
     toast.success("Profile saved.");
+  };
+
+  const switchTab = (tab: Tab) => {
+    setActiveTab(tab);
+    if (tab === "applications") setAppPage(0);
   };
 
   const tabClass = (tab: Tab) =>
@@ -447,7 +724,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="container mx-auto py-8 max-w-5xl">
+      <main className="container mx-auto py-8 max-w-[1400px]">
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-6">
           <Link to="/" className="text-primary hover:underline">Main</Link>
@@ -463,17 +740,17 @@ const Dashboard = () => {
 
         {/* Tab bar */}
         <div className="border-b border-border mb-6 flex overflow-x-auto">
-          <button className={tabClass("jobs")} onClick={() => setActiveTab("jobs")}>
+          <button className={tabClass("jobs")} onClick={() => switchTab("jobs")}>
             My Jobs ({jobs.length})
           </button>
-          <button className={tabClass("applications")} onClick={() => setActiveTab("applications")}>
+          <button className={tabClass("applications")} onClick={() => switchTab("applications")}>
             Applications ({applications.length})
           </button>
-          <button className={tabClass("pipeline")} onClick={() => setActiveTab("pipeline")}>
+          <button className={tabClass("pipeline")} onClick={() => switchTab("pipeline")}>
             Pipeline ({applications.length})
           </button>
-          <button className={tabClass("profile")} onClick={() => setActiveTab("profile")}>
-            Profile Settings
+          <button className={tabClass("profile")} onClick={() => switchTab("profile")}>
+            Company Profile
           </button>
         </div>
 
@@ -632,11 +909,35 @@ const Dashboard = () => {
                   Load sample data
                 </Button>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {applications.map((app, i) => <AppCard key={i} app={app} />)}
-              </div>
-            )}
+            ) : (() => {
+              const totalPages = Math.ceil(applications.length / APP_PAGE_SIZE);
+              const pageApps = applications.slice(appPage * APP_PAGE_SIZE, (appPage + 1) * APP_PAGE_SIZE);
+              return (
+                <>
+                  <div className="space-y-3">
+                    {pageApps.map((app, i) => <AppCard key={i} app={app} />)}
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-4 text-sm">
+                      <span className="text-muted-foreground">
+                        Showing {appPage * APP_PAGE_SIZE + 1}–{Math.min((appPage + 1) * APP_PAGE_SIZE, applications.length)} of {applications.length}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setAppPage((p) => p - 1)} disabled={appPage === 0}>
+                          Previous
+                        </Button>
+                        <span className="text-muted-foreground text-xs">
+                          {appPage + 1} / {totalPages}
+                        </span>
+                        <Button variant="outline" size="sm" onClick={() => setAppPage((p) => p + 1)} disabled={appPage >= totalPages - 1}>
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
 
@@ -650,9 +951,28 @@ const Dashboard = () => {
                   Move applicants through hiring stages using the dropdown on each card.
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={seedMockData} className="shrink-0">
-                Load sample data
-              </Button>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button variant="outline" size="sm" onClick={seedMockData}>
+                  Load sample data
+                </Button>
+                {applications.length > 0 && (
+                  <button
+                    onClick={() => {
+                      const KEY = "cdl-applications-received";
+                      const all: ReceivedApplication[] = (() => {
+                        try { return JSON.parse(localStorage.getItem(KEY) ?? "[]"); } catch { return []; }
+                      })();
+                      const kept = all.filter((a) => a.companyName !== user.name);
+                      localStorage.setItem(KEY, JSON.stringify(kept));
+                      setApplications([]);
+                      toast.success("All applications cleared.");
+                    }}
+                    className="text-xs text-muted-foreground hover:text-red-500 transition-colors"
+                  >
+                    Clear all
+                  </button>
+                )}
+              </div>
             </div>
 
             {applications.length === 0 ? (
@@ -663,43 +983,55 @@ const Dashboard = () => {
                 </Button>
               </div>
             ) : (
-              <div className="overflow-x-auto pb-4">
-                <div className="flex gap-3" style={{ minWidth: `${PIPELINE_STAGES.length * 210}px` }}>
-                  {PIPELINE_STAGES.map(({ label, headerClass }) => {
-                    const stageApps = applications.filter(
-                      (app) => (pipelineStages[getAppKey(app)] ?? "New") === label
-                    );
-                    return (
-                      <div key={label} className="flex-1" style={{ minWidth: "200px" }}>
-                        {/* Column header */}
-                        <div className={`border ${headerClass} px-3 py-2 flex items-center justify-between mb-2`}>
-                          <span className="font-semibold text-sm">{label}</span>
-                          <span className="text-xs bg-foreground/10 dark:bg-white/10 px-1.5 py-0.5 rounded-full font-medium">
-                            {stageApps.length}
-                          </span>
-                        </div>
-                        {/* Cards */}
-                        <div className="space-y-2 min-h-[100px]">
-                          {stageApps.length === 0 ? (
-                            <div className="border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-                              Empty
-                            </div>
-                          ) : (
-                            stageApps.map((app) => (
-                              <PipelineCard
-                                key={getAppKey(app)}
-                                app={app}
-                                stage={(pipelineStages[getAppKey(app)] ?? "New") as PipelineStage}
-                                onStageChange={(s) => updateAppStage(getAppKey(app), s)}
-                              />
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+              <DndContext
+                collisionDetection={pointerWithin}
+                onDragStart={(e) => setDragActiveKey(e.active.id as string)}
+                onDragEnd={(e) => {
+                  setDragActiveKey(null);
+                  const { active, over } = e;
+                  if (!over) return;
+                  const targetStage = over.id as PipelineStage;
+                  if (PIPELINE_STAGES.some((s) => s.label === targetStage)) {
+                    updateAppStage(active.id as string, targetStage);
+                  }
+                }}
+                onDragCancel={() => setDragActiveKey(null)}
+              >
+                <div className="overflow-x-auto pb-4">
+                  <div className="flex gap-3" style={{ minWidth: `${PIPELINE_STAGES.length * 210}px` }}>
+                    {PIPELINE_STAGES.map(({ label, headerClass }) => {
+                      const stageApps = applications.filter(
+                        (app) => (pipelineStages[getAppKey(app)] ?? "New") === label
+                      );
+                      return (
+                        <PipelineColumn
+                          key={label}
+                          label={label}
+                          headerClass={headerClass}
+                          apps={stageApps}
+                          pipelineStages={pipelineStages}
+                          onStageChange={updateAppStage}
+                        />
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+
+                <DragOverlay dropAnimation={null}>
+                  {dragActiveKey ? (() => {
+                    const activeApp = applications.find((a) => getAppKey(a) === dragActiveKey);
+                    if (!activeApp) return null;
+                    return (
+                      <PipelineCard
+                        app={activeApp}
+                        stage={(pipelineStages[dragActiveKey] ?? "New") as PipelineStage}
+                        onStageChange={() => {}}
+                        isDragOverlay
+                      />
+                    );
+                  })() : null}
+                </DragOverlay>
+              </DndContext>
             )}
           </div>
         )}
@@ -707,7 +1039,7 @@ const Dashboard = () => {
         {/* ── Tab: Profile Settings ──────────────────────────────────────────── */}
         {activeTab === "profile" && (
           <div>
-            <h2 className="font-display font-semibold text-base mb-4">Profile Settings</h2>
+            <h2 className="font-display font-semibold text-base mb-4">Company Profile Settings</h2>
             <div className="border border-border bg-card p-5">
               <div className="grid sm:grid-cols-2 gap-4 mb-4">
                 {/* Logo upload */}
@@ -742,6 +1074,10 @@ const Dashboard = () => {
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Company Name</Label>
                   <Input value={profileName} onChange={(e) => setProfileName(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Company Email</Label>
+                  <Input type="email" placeholder="contact@yourcompany.com" value={profileEmail} onChange={(e) => setProfileEmail(e.target.value)} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Phone</Label>
