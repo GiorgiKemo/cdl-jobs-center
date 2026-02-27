@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth";
+import { useDriverProfile } from "@/hooks/useDriverProfile";
 
 type EasyApplyDialogProps = {
   trigger: React.ReactNode;
@@ -24,8 +25,8 @@ const OffOnToggle = ({ checked, onChange }: OffOnToggleProps) => (
       type="button"
       onClick={() => onChange(false)}
       className={cn(
-        "h-7 min-w-11 px-3 text-[11px] font-semibold transition-colors",
-        !checked ? "bg-background text-foreground" : "bg-muted text-muted-foreground",
+        "h-7 w-14 text-center text-[11px] font-semibold transition-colors",
+        !checked ? "bg-foreground text-background" : "bg-muted text-muted-foreground",
       )}
     >
       OFF
@@ -34,7 +35,7 @@ const OffOnToggle = ({ checked, onChange }: OffOnToggleProps) => (
       type="button"
       onClick={() => onChange(true)}
       className={cn(
-        "h-7 min-w-11 px-3 text-[11px] font-semibold transition-colors",
+        "h-7 w-14 text-center text-[11px] font-semibold transition-colors",
         checked ? "bg-foreground text-background" : "bg-muted text-muted-foreground",
       )}
     >
@@ -45,6 +46,7 @@ const OffOnToggle = ({ checked, onChange }: OffOnToggleProps) => (
 
 const EasyApplyDialog = ({ trigger, companyName = "General Application" }: EasyApplyDialogProps) => {
   const { user } = useAuth();
+  const { profile } = useDriverProfile(user?.id ?? "");
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [firstName, setFirstName] = useState("");
@@ -55,6 +57,20 @@ const EasyApplyDialog = ({ trigger, companyName = "General Application" }: EasyA
   const [driverType, setDriverType] = useState("");
   const [endorseCdl, setEndorseCdl] = useState(false);
   const [ownerOperator, setOwnerOperator] = useState(false);
+
+  // Pre-fill from driver profile + auth email when dialog opens
+  useEffect(() => {
+    if (!open) return;
+    if (profile) {
+      setFirstName((prev) => prev || profile.firstName);
+      setLastName((prev) => prev || profile.lastName);
+      setCdl((prev) => prev || profile.cdlNumber);
+      setPhone((prev) => prev || profile.phone);
+    }
+    if (user?.email) {
+      setEmail((prev) => prev || (user.email ?? ""));
+    }
+  }, [open, profile, user]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

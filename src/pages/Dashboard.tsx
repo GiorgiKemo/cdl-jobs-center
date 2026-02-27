@@ -299,6 +299,7 @@ const DashboardInner = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
+  const [savingJob, setSavingJob] = useState(false);
 
   // Company profile state
   const [profileName, setProfileName] = useState(user!.name);
@@ -371,6 +372,7 @@ const DashboardInner = () => {
 
   const handleSaveJob = async () => {
     if (!form.title.trim()) { toast.error("Job title is required."); return; }
+    setSavingJob(true);
     try {
       if (editingId) {
         await updateJob(editingId, { ...form });
@@ -383,7 +385,13 @@ const DashboardInner = () => {
       setEditingId(null);
       setForm(EMPTY_FORM);
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to save job.");
+      const msg = err instanceof Error
+        ? err.message
+        : (err as { message?: string })?.message ?? "Failed to save job.";
+      console.error("Save job error:", err);
+      toast.error(msg);
+    } finally {
+      setSavingJob(false);
     }
   };
 
@@ -579,8 +587,8 @@ const DashboardInner = () => {
                   </div>
                 </div>
                 <div className="flex gap-3">
-                  <Button onClick={handleSaveJob} size="sm" className="px-6">
-                    {editingId ? "Update Job" : "Save Job"}
+                  <Button onClick={handleSaveJob} size="sm" className="px-6" disabled={savingJob}>
+                    {savingJob ? "Saving…" : editingId ? "Update Job" : "Save Job"}
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
                 </div>

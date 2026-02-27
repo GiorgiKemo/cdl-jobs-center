@@ -79,7 +79,7 @@ export function useJobs(companyId: string) {
 
   const addMutation = useMutation({
     mutationFn: async (job: Omit<Job, "id" | "postedAt" | "companyId" | "logoUrl"> & { companyName: string }) => {
-      const { error } = await supabase.from("jobs").insert({
+      const payload = {
         company_id: companyId,
         company_name: job.companyName,
         title: job.title,
@@ -91,8 +91,12 @@ export function useJobs(companyId: string) {
         location: job.location,
         pay: job.pay,
         status: job.status ?? "Active",
-      });
-      if (error) throw error;
+      };
+      const { error } = await supabase.from("jobs").insert(payload);
+      if (error) {
+        console.error("addJob insert error:", error, "payload:", payload);
+        throw error;
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: key }),
   });

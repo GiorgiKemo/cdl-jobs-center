@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Link, useNavigate } from "react-router-dom";
@@ -6,81 +6,121 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Eye, Heart, Lock } from "lucide-react";
 import { useAuth } from "@/context/auth";
-import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 
-const DRIVER_TYPES = ["All", "Company Driver", "Owner Operator", "Lease Purchase", "Team Driver"];
-const LICENSE_CLASSES = ["All", "Class A", "Class B", "Class C"];
-const EXPERIENCE_OPTIONS = ["All", "Less than 1 year", "1-2 years", "2-5 years", "5-10 years", "10+ years"];
-const LICENSE_STATES = [
-  "All", "Alabama", "Arizona", "California", "Colorado", "Delaware",
-  "Florida", "Georgia", "Illinois", "Indiana", "Michigan", "New Jersey",
-  "New York", "Ohio", "Pennsylvania", "Tennessee", "Texas", "Virginia",
-];
+const LICENSE_CLASSES = ["All", "Class A", "Class B", "Class C", "Permit Only"];
+const EXPERIENCE_OPTIONS = ["All", "None", "Less than 1 year", "1-3 years", "3-5 years", "5+ years"];
 
-interface Driver {
-  id: number;
+const LICENSE_CLASS_LABELS: Record<string, string> = {
+  a: "Class A",
+  b: "Class B",
+  c: "Class C",
+  permit: "Permit Only",
+};
+
+const YEARS_EXP_LABELS: Record<string, string> = {
+  none: "None",
+  "less-1": "Less than 1 year",
+  "1-2": "1-3 years",
+  "1-3": "1-3 years",
+  "2-5": "3-5 years",
+  "3-5": "3-5 years",
+  "5-10": "5+ years",
+  "5+": "5+ years",
+  "10+": "5+ years",
+};
+
+type Driver = {
+  id: string;
   name: string;
-  type: string;
   licenseClass: string;
   experience: string;
   state: string;
-  doubles: string;
-  hazmat: string;
-  tank: string;
-  tankerHazmat: string;
-}
+  about: string;
+};
 
-const mockDrivers: Driver[] = [
-  { id: 1, name: "Vladislav Vitalievich", type: "Owner Operator", licenseClass: "Class A", experience: "2-5 years", state: "Delaware", doubles: "Yes", hazmat: "Yes", tank: "Yes", tankerHazmat: "No" },
-  { id: 2, name: "James R. Mitchell", type: "Company Driver", licenseClass: "Class A", experience: "5-10 years", state: "Texas", doubles: "Yes", hazmat: "No", tank: "No", tankerHazmat: "No" },
-  { id: 3, name: "Carlos Mendez", type: "Lease Purchase", licenseClass: "Class A", experience: "2-5 years", state: "Florida", doubles: "No", hazmat: "Yes", tank: "Yes", tankerHazmat: "Yes" },
-  { id: 4, name: "David L. Patterson", type: "Team Driver", licenseClass: "Class A", experience: "10+ years", state: "Illinois", doubles: "Yes", hazmat: "Yes", tank: "No", tankerHazmat: "No" },
-  { id: 5, name: "Michael T. Brown", type: "Company Driver", licenseClass: "Class B", experience: "1-2 years", state: "Georgia", doubles: "No", hazmat: "No", tank: "No", tankerHazmat: "No" },
-  { id: 6, name: "Kevin S. Thompson", type: "Owner Operator", licenseClass: "Class A", experience: "10+ years", state: "California", doubles: "Yes", hazmat: "Yes", tank: "Yes", tankerHazmat: "Yes" },
-  { id: 7, name: "Robert A. Garcia", type: "Company Driver", licenseClass: "Class A", experience: "2-5 years", state: "Ohio", doubles: "No", hazmat: "No", tank: "Yes", tankerHazmat: "No" },
-  { id: 8, name: "Anthony J. Williams", type: "Lease Purchase", licenseClass: "Class A", experience: "Less than 1 year", state: "Pennsylvania", doubles: "No", hazmat: "No", tank: "No", tankerHazmat: "No" },
-];
+type DriverRow = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  license_class: string | null;
+  years_exp: string | null;
+  license_state: string | null;
+  about: string | null;
+};
 
 const Drivers = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [typeFilter, setTypeFilter] = useState("All");
   const [classFilter, setClassFilter] = useState("All");
   const [expFilter, setExpFilter] = useState("All");
   const [stateFilter, setStateFilter] = useState("All");
-  const [favorites, setFavorites] = useState<number[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
+
+  const { data: drivers = [], isLoading, isError, error } = useQuery({
+    queryKey: ["driver-directory"],
+    enabled: !!user && user.role === "company",
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("driver_profiles")
+        .select("id, first_name, last_name, license_class, years_exp, license_state, about, updated_at")
+        .order("updated_at", { ascending: false });
+
+      if (error) throw error;
+
+      return (((data as DriverRow[] | null) ?? []).map((row) => {
+        const fullName = `${row.first_name ?? ""} ${row.last_name ?? ""}`.trim();
+        return {
+          id: row.id,
+          name: fullName || "Unnamed Driver",
+          licenseClass: LICENSE_CLASS_LABELS[row.license_class ?? ""] ?? "Not specified",
+          experience: YEARS_EXP_LABELS[row.years_exp ?? ""] ?? "Not specified",
+          state: row.license_state ?? "Not specified",
+          about: row.about ?? "",
+        };
+      })) as Driver[];
+    },
+  });
+
+  const licenseStates = useMemo(
+    () => [
+      "All",
+      ...Array.from(
+        new Set(drivers.map((driver) => driver.state).filter((state) => state !== "Not specified")),
+      ).sort(),
+    ],
+    [drivers],
+  );
 
   const handleClear = () => {
-    setTypeFilter("All");
     setClassFilter("All");
     setExpFilter("All");
     setStateFilter("All");
   };
 
-  const toggleFavorite = (id: number) => {
-    setFavorites((prev) =>
-      prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]
-    );
+  const toggleFavorite = (id: string) => {
+    setFavorites((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]));
   };
 
-  const filtered = mockDrivers.filter((d) => {
-    if (typeFilter !== "All" && d.type !== typeFilter) return false;
-    if (classFilter !== "All" && d.licenseClass !== classFilter) return false;
-    if (expFilter !== "All" && d.experience !== expFilter) return false;
-    if (stateFilter !== "All" && d.state !== stateFilter) return false;
+  const filtered = drivers.filter((driver) => {
+    if (classFilter !== "All" && driver.licenseClass !== classFilter) return false;
+    if (expFilter !== "All" && driver.experience !== expFilter) return false;
+    if (stateFilter !== "All" && driver.state !== stateFilter) return false;
     return true;
   });
 
-  // Access gate — company accounts only
   if (!user || user.role !== "company") {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
         <main className="container mx-auto py-8 max-w-3xl">
           <p className="text-sm text-muted-foreground mb-6">
-            <Link to="/" className="text-primary hover:underline">Main</Link>
-            <span className="mx-1">»</span>
+            <Link to="/" className="text-primary hover:underline">
+              Main
+            </Link>
+            <span className="mx-1">&gt;</span>
             Drivers
           </p>
           <div className="border border-border bg-card">
@@ -127,31 +167,20 @@ const Drivers = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="container mx-auto py-8">
-        {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary hover:underline">Main</Link>
-          <span className="mx-1">»</span>
+          <Link to="/" className="text-primary hover:underline">
+            Main
+          </Link>
+          <span className="mx-1">&gt;</span>
           Drivers
         </p>
 
-        {/* Filter box */}
         <div className="bg-foreground text-background dark:bg-muted dark:text-foreground border border-border mb-6">
           <div className="px-5 py-3 border-b border-white/10 dark:border-border">
             <h1 className="font-display font-bold text-base">Filter drivers</h1>
           </div>
           <div className="px-5 py-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-              <div>
-                <label className="text-xs font-medium uppercase tracking-wide opacity-70 block mb-1.5">Driver Type:</label>
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="bg-background/10 border-white/20 dark:bg-background dark:border-border text-inherit">
-                    <SelectValue placeholder="Choose an option..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DRIVER_TYPES.map((o) => <SelectItem key={o} value={o}>{o === "All" ? "Choose an option..." : o}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
               <div>
                 <label className="text-xs font-medium uppercase tracking-wide opacity-70 block mb-1.5">License Class:</label>
                 <Select value={classFilter} onValueChange={setClassFilter}>
@@ -159,7 +188,11 @@ const Drivers = () => {
                     <SelectValue placeholder="Choose an option..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {LICENSE_CLASSES.map((o) => <SelectItem key={o} value={o}>{o === "All" ? "Choose an option..." : o}</SelectItem>)}
+                    {LICENSE_CLASSES.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option === "All" ? "Choose an option..." : option}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -170,7 +203,11 @@ const Drivers = () => {
                     <SelectValue placeholder="Choose an option..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {EXPERIENCE_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o === "All" ? "Choose an option..." : o}</SelectItem>)}
+                    {EXPERIENCE_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option === "All" ? "Choose an option..." : option}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -181,7 +218,11 @@ const Drivers = () => {
                     <SelectValue placeholder="Choose an option..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {LICENSE_STATES.map((o) => <SelectItem key={o} value={o}>{o === "All" ? "Choose an option..." : o}</SelectItem>)}
+                    {licenseStates.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option === "All" ? "Choose an option..." : option}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -198,7 +239,6 @@ const Drivers = () => {
           </div>
         </div>
 
-        {/* Results */}
         <div className="border border-border bg-card">
           <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
             <div className="w-1 h-5 bg-primary shrink-0" />
@@ -207,9 +247,15 @@ const Drivers = () => {
             </h2>
           </div>
 
-          {filtered.length === 0 ? (
+          {isLoading ? (
+            <div className="px-5 py-12 text-center text-muted-foreground text-sm">Loading drivers...</div>
+          ) : isError ? (
+            <div className="px-5 py-12 text-center text-destructive text-sm">
+              {(error as Error).message || "Failed to load drivers."}
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="px-5 py-12 text-center text-muted-foreground text-sm">
-              No drivers match the selected filters.
+              {drivers.length === 0 ? "No registered drivers yet." : "No drivers match the selected filters."}
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -227,17 +273,11 @@ const Drivers = () => {
                       aria-label={favorites.includes(driver.id) ? "Remove from favorites" : "Add to favorites"}
                       className="p-1 text-muted-foreground hover:text-primary transition-colors"
                     >
-                      <Heart
-                        className="h-5 w-5"
-                        fill={favorites.includes(driver.id) ? "currentColor" : "none"}
-                      />
+                      <Heart className="h-5 w-5" fill={favorites.includes(driver.id) ? "currentColor" : "none"} />
                     </button>
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1.5 text-sm mb-4">
-                    <p className="text-muted-foreground">
-                      Driver Type: <span className="text-primary font-medium">{driver.type}</span>
-                    </p>
                     <p className="text-muted-foreground">
                       License Class: <span className="text-primary font-medium">{driver.licenseClass}</span>
                     </p>
@@ -247,28 +287,19 @@ const Drivers = () => {
                     <p className="text-muted-foreground">
                       License State: <span className="text-primary font-medium">{driver.state}</span>
                     </p>
-                    <p className="text-muted-foreground">
-                      Doubles/Triples (T): <span className="text-primary font-medium">{driver.doubles}</span>
-                    </p>
-                    <p className="text-muted-foreground">
-                      HAZMAT (H): <span className="text-primary font-medium">{driver.hazmat}</span>
-                    </p>
-                    <p className="text-muted-foreground">
-                      Tank Vehicles (N): <span className="text-primary font-medium">{driver.tank}</span>
-                    </p>
-                    <p className="text-muted-foreground">
-                      Tanker + HAZMAT (X): <span className="text-primary font-medium">{driver.tankerHazmat}</span>
-                    </p>
                   </div>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {driver.about || "No profile summary provided yet."}
+                  </p>
 
                   <Button
                     size="sm"
                     variant="outline"
                     className="flex items-center gap-2 text-xs"
-                    onClick={() => toast.info("Driver profile coming soon.")}
+                    onClick={() => navigate(`/drivers/${driver.id}`)}
                   >
                     <Eye className="h-3.5 w-3.5" />
-                    More information...
+                    View profile
                   </Button>
                 </div>
               ))}
