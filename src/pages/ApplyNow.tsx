@@ -232,7 +232,7 @@ const ApplyNow = () => {
         console.warn("Could not save application draft to localStorage.");
       }
 
-      const { error } = await supabase.from("applications").insert({
+      const insertPromise = supabase.from("applications").insert({
         driver_id: user.id,
         company_id: null,
         job_id: null,
@@ -258,10 +258,25 @@ const ApplyNow = () => {
         extra,
         pipeline_stage: "New",
       });
-      if (error) throw error;
+
+      const timeoutPromise = new Promise<never>((_res, reject) =>
+        setTimeout(() => reject(new Error("Request timed out. Check your connection and try again.")), 30000)
+      );
+
+      const { error } = await Promise.race([insertPromise, timeoutPromise]) as { error: unknown };
+      if (error) {
+        const msg =
+          error instanceof Error
+            ? error.message
+            : (error as { message?: string })?.message ?? "Submission failed.";
+        console.error("Application insert error:", error);
+        toast.error(msg);
+        return;
+      }
       setSubmitted(true);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Submission failed.";
+      const msg = err instanceof Error ? err.message : "Submission failed. Please try again.";
+      console.error("Application submit error:", err);
       toast.error(msg);
     } finally {
       setSubmitting(false);

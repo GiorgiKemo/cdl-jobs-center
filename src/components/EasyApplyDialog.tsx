@@ -67,24 +67,40 @@ const EasyApplyDialog = ({ trigger, companyName = "General Application" }: EasyA
       return;
     }
     setSubmitting(true);
+    const insertPromise = supabase.from("applications").insert({
+      driver_id: user.id,
+      company_name: companyName,
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      phone,
+      cdl_number: cdl || null,
+      driver_type: driverType || null,
+      endorse: { cdl: endorseCdl, ownerOperator },
+      pipeline_stage: "New",
+    });
+
+    const timeoutPromise = new Promise<never>((_res, reject) =>
+      setTimeout(() => reject(new Error("Request timed out. Check your connection and try again.")), 30000)
+    );
+
     try {
-      const { error } = await supabase.from("applications").insert({
-        driver_id: user.id,
-        company_name: companyName,
-        first_name: firstName,
-        last_name: lastName,
-        email,
-        phone,
-        cdl_number: cdl,
-        driver_type: driverType,
-        endorse: { cdl: endorseCdl, ownerOperator },
-        submitted_at: new Date().toISOString(),
-      });
-      if (error) throw error;
+      const { error } = await Promise.race([insertPromise, timeoutPromise]) as { error: unknown };
+      if (error) {
+        const msg =
+          error instanceof Error
+            ? error.message
+            : (error as { message?: string })?.message ?? "Submission failed.";
+        console.error("Quick apply error:", error);
+        toast.error(msg);
+        return;
+      }
       toast.success(`Application sent to ${companyName}!`);
       setOpen(false);
-    } catch {
-      toast.error("Failed to submit application. Please try again.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Submission failed. Please try again.";
+      console.error("Quick apply error:", err);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
