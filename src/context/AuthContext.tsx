@@ -3,11 +3,13 @@ import { createContext, useContext, useState, ReactNode } from "react";
 interface User {
   email: string;
   name: string;
+  role: "driver" | "company";
 }
 
 interface AuthContextType {
   user: User | null;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (username: string, password: string) => Promise<void>;
+  register: (username: string, email: string, password: string, role: "driver" | "company") => Promise<void>;
   signOut: () => void;
 }
 
@@ -23,11 +25,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   });
 
-  // Mock sign-in — swap this block for Supabase when ready:
+  // Mock sign-in — replace body with Supabase when ready:
   // const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-  const signIn = async (email: string, _password: string) => {
-    const name = email.split("@")[0];
-    const newUser = { email, name };
+  const signIn = async (username: string, _password: string) => {
+    const newUser: User = { name: username, email: `${username}@cdl.local`, role: "driver" };
+    localStorage.setItem("cdl-user", JSON.stringify(newUser));
+    setUser(newUser);
+  };
+
+  // Mock register — replace body with Supabase when ready:
+  // const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { name, role } } })
+  const register = async (username: string, email: string, _password: string, role: "driver" | "company") => {
+    const newUser: User = { name: username, email, role };
     localStorage.setItem("cdl-user", JSON.stringify(newUser));
     setUser(newUser);
   };
@@ -38,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, signIn, register, signOut }}>
       {children}
     </AuthContext.Provider>
   );

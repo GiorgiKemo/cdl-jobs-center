@@ -5,6 +5,7 @@ import { Menu, X, Phone, Mail, Truck, ChevronDown, LogOut, User } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/context/AuthContext";
+import { SignInModal } from "@/components/SignInModal";
 
 const jobDropdownItems = [
   { name: "Dry Van", path: "/jobs?type=dry-van" },
@@ -102,6 +103,7 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [jobsDropdownOpen, setJobsDropdownOpen] = useState(false);
   const [jobsMobileOpen, setJobsMobileOpen] = useState(false);
+  const [signInOpen, setSignInOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { isDark, toggle } = useTheme();
@@ -242,8 +244,8 @@ const Navbar = () => {
               </>
             ) : (
               <>
-                <Button variant="outline" size="sm" asChild>
-                  <Link to="/signin">Sign In</Link>
+                <Button variant="outline" size="sm" onClick={() => setSignInOpen(true)}>
+                  Sign In
                 </Button>
                 <Button size="sm" className="glow-orange" asChild>
                   <Link to="/apply">Apply Now</Link>
@@ -342,8 +344,8 @@ const Navbar = () => {
                   </div>
                 ) : (
                   <div className="flex gap-2 pt-2">
-                    <Button variant="outline" size="sm" className="flex-1" asChild>
-                      <Link to="/signin" onClick={() => setIsOpen(false)}>Sign In</Link>
+                    <Button variant="outline" size="sm" className="flex-1" onClick={() => { setIsOpen(false); setSignInOpen(true); }}>
+                      Sign In
                     </Button>
                     <Button size="sm" className="flex-1" asChild>
                       <Link to="/apply" onClick={() => setIsOpen(false)}>Apply Now</Link>
@@ -355,6 +357,8 @@ const Navbar = () => {
           )}
         </AnimatePresence>
       </motion.nav>
+
+      {signInOpen && <SignInModal onClose={() => setSignInOpen(false)} />}
     </>
   );
 };
