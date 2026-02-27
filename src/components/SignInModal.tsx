@@ -141,7 +141,9 @@ export function SignInModal({ onClose }: SignInModalProps) {
   const friendlyRegisterError = (err: unknown) => {
     const msg = err instanceof Error ? err.message : "";
     if (msg.toLowerCase().includes("already registered") || msg.toLowerCase().includes("already been registered"))
-      return "This email is already registered. Please check your inbox for a confirmation email or sign in.";
+      return "This email is already registered. Please sign in instead.";
+    if (msg.toLowerCase().includes("password") || msg.includes("422"))
+      return "Password must be at least 6 characters.";
     return msg || "Registration failed. Please try again.";
   };
 
@@ -149,6 +151,10 @@ export function SignInModal({ onClose }: SignInModalProps) {
     e.preventDefault();
     if (!regUsername || !regPassword || !regEmail) {
       toast.error("Please fill in all required fields.");
+      return;
+    }
+    if (regPassword.length < 6) {
+      toast.error("Password must be at least 6 characters.");
       return;
     }
     if (regPassword !== regConfirm) {
@@ -171,6 +177,10 @@ export function SignInModal({ onClose }: SignInModalProps) {
     e.preventDefault();
     if (!contactName || !companyName || !regEmail || !regPassword) {
       toast.error("Please fill in all required fields.");
+      return;
+    }
+    if (regPassword.length < 6) {
+      toast.error("Password must be at least 6 characters.");
       return;
     }
     if (regPassword !== regConfirm) {

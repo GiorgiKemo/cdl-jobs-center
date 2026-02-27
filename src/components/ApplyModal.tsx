@@ -117,6 +117,10 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      toast.error("Please sign in to submit an application.");
+      return;
+    }
     const errs = validate();
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
