@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { useApplication } from "@/hooks/useApplication";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/auth";
 import { SignInModal } from "@/components/SignInModal";
 import { Truck, CheckCircle2 } from "lucide-react";
 

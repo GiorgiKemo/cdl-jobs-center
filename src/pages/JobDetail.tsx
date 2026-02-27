@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Phone, MapPin, ExternalLink, Truck } from "lucide-react";
 import { useJobs } from "@/hooks/useJobs";
 import { COMPANIES } from "@/data/companies";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/auth";
 import { useState, useEffect } from "react";
 import { ApplyModal } from "@/components/ApplyModal";
 import { SignInModal } from "@/components/SignInModal";

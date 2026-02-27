@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Phone, Mail, Truck, ChevronDown, LogOut, User, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/auth";
 import { SignInModal } from "@/components/SignInModal";
 
 const jobDropdownItems = [

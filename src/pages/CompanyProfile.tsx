@@ -4,7 +4,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Phone, MapPin, Star, CheckCircle, ExternalLink } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/auth";
 import { ApplyModal } from "@/components/ApplyModal";
 import { SignInModal } from "@/components/SignInModal";
 import { COMPANIES } from "@/data/companies";
