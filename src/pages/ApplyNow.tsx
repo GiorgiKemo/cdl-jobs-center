@@ -1,135 +1,324 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { motion } from "framer-motion";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { useForm } from "react-hook-form";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle } from "lucide-react";
+import { Link } from "react-router-dom";
+
+const US_STATES = [
+  "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware",
+  "Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky",
+  "Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi",
+  "Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico",
+  "New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania",
+  "Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont",
+  "Virginia","Washington","West Virginia","Wisconsin","Wyoming",
+];
+
+// Reusable toggle row: label on left, OFF · switch · ON on right
+const ToggleRow = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) => (
+  <div className="flex items-center justify-between py-1">
+    <span className="text-sm text-foreground">{label}</span>
+    <div className="flex items-center gap-1.5">
+      <span className={`text-xs font-medium ${!checked ? "text-foreground" : "text-muted-foreground"}`}>OFF</span>
+      <Switch checked={checked} onCheckedChange={onChange} className="data-[state=unchecked]:bg-muted" />
+      <span className={`text-xs font-medium ${checked ? "text-primary" : "text-muted-foreground"}`}>ON</span>
+    </div>
+  </div>
+);
+
+// Section header with left red border accent
+const SectionHeader = ({ children }: { children: React.ReactNode }) => (
+  <div className="border-l-4 border-primary bg-primary/5 px-3 py-2 mb-4">
+    <p className="text-primary text-sm font-semibold">{children}</p>
+  </div>
+);
 
 const ApplyNow = () => {
-  const { register, handleSubmit, formState: { errors } } = useForm();
+  // Basic info
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [cdlNumber, setCdlNumber] = useState("");
+  const [zipCode, setZipCode] = useState("");
+  const [date, setDate] = useState("");
+  const [driverType, setDriverType] = useState("");
+  const [licenseClass, setLicenseClass] = useState("");
+  const [yearsExp, setYearsExp] = useState("");
+  const [licenseState, setLicenseState] = useState("");
+  const [soloTeam, setSoloTeam] = useState("Solo");
+  const [submitTo, setSubmitTo] = useState("all");
+  const [notes, setNotes] = useState("");
 
-  const onSubmit = (data: any) => {
-    console.log(data);
-    toast.success("Application submitted successfully! We'll match you with top companies.");
+  // Job preference toggles
+  const [prefs, setPrefs] = useState({
+    betterPay: false, betterHomeTime: false,
+    healthInsurance: false, bonuses: false,
+    newEquipment: false,
+  });
+
+  // Endorsement toggles
+  const [endorse, setEndorse] = useState({
+    doublesTriples: false, hazmat: false,
+    tankVehicles: false, tankerHazmat: false,
+  });
+
+  // Hauler experience toggles
+  const [hauler, setHauler] = useState({
+    box: false, carHaul: false, dropAndHook: false,
+    dryBulk: false, dryVan: false, flatbed: false,
+    hopperBottom: false, intermodal: false, oilField: false,
+    oversizeLoad: false, refrigerated: false, tanker: false,
+  });
+
+  // Route preference toggles
+  const [route, setRoute] = useState({
+    dedicated: false, local: false, ltl: false,
+    otr: false, regional: false,
+  });
+
+  // Additional questions
+  const [extra, setExtra] = useState({
+    leasePurchase: false, accidents: false,
+    suspended: false, newsletters: false,
+  });
+
+  const tog = <T extends Record<string, boolean>>(setter: React.Dispatch<React.SetStateAction<T>>, key: keyof T) =>
+    (v: boolean) => setter((prev) => ({ ...prev, [key]: v }));
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    toast.success("Application submitted! We'll match you with top companies.");
   };
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <section className="py-20 bg-secondary">
-        <div className="container mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center max-w-2xl mx-auto mb-12"
-          >
-            <span className="text-primary font-medium text-sm uppercase tracking-widest">Apply Now</span>
-            <h1 className="font-display text-4xl md:text-5xl font-bold text-secondary-foreground mt-3 mb-4">
-              Start Your <span className="text-gradient">New Career</span>
-            </h1>
-            <p className="text-muted-foreground text-lg">
-              Complete this simple application and get matched with top carriers in minutes.
-            </p>
-          </motion.div>
-        </div>
-      </section>
 
-      <section className="py-16">
-        <div className="container mx-auto max-w-2xl">
-          <motion.form
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            onSubmit={handleSubmit(onSubmit)}
-            className="glass rounded-2xl p-8 md:p-12 space-y-6"
-          >
-            <div className="grid sm:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First Name *</Label>
-                <Input id="firstName" placeholder="John" {...register("firstName", { required: true })} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name *</Label>
-                <Input id="lastName" placeholder="Doe" {...register("lastName", { required: true })} />
+      <div className="container mx-auto py-8 max-w-3xl">
+        {/* Breadcrumb */}
+        <p className="text-sm text-muted-foreground mb-6">
+          <Link to="/" className="text-primary hover:underline">Main</Link>
+          <span className="mx-1">»</span>
+          Add Application
+        </p>
+
+        <form onSubmit={handleSubmit} className="bg-card border border-border shadow-sm">
+          {/* Form title */}
+          <div className="border-l-4 border-primary px-4 py-3 mb-6 mx-6 mt-6">
+            <p className="font-semibold text-foreground">Let's Get Started!</p>
+          </div>
+
+          <div className="px-6 pb-8 space-y-8">
+
+            {/* Job preferences */}
+            <div>
+              <SectionHeader>What do you want in your next job selections?</SectionHeader>
+              <div className="grid sm:grid-cols-2 gap-x-12 gap-y-1">
+                <ToggleRow label="Better pay" checked={prefs.betterPay} onChange={tog(setPrefs, "betterPay")} />
+                <ToggleRow label="Better home time" checked={prefs.betterHomeTime} onChange={tog(setPrefs, "betterHomeTime")} />
+                <ToggleRow label="Health Insurance" checked={prefs.healthInsurance} onChange={tog(setPrefs, "healthInsurance")} />
+                <ToggleRow label="Bonuses" checked={prefs.bonuses} onChange={tog(setPrefs, "bonuses")} />
+                <ToggleRow label="New equipment" checked={prefs.newEquipment} onChange={tog(setPrefs, "newEquipment")} />
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
-                <Input id="email" type="email" placeholder="john@email.com" {...register("email", { required: true })} />
+            {/* Basic info */}
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Input placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone *</Label>
-                <Input id="phone" type="tel" placeholder="(555) 123-4567" {...register("phone", { required: true })} />
+              <div className="space-y-1">
+                <Input placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Input placeholder="Phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Input placeholder="CDL #" value={cdlNumber} onChange={(e) => setCdlNumber(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Input placeholder="Zip Code" value={zipCode} onChange={(e) => setZipCode(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Input placeholder="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label>CDL Class</Label>
-                <Select>
-                  <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
+            {/* Driving experience */}
+            <div>
+              <SectionHeader>Tell us about your driving experience.</SectionHeader>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Driver Type</Label>
+                  <Select value={driverType} onValueChange={setDriverType}>
+                    <SelectTrigger><SelectValue placeholder="Owner Operator" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="company">Company Driver</SelectItem>
+                      <SelectItem value="owner-operator">Owner Operator</SelectItem>
+                      <SelectItem value="lease">Lease Operator</SelectItem>
+                      <SelectItem value="student">Student / Trainee</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">License Class</Label>
+                  <Select value={licenseClass} onValueChange={setLicenseClass}>
+                    <SelectTrigger><SelectValue placeholder="Class A" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="a">Class A</SelectItem>
+                      <SelectItem value="b">Class B</SelectItem>
+                      <SelectItem value="c">Class C</SelectItem>
+                      <SelectItem value="permit">Permit Only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Years Experience</Label>
+                  <Select value={yearsExp} onValueChange={setYearsExp}>
+                    <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="less-1">Less than 1 year</SelectItem>
+                      <SelectItem value="1-3">1–3 years</SelectItem>
+                      <SelectItem value="3-5">3–5 years</SelectItem>
+                      <SelectItem value="5+">5+ years</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">License State</Label>
+                  <Select value={licenseState} onValueChange={setLicenseState}>
+                    <SelectTrigger><SelectValue placeholder="Alabama" /></SelectTrigger>
+                    <SelectContent>
+                      {US_STATES.map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* Endorsements */}
+            <div>
+              <SectionHeader>Endorsements (optional):</SectionHeader>
+              <div className="grid sm:grid-cols-2 gap-x-12 gap-y-1">
+                <ToggleRow label="Doubles/Triples (T)" checked={endorse.doublesTriples} onChange={tog(setEndorse, "doublesTriples")} />
+                <ToggleRow label="HAZMAT (H)" checked={endorse.hazmat} onChange={tog(setEndorse, "hazmat")} />
+                <ToggleRow label="Tank Vehicles (N)" checked={endorse.tankVehicles} onChange={tog(setEndorse, "tankVehicles")} />
+                <ToggleRow label="Tanker + HAZMAT (X)" checked={endorse.tankerHazmat} onChange={tog(setEndorse, "tankerHazmat")} />
+              </div>
+            </div>
+
+            {/* Hauler experience */}
+            <div>
+              <SectionHeader>Hauler Experience:</SectionHeader>
+              <div className="grid sm:grid-cols-3 gap-x-8 gap-y-1">
+                <ToggleRow label="Box" checked={hauler.box} onChange={tog(setHauler, "box")} />
+                <ToggleRow label="Car Haule" checked={hauler.carHaul} onChange={tog(setHauler, "carHaul")} />
+                <ToggleRow label="Drop and Hook" checked={hauler.dropAndHook} onChange={tog(setHauler, "dropAndHook")} />
+                <ToggleRow label="Dry Bulk" checked={hauler.dryBulk} onChange={tog(setHauler, "dryBulk")} />
+                <ToggleRow label="Dry Van" checked={hauler.dryVan} onChange={tog(setHauler, "dryVan")} />
+                <ToggleRow label="Flatbed" checked={hauler.flatbed} onChange={tog(setHauler, "flatbed")} />
+                <ToggleRow label="Hopper Bottom" checked={hauler.hopperBottom} onChange={tog(setHauler, "hopperBottom")} />
+                <ToggleRow label="Intermodal" checked={hauler.intermodal} onChange={tog(setHauler, "intermodal")} />
+                <ToggleRow label="Oil Field" checked={hauler.oilField} onChange={tog(setHauler, "oilField")} />
+                <ToggleRow label="Oversize Load" checked={hauler.oversizeLoad} onChange={tog(setHauler, "oversizeLoad")} />
+                <ToggleRow label="Refrigerated" checked={hauler.refrigerated} onChange={tog(setHauler, "refrigerated")} />
+                <ToggleRow label="Tanker" checked={hauler.tanker} onChange={tog(setHauler, "tanker")} />
+              </div>
+            </div>
+
+            {/* Route preference */}
+            <div>
+              <SectionHeader>Route Preference:</SectionHeader>
+              <div className="grid sm:grid-cols-3 gap-x-8 gap-y-1">
+                <ToggleRow label="Dedicated" checked={route.dedicated} onChange={tog(setRoute, "dedicated")} />
+                <ToggleRow label="Local" checked={route.local} onChange={tog(setRoute, "local")} />
+                <ToggleRow label="LTL" checked={route.ltl} onChange={tog(setRoute, "ltl")} />
+                <ToggleRow label="OTR" checked={route.otr} onChange={tog(setRoute, "otr")} />
+                <ToggleRow label="Regional" checked={route.regional} onChange={tog(setRoute, "regional")} />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Additional questions */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-foreground">Interested in solo or team driving?</span>
+                <Select value={soloTeam} onValueChange={setSoloTeam}>
+                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="a">Class A</SelectItem>
-                    <SelectItem value="b">Class B</SelectItem>
-                    <SelectItem value="c">Class C</SelectItem>
-                    <SelectItem value="permit">Permit Only</SelectItem>
+                    <SelectItem value="Solo">Solo</SelectItem>
+                    <SelectItem value="Team">Team</SelectItem>
+                    <SelectItem value="Either">Either</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Years of Experience</Label>
-                <Select>
-                  <SelectTrigger><SelectValue placeholder="Select experience" /></SelectTrigger>
+              <ToggleRow label="Interested in lease purchase?" checked={extra.leasePurchase} onChange={tog(setExtra, "leasePurchase")} />
+              <ToggleRow label="Have you had any accidents or violations in the past 3 years?" checked={extra.accidents} onChange={tog(setExtra, "accidents")} />
+              <ToggleRow label="Have you had your license suspended or DUI/DWI charges in the past 10 years?" checked={extra.suspended} onChange={tog(setExtra, "suspended")} />
+              <ToggleRow label="Yes! Sign me up to receive newsletters and job alerts" checked={extra.newsletters} onChange={tog(setExtra, "newsletters")} />
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-foreground">Submit application to</span>
+                <Select value={submitTo} onValueChange={setSubmitTo}>
+                  <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="0">No Experience / Student</SelectItem>
-                    <SelectItem value="1">Less than 1 Year</SelectItem>
-                    <SelectItem value="1-3">1–3 Years</SelectItem>
-                    <SelectItem value="3-5">3–5 Years</SelectItem>
-                    <SelectItem value="5+">5+ Years</SelectItem>
+                    <SelectItem value="all">All Matching Companies</SelectItem>
+                    <SelectItem value="gi">GI Super Service</SelectItem>
+                    <SelectItem value="ugc">United Global Carrier</SelectItem>
+                    <SelectItem value="pkd">PKD Express</SelectItem>
+                    <SelectItem value="an">AN Enterprise Inc</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Preferred Freight Type</Label>
-              <Select>
-                <SelectTrigger><SelectValue placeholder="Select freight type" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="dry-van">Dry Van</SelectItem>
-                  <SelectItem value="flatbed">Flatbed</SelectItem>
-                  <SelectItem value="refrigerated">Refrigerated</SelectItem>
-                  <SelectItem value="tanker">Tanker</SelectItem>
-                  <SelectItem value="dry-bulk">Dry Bulk</SelectItem>
-                  <SelectItem value="any">Any / Open to All</SelectItem>
-                </SelectContent>
-              </Select>
+            {/* Notes area */}
+            <div className="border border-border">
+              <div className="flex items-center gap-4 border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground flex-wrap">
+                {["Edit","Insert","Format","Table","View"].map((m) => (
+                  <button key={m} type="button" className="hover:text-foreground transition-colors">{m}</button>
+                ))}
+                <span className="border-l border-border h-4 mx-1" />
+                {["B","I","U","S"].map((f) => (
+                  <button key={f} type="button" className="font-medium hover:text-foreground transition-colors">{f}</button>
+                ))}
+              </div>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder=""
+                rows={6}
+                className="border-0 rounded-none resize-none focus-visible:ring-0 focus-visible:ring-offset-0"
+              />
+              <div className="flex justify-end border-t border-border px-3 py-1 text-xs text-muted-foreground">
+                {notes.trim() ? notes.trim().split(/\s+/).length : 0} WORDS
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="message">Anything else we should know?</Label>
-              <Textarea id="message" placeholder="Tell us about your preferences, endorsements, or any other details..." rows={4} {...register("message")} />
+            {/* Submit buttons */}
+            <div className="flex items-center gap-3">
+              <Button type="submit" className="px-8">Send</Button>
+              <Button type="button" variant="outline" className="px-8">Preview</Button>
             </div>
 
-            <Button type="submit" size="lg" className="w-full text-lg glow-orange group">
-              Submit Application
-              <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-            </Button>
+          </div>
+        </form>
+      </div>
 
-            <div className="flex items-start gap-2 text-sm text-muted-foreground">
-              <CheckCircle className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-              <p>Your information is secure and will only be shared with verified trucking companies.</p>
-            </div>
-          </motion.form>
-        </div>
-      </section>
       <Footer />
     </div>
   );
