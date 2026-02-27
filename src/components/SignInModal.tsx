@@ -114,12 +114,25 @@ export function SignInModal({ onClose }: SignInModalProps) {
       return;
     }
     setSubmitting(true);
+    const timeout = setTimeout(() => {
+      setSubmitting(false);
+      toast.error("Sign in is taking too long. Please try again.");
+    }, 15000);
     try {
       await signIn(loginEmail, loginPassword);
+      clearTimeout(timeout);
       toast.success("Welcome back!");
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Sign in failed. Please try again.");
+      clearTimeout(timeout);
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.toLowerCase().includes("not confirmed")) {
+        toast.error("Your email is not confirmed yet. Check your inbox or contact support.");
+      } else if (msg.toLowerCase().includes("invalid login")) {
+        toast.error("Incorrect email or password.");
+      } else {
+        toast.error(msg || "Sign in failed. Please try again.");
+      }
     } finally {
       setSubmitting(false);
     }
