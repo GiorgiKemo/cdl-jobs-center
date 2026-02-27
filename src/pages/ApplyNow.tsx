@@ -374,7 +374,7 @@ const ApplyNow = () => {
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Driver Type *</Label>
                   <Select value={driverType} onValueChange={(v) => { setDriverType(v); setErrors((p) => ({ ...p, driverType: "" })); }}>
-                    <SelectTrigger className={errors.driverType ? "border-destructive" : ""}><SelectValue placeholder="Owner Operator" /></SelectTrigger>
+                    <SelectTrigger className={errors.driverType ? "border-destructive" : ""}><SelectValue placeholder="Select driver type" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="company">Company Driver</SelectItem>
                       <SelectItem value="owner-operator">Owner Operator</SelectItem>
@@ -387,7 +387,7 @@ const ApplyNow = () => {
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">License Class *</Label>
                   <Select value={licenseClass} onValueChange={(v) => { setLicenseClass(v); setErrors((p) => ({ ...p, licenseClass: "" })); }}>
-                    <SelectTrigger className={errors.licenseClass ? "border-destructive" : ""}><SelectValue placeholder="Class A" /></SelectTrigger>
+                    <SelectTrigger className={errors.licenseClass ? "border-destructive" : ""}><SelectValue placeholder="Select class" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="a">Class A</SelectItem>
                       <SelectItem value="b">Class B</SelectItem>
@@ -400,7 +400,7 @@ const ApplyNow = () => {
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Years Experience *</Label>
                   <Select value={yearsExp} onValueChange={(v) => { setYearsExp(v); setErrors((p) => ({ ...p, yearsExp: "" })); }}>
-                    <SelectTrigger className={errors.yearsExp ? "border-destructive" : ""}><SelectValue placeholder="None" /></SelectTrigger>
+                    <SelectTrigger className={errors.yearsExp ? "border-destructive" : ""}><SelectValue placeholder="Select experience" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
                       <SelectItem value="less-1">Less than 1 year</SelectItem>
@@ -414,7 +414,7 @@ const ApplyNow = () => {
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">License State *</Label>
                   <Select value={licenseState} onValueChange={(v) => { setLicenseState(v); setErrors((p) => ({ ...p, licenseState: "" })); }}>
-                    <SelectTrigger className={errors.licenseState ? "border-destructive" : ""}><SelectValue placeholder="Alabama" /></SelectTrigger>
+                    <SelectTrigger className={errors.licenseState ? "border-destructive" : ""}><SelectValue placeholder="Select state" /></SelectTrigger>
                     <SelectContent>
                       {US_STATES.map((s) => (
                         <SelectItem key={s} value={s}>{s}</SelectItem>
