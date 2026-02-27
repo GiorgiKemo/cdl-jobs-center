@@ -110,6 +110,44 @@ CREATE TABLE public.saved_jobs (
   UNIQUE(driver_id, job_id)
 );
 
+-- 7. MESSAGES — chat messages between drivers and companies (per application)
+-- ============================================================================
+CREATE TABLE public.messages (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  application_id  UUID NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+  sender_id       UUID NOT NULL REFERENCES auth.users(id),
+  sender_role     TEXT NOT NULL CHECK (sender_role IN ('driver', 'company')),
+  body            TEXT NOT NULL CHECK (char_length(body) > 0 AND char_length(body) <= 5000),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  read_at         TIMESTAMPTZ  -- null = unread by recipient
+);
+
+CREATE INDEX idx_messages_app ON messages(application_id, created_at);
+CREATE INDEX idx_messages_unread ON messages(sender_id, read_at) WHERE read_at IS NULL;
+
+-- 8. LEADS — Facebook / Google Sheets driver leads for companies
+-- ============================================================================
+CREATE TABLE public.leads (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source          TEXT NOT NULL DEFAULT 'facebook',
+  full_name       TEXT NOT NULL,
+  phone           TEXT,
+  email           TEXT,
+  state           TEXT,
+  years_exp       TEXT,
+  is_owner_op     BOOLEAN DEFAULT false,
+  truck_year      TEXT,
+  truck_make      TEXT,
+  truck_model     TEXT,
+  status          TEXT CHECK (status IN ('new','contacted','hired','dismissed')) DEFAULT 'new',
+  sheet_row_id    TEXT UNIQUE,
+  synced_at       TIMESTAMPTZ DEFAULT now(),
+  created_at      TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_leads_state ON leads(state);
+CREATE INDEX idx_leads_status ON leads(status);
+
 -- ============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
 -- ============================================================================
@@ -148,6 +186,30 @@ CREATE POLICY "Users can update own company profile"     ON company_profiles FOR
 -- saved_jobs
 ALTER TABLE saved_jobs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Drivers can manage own saved jobs"  ON saved_jobs FOR ALL USING (driver_id = auth.uid()) WITH CHECK (driver_id = auth.uid());
+
+-- messages
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Read own conversations" ON messages FOR SELECT USING (
+  EXISTS (SELECT 1 FROM applications a WHERE a.id = messages.application_id
+    AND (a.driver_id = auth.uid() OR a.company_id = auth.uid()))
+);
+CREATE POLICY "Send in own conversations" ON messages FOR INSERT WITH CHECK (
+  sender_id = auth.uid() AND EXISTS (SELECT 1 FROM applications a WHERE a.id = messages.application_id
+    AND (a.driver_id = auth.uid() OR a.company_id = auth.uid()))
+);
+CREATE POLICY "Mark received as read" ON messages FOR UPDATE USING (
+  sender_id != auth.uid() AND EXISTS (SELECT 1 FROM applications a WHERE a.id = messages.application_id
+    AND (a.driver_id = auth.uid() OR a.company_id = auth.uid()))
+);
+
+-- leads
+ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Companies can read leads" ON leads FOR SELECT USING (
+  EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'company')
+);
+CREATE POLICY "Companies can update lead status" ON leads FOR UPDATE USING (
+  EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'company')
+);
 
 -- ============================================================================
 -- STORAGE BUCKET

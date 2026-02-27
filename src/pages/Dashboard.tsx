@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { useAuth } from "@/context/auth";
 import { useJobs } from "@/hooks/useJobs";
 import { Job } from "@/data/jobs";
 import { toast } from "sonner";
-import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload, Bell } from "lucide-react";
+import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload, Bell, MessageSquare, Users, Phone as PhoneIcon, Mail as MailIcon, MapPin, Truck as TruckIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -21,6 +21,9 @@ import {
   useDraggable,
   useDroppable,
 } from "@dnd-kit/core";
+import { ChatPanel } from "@/components/ChatPanel";
+import { useUnreadCount } from "@/hooks/useMessages";
+import { useLeads, useUpdateLeadStatus } from "@/hooks/useLeads";
 
 const FREIGHT_TYPES = [
   "Box", "Car Hauler", "Drop and Hook", "Dry Bulk", "Dry Van", "Flatbed",
@@ -112,7 +115,7 @@ const EMPTY_FORM = {
   status: "Active",
 };
 
-type Tab = "jobs" | "applications" | "pipeline" | "profile" | "analytics";
+type Tab = "jobs" | "applications" | "pipeline" | "profile" | "analytics" | "messages" | "leads";
 
 // ── Application card with expand/collapse ────────────────────────────────────
 const AppCard = ({ app }: { app: ReceivedApplication }) => {
@@ -291,9 +294,21 @@ const DashboardInner = () => {
   const { user } = useAuth();
   const qc = useQueryClient();
   const { jobs, addJob, updateJob, removeJob } = useJobs(user!.id);
+  const { data: unreadMsgCount = 0 } = useUnreadCount(user!.id);
+  const { data: leads = [] } = useLeads();
+  const updateLeadStatus = useUpdateLeadStatus();
 
-  const [activeTab, setActiveTab] = useState<Tab>("jobs");
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const t = searchParams.get("tab");
+    if (t === "messages" || t === "leads") return t;
+    return "jobs";
+  });
+  const [initialChatAppId, setInitialChatAppId] = useState<string | null>(null);
   const [appPage, setAppPage] = useState(0);
+  const [leadPage, setLeadPage] = useState(0);
+  const [leadStateFilter, setLeadStateFilter] = useState("all");
+  const [leadTypeFilter, setLeadTypeFilter] = useState<"all" | "owner-op" | "company">("all");
   const APP_PAGE_SIZE = 10;
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -542,6 +557,26 @@ const DashboardInner = () => {
           </button>
           <button className={tabClass("pipeline")} onClick={() => switchTab("pipeline")}>
             Pipeline ({applications.length})
+          </button>
+          <button className={tabClass("messages")} onClick={() => switchTab("messages")}>
+            Messages
+            {unreadMsgCount > 0 && (
+              <span className="ml-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white px-1">
+                {unreadMsgCount}
+              </span>
+            )}
+          </button>
+          <button className={tabClass("leads")} onClick={() => switchTab("leads")}>
+            Leads ({leads.length})
+            {(() => {
+              const newCount = leads.filter((l) => l.status === "new").length;
+              if (newCount === 0) return null;
+              return (
+                <span className="ml-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white px-1">
+                  {newCount}
+                </span>
+              );
+            })()}
           </button>
           <button className={tabClass("profile")} onClick={() => switchTab("profile")}>
             Company Profile
@@ -889,6 +924,218 @@ const DashboardInner = () => {
             </div>
           </div>
         )}
+
+        {/* ── Tab: Messages ──────────────────────────────────────────────────── */}
+        {activeTab === "messages" && (
+          <ChatPanel userId={user!.id} userRole="company" userName={user!.name} initialApplicationId={initialChatAppId} />
+        )}
+
+        {/* ── Tab: Leads ───────────────────────────────────────────────────── */}
+        {activeTab === "leads" && (() => {
+          const uniqueStates = [...new Set(leads.map((l) => l.state).filter(Boolean))].sort() as string[];
+          const filtered = leads.filter((l) => {
+            if (leadStateFilter !== "all" && l.state !== leadStateFilter) return false;
+            if (leadTypeFilter === "owner-op" && !l.isOwnerOp) return false;
+            if (leadTypeFilter === "company" && l.isOwnerOp) return false;
+            return true;
+          });
+          const LEAD_PAGE_SIZE = 10;
+          const totalPages = Math.ceil(filtered.length / LEAD_PAGE_SIZE);
+          const pageLeads = filtered.slice(leadPage * LEAD_PAGE_SIZE, (leadPage + 1) * LEAD_PAGE_SIZE);
+
+          const expLabel = (v: string | null) => {
+            if (!v) return "N/A";
+            if (v === "less-1") return "< 1 year";
+            if (v === "5+") return "5+ years";
+            return `${v} years`;
+          };
+
+          const statusDot = (s: string) => {
+            if (s === "new") return "bg-blue-500";
+            if (s === "contacted") return "bg-green-500";
+            if (s === "hired") return "bg-emerald-600";
+            return "bg-gray-400";
+          };
+
+          const statusLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+          const timeAgo = (iso: string) => {
+            const diff = Date.now() - new Date(iso).getTime();
+            const mins = Math.floor(diff / 60_000);
+            if (mins < 60) return `${mins}m ago`;
+            const hrs = Math.floor(mins / 60);
+            if (hrs < 24) return `${hrs}h ago`;
+            const days = Math.floor(hrs / 24);
+            return `${days}d ago`;
+          };
+
+          return (
+            <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="font-display font-semibold text-base flex items-center gap-2">
+                    <Users className="h-5 w-5 text-primary" />
+                    Driver Leads
+                    <span className="text-muted-foreground font-normal text-sm">({filtered.length})</span>
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Facebook lead ad responses from drivers looking for jobs.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={leadStateFilter} onValueChange={(v) => { setLeadStateFilter(v); setLeadPage(0); }}>
+                    <SelectTrigger className="w-32 h-8 text-xs">
+                      <SelectValue placeholder="All States" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All States</SelectItem>
+                      {uniqueStates.map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex border border-border rounded-md overflow-hidden">
+                    {(["all", "owner-op", "company"] as const).map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => { setLeadTypeFilter(t); setLeadPage(0); }}
+                        className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                          leadTypeFilter === t
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-card text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {t === "all" ? "All" : t === "owner-op" ? "Owner Op" : "Company"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {filtered.length === 0 ? (
+                <div className="border border-border bg-card px-5 py-12 text-center text-muted-foreground text-sm">
+                  <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p>No leads match your filters.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    {pageLeads.map((lead) => (
+                      <div key={lead.id} className={`border bg-card p-4 transition-colors ${lead.status === "dismissed" ? "border-border opacity-60" : lead.status === "new" ? "border-blue-200 dark:border-blue-800" : "border-border"}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3 min-w-0 flex-1">
+                            {/* Avatar */}
+                            <div className="h-10 w-10 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
+                              {lead.fullName.split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2)}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              {/* Name + status */}
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-medium text-sm">{lead.fullName}</p>
+                                <span className={`h-2 w-2 rounded-full shrink-0 ${statusDot(lead.status)}`} title={statusLabel(lead.status)} />
+                                <span className="text-[10px] text-muted-foreground">{statusLabel(lead.status)}</span>
+                              </div>
+                              {/* Contact info */}
+                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
+                                {lead.phone && (
+                                  <a href={`tel:${lead.phone}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors">
+                                    <PhoneIcon className="h-3 w-3" />{lead.phone}
+                                  </a>
+                                )}
+                                {lead.email && (
+                                  <a href={`mailto:${lead.email}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors">
+                                    <MailIcon className="h-3 w-3" />{lead.email}
+                                  </a>
+                                )}
+                              </div>
+                              {/* Badges */}
+                              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                {lead.state && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-[11px] font-medium">
+                                    <MapPin className="h-3 w-3" />{lead.state}
+                                  </span>
+                                )}
+                                <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-[11px] font-medium">
+                                  {expLabel(lead.yearsExp)} exp
+                                </span>
+                                {lead.isOwnerOp && (
+                                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-[11px] font-medium">
+                                    Owner Operator
+                                  </span>
+                                )}
+                                {!lead.isOwnerOp && (
+                                  <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-[11px] font-medium">
+                                    Company Driver
+                                  </span>
+                                )}
+                              </div>
+                              {/* Truck info for owner ops */}
+                              {lead.isOwnerOp && lead.truckYear && (
+                                <div className="flex items-center gap-1 mt-1.5 text-xs text-muted-foreground">
+                                  <TruckIcon className="h-3 w-3" />
+                                  {lead.truckYear} {lead.truckMake} {lead.truckModel}
+                                </div>
+                              )}
+                              {/* Time */}
+                              <p className="text-[10px] text-muted-foreground mt-1.5">Added {timeAgo(lead.syncedAt)}</p>
+                            </div>
+                          </div>
+                          {/* Actions */}
+                          <div className="flex flex-col gap-1.5 shrink-0">
+                            {lead.status !== "contacted" && lead.status !== "hired" && (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="text-xs h-7 px-3"
+                                onClick={() => updateLeadStatus.mutate({ leadId: lead.id, status: "contacted" })}
+                              >
+                                Contact
+                              </Button>
+                            )}
+                            {lead.status === "contacted" && (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="text-xs h-7 px-3 bg-emerald-600 hover:bg-emerald-700"
+                                onClick={() => updateLeadStatus.mutate({ leadId: lead.id, status: "hired" })}
+                              >
+                                Mark Hired
+                              </Button>
+                            )}
+                            {lead.status !== "dismissed" && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-xs h-7 px-3 text-muted-foreground"
+                                onClick={() => updateLeadStatus.mutate({ leadId: lead.id, status: "dismissed" })}
+                              >
+                                Dismiss
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-4 text-sm">
+                      <span className="text-muted-foreground">
+                        Showing {leadPage * LEAD_PAGE_SIZE + 1}–{Math.min((leadPage + 1) * LEAD_PAGE_SIZE, filtered.length)} of {filtered.length}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setLeadPage((p) => p - 1)} disabled={leadPage === 0}>
+                          Previous
+                        </Button>
+                        <span className="text-muted-foreground text-xs">{leadPage + 1} / {totalPages}</span>
+                        <Button variant="outline" size="sm" onClick={() => setLeadPage((p) => p + 1)} disabled={leadPage >= totalPages - 1}>
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ── Tab: Analytics ─────────────────────────────────────────────────── */}
         {activeTab === "analytics" && (() => {

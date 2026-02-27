@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Phone, Mail, Truck, ChevronDown, LogOut, User, LayoutDashboard } from "lucide-react";
+import { Menu, X, Phone, Mail, Truck, ChevronDown, LogOut, User, LayoutDashboard, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/context/auth";
 import { SignInModal } from "@/components/SignInModal";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { useUnreadCount } from "@/hooks/useMessages";
 
 const jobDropdownItems = [
   { name: "All Jobs", path: "/jobs" },
@@ -161,7 +162,8 @@ const Navbar = () => {
     refetchInterval: 30_000,
   });
 
-  const notifCount = isCompany ? newAppCount : driverUpdateCount;
+  const { data: unreadMsgCount = 0 } = useUnreadCount(user?.id);
+  const notifCount = (isCompany ? newAppCount : driverUpdateCount) + unreadMsgCount;
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -356,6 +358,19 @@ const Navbar = () => {
                         >
                           <LayoutDashboard className="h-3.5 w-3.5 shrink-0" />
                           {user.role === "company" ? "Dashboard" : "My Dashboard"}
+                        </Link>
+                        <Link
+                          to={`${user.role === "company" ? "/dashboard" : "/driver-dashboard"}?tab=messages`}
+                          onClick={() => setProfileOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary"
+                        >
+                          <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                          Messages
+                          {unreadMsgCount > 0 && (
+                            <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                              {unreadMsgCount > 99 ? "99+" : unreadMsgCount}
+                            </span>
+                          )}
                         </Link>
                         <hr className="border-border my-1" />
                         <button

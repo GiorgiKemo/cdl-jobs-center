@@ -39,15 +39,38 @@ const COMPANY_STATES = [
 const Companies = () => {
   const [stateFilter, setStateFilter] = useState("All");
 
-  const { data: companies = [], isLoading } = useQuery({
+  const {
+    data: companies = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["companies-directory"],
+    networkMode: "always",
+    retry: 2,
+    refetchOnMount: "always",
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("company_profiles")
-        .select("id, company_name, phone, address, email, website, about, logo_url")
-        .order("company_name");
-      if (error) throw error;
-      return (data ?? []) as CompanyRow[];
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      try {
+        const { data, error } = await supabase
+          .from("company_profiles")
+          .select("id, company_name, phone, address, email, website, about, logo_url")
+          .abortSignal(controller.signal)
+          .order("company_name");
+
+        if (error) throw error;
+        return (data ?? []) as CompanyRow[];
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          throw new Error("Loading companies timed out. Please try again.");
+        }
+        throw err;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
     },
   });
 
@@ -128,6 +151,15 @@ const Companies = () => {
           {isLoading ? (
             <div className="px-5 py-12 text-center text-muted-foreground text-sm">
               Loading companies...
+            </div>
+          ) : isError ? (
+            <div className="px-5 py-12 text-center">
+              <p className="text-sm text-destructive mb-3">
+                {error instanceof Error ? error.message : "Failed to load companies."}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                Try again
+              </Button>
             </div>
           ) : filtered.length === 0 ? (
             <div className="px-5 py-12 text-center text-muted-foreground text-sm">

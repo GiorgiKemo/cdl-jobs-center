@@ -155,6 +155,28 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
 
+  /* Keep layout stable while Radix Select is open (no scrollbar compensation jump). */
+  html body.cdl-select-open[data-scroll-locked] {
+    overflow: auto !important;
+    overscroll-behavior: auto !important;
+    margin-right: 0 !important;
+    padding-right: 0 !important;
+    pointer-events: auto !important;
+  }
+
+  html body.cdl-select-open.with-scroll-bars-hidden {
+    overflow: auto !important;
+    padding-right: 0 !important;
+  }
+
+  html body.cdl-select-open .right-scroll-bar-position {
+    right: 0 !important;
+  }
+
+  html body.cdl-select-open .width-before-scroll-bar {
+    margin-right: 0 !important;
+  }
+
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Space Grotesk', sans-serif;
   }

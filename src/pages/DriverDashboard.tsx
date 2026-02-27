@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -12,12 +12,15 @@ import { useAuth } from "@/context/auth";
 import { useActiveJobs } from "@/hooks/useJobs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { useDriverProfile, DriverProfile } from "@/hooks/useDriverProfile";
-import { Truck, Briefcase, Bookmark, User, BarChart3, ChevronDown, ChevronUp, MapPin, DollarSign, Bell } from "lucide-react";
+import { Truck, Briefcase, Bookmark, User, BarChart3, ChevronDown, ChevronUp, MapPin, DollarSign, Bell, MessageSquare } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { ChatPanel } from "@/components/ChatPanel";
+import { useUnreadCount } from "@/hooks/useMessages";
 
-type Tab = "overview" | "applications" | "saved" | "profile";
+type Tab = "overview" | "applications" | "saved" | "profile" | "analytics" | "messages";
 type PipelineStage = "New" | "Reviewing" | "Interview" | "Hired" | "Rejected";
 
 interface StoredApplication {
@@ -122,10 +125,16 @@ const DriverDashboardInner = () => {
   const { jobs: allActiveJobs } = useActiveJobs();
   const { savedIds, toggle: toggleSave } = useSavedJobs(user!.id);
   const { profile, isLoading: profileLoading, saveProfile } = useDriverProfile(user!.id);
+  const { data: unreadMsgCount = 0 } = useUnreadCount(user!.id);
 
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const t = searchParams.get("tab");
+    return t === "messages" ? "messages" : "overview";
+  });
   const [expandedApp, setExpandedApp] = useState<string | null>(null);
   const [stageFilter, setStageFilter] = useState<PipelineStage | "All">("All");
+  const [initialChatAppId, setInitialChatAppId] = useState<string | null>(null);
   const [dismissedApps, setDismissedApps] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem(`cdl-dismissed-apps-${user!.id}`);
@@ -232,7 +241,9 @@ const DriverDashboardInner = () => {
     { id: "overview",      label: "Overview",        icon: <BarChart3 className="h-4 w-4" /> },
     { id: "applications",  label: `My Applications (${totalApps})`, icon: <Briefcase className="h-4 w-4" />, badge: unseenUpdates },
     { id: "saved",         label: `Saved Jobs (${savedCount})`,     icon: <Bookmark className="h-4 w-4" /> },
+    { id: "messages",      label: "Messages",        icon: <MessageSquare className="h-4 w-4" />, badge: unreadMsgCount },
     { id: "profile",       label: "My Profile",      icon: <User className="h-4 w-4" /> },
+    { id: "analytics",     label: "Analytics",       icon: <BarChart3 className="h-4 w-4" /> },
   ];
 
   return (
@@ -477,13 +488,25 @@ const DriverDashboardInner = () => {
                               <p className="text-sm text-muted-foreground leading-relaxed">{app.notes}</p>
                             </div>
                           )}
-                          {app.jobId && (
-                            <div className="pt-2">
+                          <div className="pt-2 flex gap-2">
+                            {app.jobId && (
                               <Button asChild size="sm" variant="outline">
                                 <Link to={`/jobs/${app.jobId}`}>View Job Posting</Link>
                               </Button>
-                            </div>
-                          )}
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setInitialChatAppId(app.id);
+                                switchTab("messages");
+                              }}
+                            >
+                              <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                              Message Company
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -492,6 +515,11 @@ const DriverDashboardInner = () => {
               </div>
             )}
           </div>
+        )}
+
+        {/* ── MESSAGES ── */}
+        {activeTab === "messages" && (
+          <ChatPanel userId={user!.id} userRole="driver" userName={user!.name} initialApplicationId={initialChatAppId} />
         )}
 
         {/* ── SAVED JOBS ── */}
@@ -642,6 +670,143 @@ const DriverDashboardInner = () => {
             </div>
           </div>
         )}
+
+        {/* ── ANALYTICS ── */}
+        {activeTab === "analytics" && (() => {
+          const total = applications.length;
+          const stageCounts = (["New", "Reviewing", "Interview", "Hired", "Rejected"] as PipelineStage[]).reduce<Record<string, number>>(
+            (acc, s) => { acc[s] = applications.filter((a) => a.pipeline_stage === s).length; return acc; }, {}
+          );
+
+          const responded = total - (stageCounts["New"] ?? 0);
+          const responseRate = total > 0 ? Math.round((responded / total) * 100) : 0;
+          const interviewPlus = (stageCounts["Interview"] ?? 0) + (stageCounts["Hired"] ?? 0);
+          const interviewRate = total > 0 ? Math.round((interviewPlus / total) * 100) : 0;
+          const hireRate = total > 0 ? Math.round(((stageCounts["Hired"] ?? 0) / total) * 100) : 0;
+
+          // Average response time (days between submit and update for responded apps)
+          const respondedApps = applications.filter((a) => a.updatedAt !== a.submittedAt && a.pipeline_stage !== "New");
+          const avgDays = respondedApps.length > 0
+            ? Math.round(respondedApps.reduce((sum, a) => sum + (new Date(a.updatedAt).getTime() - new Date(a.submittedAt).getTime()) / (1000 * 60 * 60 * 24), 0) / respondedApps.length)
+            : null;
+
+          // Application timeline — last 6 months
+          const now = new Date();
+          const monthlyData: { month: string; count: number }[] = [];
+          for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+            const label = d.toLocaleDateString("en-US", { month: "short" });
+            const count = applications.filter((a) => a.submittedAt.startsWith(key)).length;
+            monthlyData.push({ month: label, count });
+          }
+
+          // Top 5 companies
+          const companyCounts: Record<string, number> = {};
+          applications.forEach((a) => { companyCounts[a.companyName] = (companyCounts[a.companyName] ?? 0) + 1; });
+          const topCompanies = Object.entries(companyCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+          const maxCompanyCount = topCompanies.length > 0 ? topCompanies[0][1] : 1;
+
+          const StatCard = ({ label, value, sub }: { label: string; value: string | number; sub?: string }) => (
+            <div className="border border-border bg-card p-5">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{label}</p>
+              <p className="font-display font-bold text-3xl text-foreground">{value}</p>
+              {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+            </div>
+          );
+
+          return (
+            <div className="space-y-6">
+              <h2 className="font-display font-semibold text-base border-l-4 border-primary pl-3">Analytics Overview</h2>
+
+              {total === 0 ? (
+                <div className="border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+                  No data yet. Analytics will appear here as you submit applications.
+                </div>
+              ) : (
+                <>
+                  {/* Summary stats */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <StatCard label="Response Rate" value={`${responseRate}%`} sub={`${responded} of ${total} responded`} />
+                    <StatCard label="Interview Rate" value={`${interviewRate}%`} sub={`${interviewPlus} interviews`} />
+                    <StatCard label="Hire Rate" value={`${hireRate}%`} sub={`${stageCounts["Hired"]} hired`} />
+                    <StatCard label="Avg. Response Time" value={avgDays !== null ? `${avgDays}d` : "—"} sub={avgDays !== null ? `${respondedApps.length} responded` : "no data yet"} />
+                  </div>
+
+                  {/* Pipeline stage breakdown */}
+                  <div className="border border-border bg-card p-5">
+                    <p className="font-semibold text-sm mb-4">Pipeline Stage Breakdown</p>
+                    <div className="space-y-3">
+                      {(["New", "Reviewing", "Interview", "Hired", "Rejected"] as PipelineStage[]).map((stage) => {
+                        const count = stageCounts[stage] ?? 0;
+                        const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                        const colors: Record<string, string> = {
+                          New: "bg-slate-400",
+                          Reviewing: "bg-blue-500",
+                          Interview: "bg-yellow-500",
+                          Hired: "bg-green-500",
+                          Rejected: "bg-red-400",
+                        };
+                        return (
+                          <div key={stage}>
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="font-medium">{stage === "Rejected" ? "Not Moving Forward" : stage}</span>
+                              <span className="text-muted-foreground">{count} ({pct}%)</span>
+                            </div>
+                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full transition-all ${colors[stage]}`} style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Application timeline */}
+                  <div className="border border-border bg-card p-5">
+                    <p className="font-semibold text-sm mb-4">Applications Over Time</p>
+                    <div className="h-48">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={monthlyData} margin={{ top: 5, right: 5, bottom: 5, left: -20 }}>
+                          <XAxis dataKey="month" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                          <YAxis allowDecimals={false} tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                          <Tooltip
+                            contentStyle={{ fontSize: 12, borderRadius: 6, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }}
+                            formatter={(value: number) => [value, "Applications"]}
+                          />
+                          <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Top companies */}
+                  {topCompanies.length > 0 && (
+                    <div className="border border-border bg-card p-5">
+                      <p className="font-semibold text-sm mb-4">Top Companies Applied To</p>
+                      <div className="space-y-3">
+                        {topCompanies.map(([name, count]) => {
+                          const pct = Math.round((count / maxCompanyCount) * 100);
+                          return (
+                            <div key={name}>
+                              <div className="flex justify-between text-sm mb-1">
+                                <span className="font-medium truncate mr-3">{name}</span>
+                                <span className="text-muted-foreground shrink-0">{count} app{count > 1 ? "s" : ""}</span>
+                              </div>
+                              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })()}
       </main>
       <Footer />
     </div>

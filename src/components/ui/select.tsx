@@ -4,7 +4,64 @@ import { Check, ChevronDown, ChevronUp } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-const Select = SelectPrimitive.Root;
+const SELECT_OPEN_UNLOCK_CLASS = "cdl-select-open";
+let openSelectCount = 0;
+
+const addSelectUnlockClass = () => {
+  if (typeof document === "undefined") return;
+  openSelectCount += 1;
+  document.body.classList.add(SELECT_OPEN_UNLOCK_CLASS);
+};
+
+const removeSelectUnlockClass = () => {
+  if (typeof document === "undefined") return;
+  openSelectCount = Math.max(0, openSelectCount - 1);
+  if (openSelectCount === 0) {
+    document.body.classList.remove(SELECT_OPEN_UNLOCK_CLASS);
+  }
+};
+
+type SelectProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Root>;
+
+const Select = ({ onOpenChange, open, ...props }: SelectProps) => {
+  const isControlled = open !== undefined;
+  const isOpenRef = React.useRef(Boolean(open ?? props.defaultOpen));
+
+  React.useEffect(() => {
+    if (isOpenRef.current) {
+      addSelectUnlockClass();
+    }
+    return () => {
+      if (isOpenRef.current) {
+        removeSelectUnlockClass();
+      }
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!isControlled) return;
+    const nextIsOpen = Boolean(open);
+    if (nextIsOpen === isOpenRef.current) return;
+    if (nextIsOpen) addSelectUnlockClass();
+    else removeSelectUnlockClass();
+    isOpenRef.current = nextIsOpen;
+  }, [isControlled, open]);
+
+  return (
+    <SelectPrimitive.Root
+      {...props}
+      open={open}
+      onOpenChange={(nextIsOpen) => {
+        if (!isControlled && nextIsOpen !== isOpenRef.current) {
+          if (nextIsOpen) addSelectUnlockClass();
+          else removeSelectUnlockClass();
+          isOpenRef.current = nextIsOpen;
+        }
+        onOpenChange?.(nextIsOpen);
+      }}
+    />
+  );
+};
 
 const SelectGroup = SelectPrimitive.Group;
 
@@ -61,21 +118,7 @@ SelectScrollDownButton.displayName = SelectPrimitive.ScrollDownButton.displayNam
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = "popper", ...props }, ref) => {
-  // Radix Select disables outside pointer events and locks body scroll while open.
-  // We intentionally keep the page scrollable/interactable outside the menu.
-  React.useEffect(() => {
-    const style = document.createElement("style");
-    style.textContent = `
-      html, body { overflow: auto !important; }
-      body[data-scroll-locked] { overflow: auto !important; margin-right: 0 !important; }
-      body { pointer-events: auto !important; }
-    `;
-    document.head.appendChild(style);
-    return () => { document.head.removeChild(style); };
-  }, []);
-
-  return (
+>(({ className, children, position = "popper", ...props }, ref) => (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         ref={ref}
@@ -109,8 +152,7 @@ const SelectContent = React.forwardRef<
         <SelectScrollDownButton />
       </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
-  );
-});
+));
 SelectContent.displayName = SelectPrimitive.Content.displayName;
 
 const SelectLabel = React.forwardRef<
