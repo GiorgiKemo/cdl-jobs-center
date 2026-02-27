@@ -14,7 +14,7 @@ import { useApplication } from "@/hooks/useApplication";
 import { useAuth } from "@/context/auth";
 import { useDriverProfile } from "@/hooks/useDriverProfile";
 import { SignInModal } from "@/components/SignInModal";
-import { Truck, CheckCircle2, ChevronDown, ChevronUp, Check, Clock, User, Briefcase, Settings } from "lucide-react";
+import { Truck, CheckCircle2, ChevronDown, ChevronUp, Check, Clock, User, Briefcase, Settings, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 const US_STATES = [
@@ -330,6 +330,11 @@ const ApplyNow = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Only allow submit from Step 3
+    if (step !== 3) {
+      nextStep();
+      return;
+    }
     setSubmitting(true);
 
     try {
@@ -417,7 +422,14 @@ const ApplyNow = () => {
             {/* ── STEP 1: Personal Info ── */}
             {step === 1 && (
               <div className="space-y-6">
-                <h2 className="font-display font-semibold text-lg">Personal Information</h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="font-display font-semibold text-lg">Personal Information</h2>
+                  {editingProfile && (
+                    <button type="button" onClick={() => setEditingProfile(false)} className="text-muted-foreground hover:text-foreground transition-colors" title="Cancel editing">
+                      <X className="h-5 w-5" />
+                    </button>
+                  )}
+                </div>
 
                 {/* Profile summary card for logged-in users with data */}
                 {hasProfileData && !editingProfile ? (
@@ -439,11 +451,6 @@ const ApplyNow = () => {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {hasProfileData && editingProfile && (
-                      <Button type="button" variant="ghost" size="sm" onClick={() => setEditingProfile(false)} className="text-xs mb-2">
-                        Use profile info
-                      </Button>
-                    )}
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">First Name *</Label>
@@ -483,7 +490,10 @@ const ApplyNow = () => {
                   </div>
                 )}
 
-                <div className="flex justify-end pt-4">
+                <div className="flex justify-between pt-4">
+                  {editingProfile ? (
+                    <Button type="button" variant="outline" onClick={() => setEditingProfile(false)}>Cancel editing</Button>
+                  ) : <div />}
                   <Button type="button" onClick={nextStep} className="px-8">
                     Next
                   </Button>
