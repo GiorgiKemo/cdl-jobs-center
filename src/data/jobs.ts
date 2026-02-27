@@ -10,6 +10,7 @@ export interface Job {
   location: string;
   pay: string;
   postedAt?: string;
+  status?: "Draft" | "Active" | "Paused" | "Closed";
 }
 
 export const SEED_JOBS: Job[] = [

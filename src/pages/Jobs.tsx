@@ -22,7 +22,10 @@ const urlTypeMap: Record<string, string> = {
 const Jobs = () => {
   const [searchParams] = useSearchParams();
   const { loadAll } = useJobs();
-  const allJobs = useMemo(() => [...SEED_JOBS, ...loadAll()], []);
+  const allJobs = useMemo(() => [
+    ...SEED_JOBS,
+    ...loadAll().filter((j) => !j.status || j.status === "Active"),
+  ], []);
 
   // Pending filter values (before Search is clicked)
   const [pendingFreight, setPendingFreight] = useState("all");

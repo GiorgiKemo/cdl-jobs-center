@@ -101,7 +101,8 @@ export function ApplyModal({ companyName, onClose }: ApplyModalProps) {
     // Record received application for the company's dashboard
     const KEY_RECEIVED = "cdl-applications-received";
     const received = JSON.parse(localStorage.getItem(KEY_RECEIVED) ?? "[]");
-    received.push({ ...data, companyName, submittedAt: new Date().toISOString() });
+    const appId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    received.push({ ...data, id: appId, companyName, submittedAt: new Date().toISOString() });
     localStorage.setItem(KEY_RECEIVED, JSON.stringify(received));
 
     toast.success(`Application submitted to ${companyName}!`);
