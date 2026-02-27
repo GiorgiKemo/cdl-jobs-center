@@ -8,6 +8,7 @@ import ApplyNow from "./pages/ApplyNow";
 import Jobs from "./pages/Jobs";
 import Drivers from "./pages/Drivers";
 import Companies from "./pages/Companies";
+import CompanyProfile from "./pages/CompanyProfile";
 import SignIn from "./pages/SignIn";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/jobs" element={<Jobs />} />
             <Route path="/drivers" element={<Drivers />} />
             <Route path="/companies" element={<Companies />} />
+            <Route path="/companies/:slug" element={<CompanyProfile />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />

@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Phone, MapPin, Star, CheckCircle } from "lucide-react";
-import { toast } from "sonner";
+import { COMPANIES } from "@/data/companies";
 
 const DRIVER_TYPES = ["All", "Owner Operator", "Company Driver", "Student"];
 const FREIGHT_TYPES = [
@@ -26,39 +26,6 @@ const COMPANY_STATES = [
   "West Virginia", "Wisconsin", "Wyoming",
 ];
 
-interface Company {
-  id: number;
-  name: string;
-  state: string;
-  phone: string;
-  address: string;
-  rating: number;
-  driverTypes: string[];
-  freightTypes: string[];
-}
-
-const companies: Company[] = [
-  {
-    id: 1, name: "GI Super Service", state: "Illinois",
-    phone: "(847) 718-1330", address: "2256 Landmeier Rd Suite B, Elk Grove Village, IL 60007",
-    rating: 5, driverTypes: ["Company Driver", "Owner Operator"], freightTypes: ["Dry Van", "Refrigerated"],
-  },
-  {
-    id: 2, name: "United Global Carrier", state: "Illinois",
-    phone: "(773) 627-5960", address: "1338 South Loraine Rd Unit D, Wheaton, IL 60189",
-    rating: 5, driverTypes: ["Company Driver", "Lease Purchase"], freightTypes: ["Flatbed", "Dry Van"],
-  },
-  {
-    id: 3, name: "PKD Express", state: "California",
-    phone: "(310) 555-0192", address: "4820 Pacific Coast Hwy, Long Beach, CA 90804",
-    rating: 5, driverTypes: ["Company Driver", "Owner Operator"], freightTypes: ["Tanker"],
-  },
-  {
-    id: 4, name: "AN Enterprise Inc", state: "Florida",
-    phone: "(305) 555-0138", address: "8740 NW 36th St, Doral, FL 33166",
-    rating: 5, driverTypes: ["Team Driver", "Company Driver"], freightTypes: ["Dry Van", "Dry Bulk"],
-  },
-];
 
 const Companies = () => {
   const [driverTypeFilter, setDriverTypeFilter] = useState("All");
@@ -71,7 +38,7 @@ const Companies = () => {
     setStateFilter("All");
   };
 
-  const filtered = companies.filter((c) => {
+  const filtered = COMPANIES.filter((c) => {
     if (driverTypeFilter !== "All" && !c.driverTypes.includes(driverTypeFilter)) return false;
     if (freightTypeFilter !== "All" && !c.freightTypes.includes(freightTypeFilter)) return false;
     if (stateFilter !== "All" && c.state !== stateFilter) return false;
@@ -176,12 +143,12 @@ const Companies = () => {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <button
-                      className="font-display font-semibold text-primary hover:underline text-left mb-1.5"
-                      onClick={() => toast.info("Company profile coming soon.")}
+                    <Link
+                      to={`/companies/${c.slug}`}
+                      className="font-display font-semibold text-primary hover:underline text-left mb-1.5 block"
                     >
                       {c.name}
-                    </button>
+                    </Link>
                     <p className="flex items-center gap-1.5 text-sm text-muted-foreground mb-1">
                       <Phone className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                       {c.phone}
@@ -196,13 +163,8 @@ const Companies = () => {
                   </div>
 
                   {/* Action */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0"
-                    onClick={() => toast.info("Company profile coming soon.")}
-                  >
-                    View Profile
+                  <Button variant="outline" size="sm" className="shrink-0" asChild>
+                    <Link to={`/companies/${c.slug}`}>View Profile</Link>
                   </Button>
                 </div>
               ))}

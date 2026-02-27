@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+import { useApplication } from "@/hooks/useApplication";
 
 const US_STATES = [
   "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware",
@@ -41,33 +42,38 @@ const SectionHeader = ({ children }: { children: React.ReactNode }) => (
 );
 
 const ApplyNow = () => {
-  // Basic info
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [cdlNumber, setCdlNumber] = useState("");
-  const [zipCode, setZipCode] = useState("");
-  const [date, setDate] = useState("");
-  const [driverType, setDriverType] = useState("");
-  const [licenseClass, setLicenseClass] = useState("");
-  const [yearsExp, setYearsExp] = useState("");
-  const [licenseState, setLicenseState] = useState("");
-  const [soloTeam, setSoloTeam] = useState("Solo");
+  const { load, save } = useApplication();
+  const saved = load();
+
+  // Basic info — pre-fill from saved
+  const [firstName, setFirstName] = useState(saved.firstName ?? "");
+  const [lastName, setLastName] = useState(saved.lastName ?? "");
+  const [email, setEmail] = useState(saved.email ?? "");
+  const [phone, setPhone] = useState(saved.phone ?? "");
+  const [cdlNumber, setCdlNumber] = useState(saved.cdlNumber ?? "");
+  const [zipCode, setZipCode] = useState(saved.zipCode ?? "");
+  const [date, setDate] = useState(saved.date ?? "");
+  const [driverType, setDriverType] = useState(saved.driverType ?? "");
+  const [licenseClass, setLicenseClass] = useState(saved.licenseClass ?? "");
+  const [yearsExp, setYearsExp] = useState(saved.yearsExp ?? "");
+  const [licenseState, setLicenseState] = useState(saved.licenseState ?? "");
+  const [soloTeam, setSoloTeam] = useState(saved.soloTeam ?? "Solo");
   const [submitTo, setSubmitTo] = useState("all");
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(saved.notes ?? "");
 
   // Job preference toggles
   const [prefs, setPrefs] = useState({
     betterPay: false, betterHomeTime: false,
     healthInsurance: false, bonuses: false,
     newEquipment: false,
+    ...(saved.prefs ?? {}),
   });
 
   // Endorsement toggles
   const [endorse, setEndorse] = useState({
     doublesTriples: false, hazmat: false,
     tankVehicles: false, tankerHazmat: false,
+    ...(saved.endorse ?? {}),
   });
 
   // Hauler experience toggles
@@ -76,18 +82,21 @@ const ApplyNow = () => {
     dryBulk: false, dryVan: false, flatbed: false,
     hopperBottom: false, intermodal: false, oilField: false,
     oversizeLoad: false, refrigerated: false, tanker: false,
+    ...(saved.hauler ?? {}),
   });
 
   // Route preference toggles
   const [route, setRoute] = useState({
     dedicated: false, local: false, ltl: false,
     otr: false, regional: false,
+    ...(saved.route ?? {}),
   });
 
   // Additional questions
   const [extra, setExtra] = useState({
     leasePurchase: false, accidents: false,
     suspended: false, newsletters: false,
+    ...(saved.extra ?? {}),
   });
 
   const tog = <T extends Record<string, boolean>>(setter: React.Dispatch<React.SetStateAction<T>>, key: keyof T) =>
@@ -95,6 +104,11 @@ const ApplyNow = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    save({
+      firstName, lastName, email, phone, cdlNumber, zipCode, date,
+      driverType, licenseClass, yearsExp, licenseState, soloTeam, notes,
+      prefs, endorse, hauler, route, extra,
+    });
     toast.success("Application submitted! We'll match you with top companies.");
   };
 
