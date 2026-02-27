@@ -7,14 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { useApplication } from "@/hooks/useApplication";
 import { useAuth } from "@/context/auth";
 import { useDriverProfile } from "@/hooks/useDriverProfile";
 import { SignInModal } from "@/components/SignInModal";
-import { Truck, CheckCircle2 } from "lucide-react";
+import { Truck, CheckCircle2, ChevronDown, ChevronUp, Check, Clock, User, Briefcase, Settings } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 const US_STATES = [
@@ -41,35 +41,93 @@ const LICENSE_CLASS_LABELS: Record<string, string> = {
   permit: "Permit Only",
 };
 
-// Reusable toggle row: label on left, OFF · switch · ON on right
-const ToggleRow = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) => (
-  <div className="flex items-center justify-between py-1">
-    <span className="text-sm text-foreground">{label}</span>
-    <div className="flex items-center gap-1.5">
-      <span className={`text-xs font-medium ${!checked ? "text-foreground" : "text-muted-foreground"}`}>OFF</span>
-      <Switch checked={checked} onCheckedChange={onChange} className="data-[state=unchecked]:bg-muted" />
-      <span className={`text-xs font-medium ${checked ? "text-primary" : "text-muted-foreground"}`}>ON</span>
+// ── Inline helpers ──
+
+const ProgressBar = ({ step }: { step: number }) => {
+  const steps = [
+    { num: 1, label: "Personal Info", icon: User },
+    { num: 2, label: "Experience", icon: Briefcase },
+    { num: 3, label: "Preferences", icon: Settings },
+  ];
+  return (
+    <div className="mb-6">
+      <div className="flex items-center justify-between mb-2">
+        {steps.map((s, i) => (
+          <div key={s.num} className="flex items-center flex-1">
+            <div className="flex items-center gap-2">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                step > s.num ? "bg-green-500 text-white" : step === s.num ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+              }`}>
+                {step > s.num ? <Check className="h-4 w-4" /> : s.num}
+              </div>
+              <span className={`text-xs font-medium hidden sm:inline ${step >= s.num ? "text-foreground" : "text-muted-foreground"}`}>
+                {s.label}
+              </span>
+            </div>
+            {i < steps.length - 1 && (
+              <div className={`flex-1 h-0.5 mx-3 transition-colors ${step > s.num ? "bg-green-500" : "bg-muted"}`} />
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Clock className="h-3 w-3" />
+        <span>Estimated time: 2-3 min</span>
+      </div>
     </div>
-  </div>
+  );
+};
+
+const Chip = ({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) => (
+  <Badge
+    variant={selected ? "default" : "outline"}
+    className={`cursor-pointer select-none transition-colors px-3 py-1.5 text-xs ${
+      selected ? "" : "hover:bg-muted"
+    }`}
+    onClick={onClick}
+  >
+    {selected && <Check className="h-3 w-3 mr-1" />}
+    {label}
+  </Badge>
 );
 
-// Section header with left red border accent
-const SectionHeader = ({ children }: { children: React.ReactNode }) => (
-  <div className="border-l-4 border-primary bg-primary/5 px-3 py-2 mb-4">
-    <p className="text-primary text-sm font-semibold">{children}</p>
+const CollapsibleSection = ({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border border-border rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-foreground hover:bg-muted/50 transition-colors"
+      >
+        {title}
+        {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+      </button>
+      {open && <div className="px-4 pb-4">{children}</div>}
+    </div>
+  );
+};
+
+const ToggleRow = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) => (
+  <div className="flex items-center justify-between py-1.5">
+    <span className="text-sm text-foreground">{label}</span>
+    <Switch checked={checked} onCheckedChange={onChange} className="data-[state=unchecked]:bg-muted" />
   </div>
 );
 
 const ApplyNow = () => {
-  // All hooks must be declared before any conditional return
   const { user, loading } = useAuth();
   const [signInOpen, setSignInOpen] = useState(false);
   const { load, save } = useApplication();
   const saved = load();
   const { profile } = useDriverProfile(user?.id ?? "");
 
+  const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
+
   const [firstName, setFirstName] = useState(saved.firstName ?? "");
   const [lastName, setLastName] = useState(saved.lastName ?? "");
   const [email, setEmail] = useState(saved.email ?? "");
@@ -132,10 +190,10 @@ const ApplyNow = () => {
     if (user?.email) setEmail(prev => prev || user.email);
   }, [user]);
 
-  // Loading guard — wait for auth session to resolve
+  // Loading guard
   if (loading) return null;
 
-  // Auth gate — guests and company accounts cannot use this form
+  // Auth gate
   if (!user || user.role === "company") {
     return (
       <div className="min-h-screen bg-background">
@@ -143,7 +201,7 @@ const ApplyNow = () => {
         <main className="container mx-auto py-16 max-w-xl text-center">
           <p className="text-sm text-muted-foreground mb-6">
             <Link to="/" className="text-primary hover:underline">Main</Link>
-            <span className="mx-1">»</span>
+            <span className="mx-1">&raquo;</span>
             Add Application
           </p>
           <div className="border border-border bg-card p-12">
@@ -172,7 +230,7 @@ const ApplyNow = () => {
     );
   }
 
-  // Confirmation screen after successful submission
+  // Confirmation screen
   if (submitted) {
     return (
       <div className="min-h-screen bg-background">
@@ -180,7 +238,7 @@ const ApplyNow = () => {
         <main className="container mx-auto py-8 max-w-3xl">
           <p className="text-sm text-muted-foreground mb-6">
             <Link to="/" className="text-primary hover:underline">Main</Link>
-            <span className="mx-1">»</span>
+            <span className="mx-1">&raquo;</span>
             Add Application
           </p>
           <div className="border border-border bg-card p-12 text-center">
@@ -210,10 +268,23 @@ const ApplyNow = () => {
     );
   }
 
-  const tog = <T extends Record<string, boolean>>(setter: React.Dispatch<React.SetStateAction<T>>, key: keyof T) =>
-    (v: boolean) => setter((prev) => ({ ...prev, [key]: v }));
+  // ── Helpers ──
 
-  const validate = () => {
+  const tog = <T extends Record<string, boolean>>(setter: React.Dispatch<React.SetStateAction<T>>, key: keyof T) =>
+    () => setter((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const saveDraft = () => {
+    const data = {
+      firstName, lastName, email, phone, cdlNumber, zipCode, date,
+      driverType, licenseClass, yearsExp, licenseState, soloTeam, notes,
+      prefs, endorse, hauler, route, extra,
+    };
+    save(data);
+    setDraftSaved(true);
+    setTimeout(() => setDraftSaved(false), 2000);
+  };
+
+  const validateStep1 = () => {
     const e: Record<string, string> = {};
     if (!firstName.trim()) e.firstName = "First name is required";
     if (!lastName.trim()) e.lastName = "Last name is required";
@@ -223,6 +294,11 @@ const ApplyNow = () => {
     if (!cdlNumber.trim()) e.cdlNumber = "CDL number is required";
     if (!zipCode.trim()) e.zipCode = "Zip code is required";
     else if (!/^\d{5}(-\d{4})?$/.test(zipCode)) e.zipCode = "Enter a valid zip code";
+    return e;
+  };
+
+  const validateStep2 = () => {
+    const e: Record<string, string> = {};
     if (!driverType) e.driverType = "Select a driver type";
     if (!licenseClass) e.licenseClass = "Select a license class";
     if (!yearsExp) e.yearsExp = "Select years of experience";
@@ -230,28 +306,34 @@ const ApplyNow = () => {
     return e;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const errs = validate();
+  const nextStep = () => {
+    let errs: Record<string, string> = {};
+    if (step === 1) errs = validateStep1();
+    if (step === 2) errs = validateStep2();
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
-      toast.error("Please fix the errors before submitting.");
+      toast.error("Please fix the errors before continuing.");
       return;
     }
     setErrors({});
+    saveDraft();
+    setStep(step + 1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const prevStep = () => {
+    setErrors({});
+    saveDraft();
+    setStep(step - 1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSubmitting(true);
 
     try {
-      const data = {
-        firstName, lastName, email, phone, cdlNumber, zipCode, date,
-        driverType, licenseClass, yearsExp, licenseState, soloTeam, notes,
-        prefs, endorse, hauler, route, extra,
-      };
-
-      const savedOk = save(data);
-      if (!savedOk) {
-        console.warn("Could not save application draft to localStorage.");
-      }
+      saveDraft();
 
       const insertPromise = supabase.from("applications").insert({
         driver_id: user.id,
@@ -304,6 +386,9 @@ const ApplyNow = () => {
     }
   };
 
+  // Check if profile has enough data for summary card
+  const hasProfileData = firstName && lastName && email && cdlNumber;
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -312,204 +397,267 @@ const ApplyNow = () => {
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-6">
           <Link to="/" className="text-primary hover:underline">Main</Link>
-          <span className="mx-1">»</span>
+          <span className="mx-1">&raquo;</span>
           Add Application
         </p>
 
         <form onSubmit={handleSubmit} className="bg-card border border-border shadow-sm">
-          {/* Form title */}
-          <div className="border-l-4 border-primary px-4 py-3 mb-6 mx-6 mt-6">
-            <p className="font-semibold text-foreground">Let's Get Started!</p>
-          </div>
+          <div className="px-6 pt-6 pb-8">
 
-          <div className="px-6 pb-8 space-y-8">
+            {/* Progress bar */}
+            <ProgressBar step={step} />
 
-            {/* Job preferences */}
-            <div>
-              <SectionHeader>What do you want in your next job selections?</SectionHeader>
-              <div className="grid sm:grid-cols-2 gap-x-12 gap-y-1">
-                <ToggleRow label="Better pay" checked={prefs.betterPay} onChange={tog(setPrefs, "betterPay")} />
-                <ToggleRow label="Better home time" checked={prefs.betterHomeTime} onChange={tog(setPrefs, "betterHomeTime")} />
-                <ToggleRow label="Health Insurance" checked={prefs.healthInsurance} onChange={tog(setPrefs, "healthInsurance")} />
-                <ToggleRow label="Bonuses" checked={prefs.bonuses} onChange={tog(setPrefs, "bonuses")} />
-                <ToggleRow label="New equipment" checked={prefs.newEquipment} onChange={tog(setPrefs, "newEquipment")} />
-              </div>
-            </div>
-
-            {/* Basic info */}
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Input placeholder="First name *" value={firstName} onChange={(e) => setFirstName(e.target.value)} className={errors.firstName ? "border-destructive" : ""} />
-                {errors.firstName && <p className="text-xs text-destructive">{errors.firstName}</p>}
-              </div>
-              <div className="space-y-1">
-                <Input placeholder="Last name *" value={lastName} onChange={(e) => setLastName(e.target.value)} className={errors.lastName ? "border-destructive" : ""} />
-                {errors.lastName && <p className="text-xs text-destructive">{errors.lastName}</p>}
-              </div>
-              <div className="space-y-1">
-                <Input placeholder="Email *" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={errors.email ? "border-destructive" : ""} />
-                {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
-              </div>
-              <div className="space-y-1">
-                <Input placeholder="Phone *" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={errors.phone ? "border-destructive" : ""} />
-                {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
-              </div>
-              <div className="space-y-1">
-                <Input placeholder="CDL # *" value={cdlNumber} onChange={(e) => setCdlNumber(e.target.value)} className={errors.cdlNumber ? "border-destructive" : ""} />
-                {errors.cdlNumber && <p className="text-xs text-destructive">{errors.cdlNumber}</p>}
-              </div>
-              <div className="space-y-1">
-                <Input placeholder="Zip Code *" value={zipCode} onChange={(e) => setZipCode(e.target.value)} className={errors.zipCode ? "border-destructive" : ""} />
-                {errors.zipCode && <p className="text-xs text-destructive">{errors.zipCode}</p>}
-              </div>
-              <div className="space-y-1">
-                <Input placeholder="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-              </div>
-            </div>
-
-            {/* Driving experience */}
-            <div>
-              <SectionHeader>Tell us about your driving experience.</SectionHeader>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Driver Type *</Label>
-                  <Select value={driverType} onValueChange={(v) => { setDriverType(v); setErrors((p) => ({ ...p, driverType: "" })); }}>
-                    <SelectTrigger className={errors.driverType ? "border-destructive" : ""}><SelectValue placeholder="Select driver type" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="company">Company Driver</SelectItem>
-                      <SelectItem value="owner-operator">Owner Operator</SelectItem>
-                      <SelectItem value="lease">Lease Operator</SelectItem>
-                      <SelectItem value="student">Student / Trainee</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors.driverType && <p className="text-xs text-destructive">{errors.driverType}</p>}
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">License Class *</Label>
-                  <Select value={licenseClass} onValueChange={(v) => { setLicenseClass(v); setErrors((p) => ({ ...p, licenseClass: "" })); }}>
-                    <SelectTrigger className={errors.licenseClass ? "border-destructive" : ""}><SelectValue placeholder="Select class" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="a">Class A</SelectItem>
-                      <SelectItem value="b">Class B</SelectItem>
-                      <SelectItem value="c">Class C</SelectItem>
-                      <SelectItem value="permit">Permit Only</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors.licenseClass && <p className="text-xs text-destructive">{errors.licenseClass}</p>}
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Years Experience *</Label>
-                  <Select value={yearsExp} onValueChange={(v) => { setYearsExp(v); setErrors((p) => ({ ...p, yearsExp: "" })); }}>
-                    <SelectTrigger className={errors.yearsExp ? "border-destructive" : ""}><SelectValue placeholder="Select experience" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="less-1">Less than 1 year</SelectItem>
-                      <SelectItem value="1-3">1–3 years</SelectItem>
-                      <SelectItem value="3-5">3–5 years</SelectItem>
-                      <SelectItem value="5+">5+ years</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors.yearsExp && <p className="text-xs text-destructive">{errors.yearsExp}</p>}
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">License State *</Label>
-                  <Select value={licenseState} onValueChange={(v) => { setLicenseState(v); setErrors((p) => ({ ...p, licenseState: "" })); }}>
-                    <SelectTrigger className={errors.licenseState ? "border-destructive" : ""}><SelectValue placeholder="Select state" /></SelectTrigger>
-                    <SelectContent>
-                      {US_STATES.map((s) => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.licenseState && <p className="text-xs text-destructive">{errors.licenseState}</p>}
-                </div>
-              </div>
-            </div>
-
-            {/* Endorsements */}
-            <div>
-              <SectionHeader>Endorsements (optional):</SectionHeader>
-              <div className="grid sm:grid-cols-2 gap-x-12 gap-y-1">
-                <ToggleRow label="Doubles/Triples (T)" checked={endorse.doublesTriples} onChange={tog(setEndorse, "doublesTriples")} />
-                <ToggleRow label="HAZMAT (H)" checked={endorse.hazmat} onChange={tog(setEndorse, "hazmat")} />
-                <ToggleRow label="Tank Vehicles (N)" checked={endorse.tankVehicles} onChange={tog(setEndorse, "tankVehicles")} />
-                <ToggleRow label="Tanker + HAZMAT (X)" checked={endorse.tankerHazmat} onChange={tog(setEndorse, "tankerHazmat")} />
-              </div>
-            </div>
-
-            {/* Hauler experience */}
-            <div>
-              <SectionHeader>Hauler Experience:</SectionHeader>
-              <div className="grid sm:grid-cols-3 gap-x-8 gap-y-1">
-                <ToggleRow label="Box" checked={hauler.box} onChange={tog(setHauler, "box")} />
-                <ToggleRow label="Car Hauler" checked={hauler.carHaul} onChange={tog(setHauler, "carHaul")} />
-                <ToggleRow label="Drop and Hook" checked={hauler.dropAndHook} onChange={tog(setHauler, "dropAndHook")} />
-                <ToggleRow label="Dry Bulk" checked={hauler.dryBulk} onChange={tog(setHauler, "dryBulk")} />
-                <ToggleRow label="Dry Van" checked={hauler.dryVan} onChange={tog(setHauler, "dryVan")} />
-                <ToggleRow label="Flatbed" checked={hauler.flatbed} onChange={tog(setHauler, "flatbed")} />
-                <ToggleRow label="Hopper Bottom" checked={hauler.hopperBottom} onChange={tog(setHauler, "hopperBottom")} />
-                <ToggleRow label="Intermodal" checked={hauler.intermodal} onChange={tog(setHauler, "intermodal")} />
-                <ToggleRow label="Oil Field" checked={hauler.oilField} onChange={tog(setHauler, "oilField")} />
-                <ToggleRow label="Oversize Load" checked={hauler.oversizeLoad} onChange={tog(setHauler, "oversizeLoad")} />
-                <ToggleRow label="Refrigerated" checked={hauler.refrigerated} onChange={tog(setHauler, "refrigerated")} />
-                <ToggleRow label="Tanker" checked={hauler.tanker} onChange={tog(setHauler, "tanker")} />
-              </div>
-            </div>
-
-            {/* Route preference */}
-            <div>
-              <SectionHeader>Route Preference:</SectionHeader>
-              <div className="grid sm:grid-cols-3 gap-x-8 gap-y-1">
-                <ToggleRow label="Dedicated" checked={route.dedicated} onChange={tog(setRoute, "dedicated")} />
-                <ToggleRow label="Local" checked={route.local} onChange={tog(setRoute, "local")} />
-                <ToggleRow label="LTL" checked={route.ltl} onChange={tog(setRoute, "ltl")} />
-                <ToggleRow label="OTR" checked={route.otr} onChange={tog(setRoute, "otr")} />
-                <ToggleRow label="Regional" checked={route.regional} onChange={tog(setRoute, "regional")} />
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Additional questions */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-foreground">Interested in solo or team driving?</span>
-                <Select value={soloTeam} onValueChange={setSoloTeam}>
-                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Solo">Solo</SelectItem>
-                    <SelectItem value="Team">Team</SelectItem>
-                    <SelectItem value="Either">Either</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <ToggleRow label="Interested in lease purchase?" checked={extra.leasePurchase} onChange={tog(setExtra, "leasePurchase")} />
-              <ToggleRow label="Have you had any accidents or violations in the past 3 years?" checked={extra.accidents} onChange={tog(setExtra, "accidents")} />
-              <ToggleRow label="Have you had your license suspended or DUI/DWI charges in the past 10 years?" checked={extra.suspended} onChange={tog(setExtra, "suspended")} />
-              <ToggleRow label="Yes! Sign me up to receive newsletters and job alerts" checked={extra.newsletters} onChange={tog(setExtra, "newsletters")} />
-            </div>
-
-            {/* Notes area */}
-            <div>
-              <Label className="text-sm font-medium mb-2 block">Message to companies (optional):</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Tell companies about yourself, your experience, or anything else you'd like them to know..."
-                rows={6}
-                className="resize-none"
-              />
-              <p className="text-xs text-muted-foreground mt-1 text-right">
-                {notes.trim() ? notes.trim().split(/\s+/).length : 0} words
+            {/* Draft saved indicator */}
+            {draftSaved && (
+              <p className="text-xs text-green-500 mb-4 flex items-center gap-1">
+                <Check className="h-3 w-3" /> Draft saved
               </p>
-            </div>
+            )}
 
-            {/* Submit buttons */}
-            <div className="flex items-center gap-3">
-              <Button type="submit" className="px-8" disabled={submitting}>
-                {submitting ? "Submitting..." : "Send Application"}
-              </Button>
-            </div>
+            {/* ── STEP 1: Personal Info ── */}
+            {step === 1 && (
+              <div className="space-y-6">
+                <h2 className="font-display font-semibold text-lg">Personal Information</h2>
+
+                {/* Profile summary card for logged-in users with data */}
+                {hasProfileData && !editingProfile ? (
+                  <div className="border border-border rounded-lg p-4 bg-muted/30">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-medium text-foreground">Applying as:</p>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setEditingProfile(true)} className="text-xs">
+                        Edit details
+                      </Button>
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-2 text-sm">
+                      <p><span className="text-muted-foreground">Name:</span> {firstName} {lastName}</p>
+                      <p><span className="text-muted-foreground">Email:</span> {email}</p>
+                      <p><span className="text-muted-foreground">Phone:</span> {phone || "—"}</p>
+                      <p><span className="text-muted-foreground">CDL #:</span> {cdlNumber}</p>
+                      <p><span className="text-muted-foreground">Zip:</span> {zipCode || "—"}</p>
+                      <p><span className="text-muted-foreground">Available:</span> {date || "—"}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {hasProfileData && editingProfile && (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setEditingProfile(false)} className="text-xs mb-2">
+                        Use profile info
+                      </Button>
+                    )}
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">First Name *</Label>
+                        <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" className={errors.firstName ? "border-destructive" : ""} />
+                        {errors.firstName && <p className="text-xs text-destructive">{errors.firstName}</p>}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Last Name *</Label>
+                        <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" className={errors.lastName ? "border-destructive" : ""} />
+                        {errors.lastName && <p className="text-xs text-destructive">{errors.lastName}</p>}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Email *</Label>
+                        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" className={errors.email ? "border-destructive" : ""} />
+                        {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Phone *</Label>
+                        <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 000-0000" className={errors.phone ? "border-destructive" : ""} />
+                        {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">CDL Number *</Label>
+                        <Input value={cdlNumber} onChange={(e) => setCdlNumber(e.target.value)} placeholder="CDL-XX-000000" className={errors.cdlNumber ? "border-destructive" : ""} />
+                        {errors.cdlNumber && <p className="text-xs text-destructive">{errors.cdlNumber}</p>}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Zip Code *</Label>
+                        <Input value={zipCode} onChange={(e) => setZipCode(e.target.value)} placeholder="00000" className={errors.zipCode ? "border-destructive" : ""} />
+                        {errors.zipCode && <p className="text-xs text-destructive">{errors.zipCode}</p>}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Available Date</Label>
+                        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-4">
+                  <Button type="button" onClick={nextStep} className="px-8">
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* ── STEP 2: Experience ── */}
+            {step === 2 && (
+              <div className="space-y-6">
+                <h2 className="font-display font-semibold text-lg">Driving Experience</h2>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Driver Type *</Label>
+                    <Select value={driverType} onValueChange={(v) => { setDriverType(v); setErrors((p) => ({ ...p, driverType: "" })); }}>
+                      <SelectTrigger className={errors.driverType ? "border-destructive" : ""}><SelectValue placeholder="Select driver type" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="company">Company Driver</SelectItem>
+                        <SelectItem value="owner-operator">Owner Operator</SelectItem>
+                        <SelectItem value="lease">Lease Operator</SelectItem>
+                        <SelectItem value="student">Student / Trainee</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {errors.driverType && <p className="text-xs text-destructive">{errors.driverType}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">License Class *</Label>
+                    <Select value={licenseClass} onValueChange={(v) => { setLicenseClass(v); setErrors((p) => ({ ...p, licenseClass: "" })); }}>
+                      <SelectTrigger className={errors.licenseClass ? "border-destructive" : ""}><SelectValue placeholder="Select class" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="a">Class A</SelectItem>
+                        <SelectItem value="b">Class B</SelectItem>
+                        <SelectItem value="c">Class C</SelectItem>
+                        <SelectItem value="permit">Permit Only</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {errors.licenseClass && <p className="text-xs text-destructive">{errors.licenseClass}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Years Experience *</Label>
+                    <Select value={yearsExp} onValueChange={(v) => { setYearsExp(v); setErrors((p) => ({ ...p, yearsExp: "" })); }}>
+                      <SelectTrigger className={errors.yearsExp ? "border-destructive" : ""}><SelectValue placeholder="Select experience" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="less-1">Less than 1 year</SelectItem>
+                        <SelectItem value="1-3">1-3 years</SelectItem>
+                        <SelectItem value="3-5">3-5 years</SelectItem>
+                        <SelectItem value="5+">5+ years</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {errors.yearsExp && <p className="text-xs text-destructive">{errors.yearsExp}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">License State *</Label>
+                    <Select value={licenseState} onValueChange={(v) => { setLicenseState(v); setErrors((p) => ({ ...p, licenseState: "" })); }}>
+                      <SelectTrigger className={errors.licenseState ? "border-destructive" : ""}><SelectValue placeholder="Select state" /></SelectTrigger>
+                      <SelectContent>
+                        {US_STATES.map((s) => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.licenseState && <p className="text-xs text-destructive">{errors.licenseState}</p>}
+                  </div>
+                </div>
+
+                {/* Solo/Team */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-foreground">Interested in solo or team driving?</span>
+                  <Select value={soloTeam} onValueChange={setSoloTeam}>
+                    <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Solo">Solo</SelectItem>
+                      <SelectItem value="Team">Team</SelectItem>
+                      <SelectItem value="Either">Either</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Endorsements — collapsible with chips */}
+                <CollapsibleSection title="Endorsements (optional)">
+                  <div className="flex flex-wrap gap-2">
+                    <Chip label="Doubles/Triples (T)" selected={endorse.doublesTriples} onClick={tog(setEndorse, "doublesTriples")} />
+                    <Chip label="HAZMAT (H)" selected={endorse.hazmat} onClick={tog(setEndorse, "hazmat")} />
+                    <Chip label="Tank Vehicles (N)" selected={endorse.tankVehicles} onClick={tog(setEndorse, "tankVehicles")} />
+                    <Chip label="Tanker + HAZMAT (X)" selected={endorse.tankerHazmat} onClick={tog(setEndorse, "tankerHazmat")} />
+                  </div>
+                </CollapsibleSection>
+
+                <div className="flex justify-between pt-4">
+                  <Button type="button" variant="outline" onClick={prevStep}>Back</Button>
+                  <Button type="button" onClick={nextStep} className="px-8">Next</Button>
+                </div>
+              </div>
+            )}
+
+            {/* ── STEP 3: Preferences & Submit ── */}
+            {step === 3 && (
+              <div className="space-y-6">
+                <h2 className="font-display font-semibold text-lg">Preferences</h2>
+
+                {/* Hauler experience — chips */}
+                <CollapsibleSection title="Hauler Experience (optional)">
+                  <div className="flex flex-wrap gap-2">
+                    <Chip label="Box" selected={hauler.box} onClick={tog(setHauler, "box")} />
+                    <Chip label="Car Hauler" selected={hauler.carHaul} onClick={tog(setHauler, "carHaul")} />
+                    <Chip label="Drop and Hook" selected={hauler.dropAndHook} onClick={tog(setHauler, "dropAndHook")} />
+                    <Chip label="Dry Bulk" selected={hauler.dryBulk} onClick={tog(setHauler, "dryBulk")} />
+                    <Chip label="Dry Van" selected={hauler.dryVan} onClick={tog(setHauler, "dryVan")} />
+                    <Chip label="Flatbed" selected={hauler.flatbed} onClick={tog(setHauler, "flatbed")} />
+                    <Chip label="Hopper Bottom" selected={hauler.hopperBottom} onClick={tog(setHauler, "hopperBottom")} />
+                    <Chip label="Intermodal" selected={hauler.intermodal} onClick={tog(setHauler, "intermodal")} />
+                    <Chip label="Oil Field" selected={hauler.oilField} onClick={tog(setHauler, "oilField")} />
+                    <Chip label="Oversize Load" selected={hauler.oversizeLoad} onClick={tog(setHauler, "oversizeLoad")} />
+                    <Chip label="Refrigerated" selected={hauler.refrigerated} onClick={tog(setHauler, "refrigerated")} />
+                    <Chip label="Tanker" selected={hauler.tanker} onClick={tog(setHauler, "tanker")} />
+                  </div>
+                </CollapsibleSection>
+
+                {/* Route preference — chips */}
+                <CollapsibleSection title="Route Preference (optional)">
+                  <div className="flex flex-wrap gap-2">
+                    <Chip label="Dedicated" selected={route.dedicated} onClick={tog(setRoute, "dedicated")} />
+                    <Chip label="Local" selected={route.local} onClick={tog(setRoute, "local")} />
+                    <Chip label="LTL" selected={route.ltl} onClick={tog(setRoute, "ltl")} />
+                    <Chip label="OTR" selected={route.otr} onClick={tog(setRoute, "otr")} />
+                    <Chip label="Regional" selected={route.regional} onClick={tog(setRoute, "regional")} />
+                  </div>
+                </CollapsibleSection>
+
+                {/* Job priorities — chips */}
+                <CollapsibleSection title="What do you want in your next job? (optional)" defaultOpen>
+                  <div className="flex flex-wrap gap-2">
+                    <Chip label="Better Pay" selected={prefs.betterPay} onClick={tog(setPrefs, "betterPay")} />
+                    <Chip label="Better Home Time" selected={prefs.betterHomeTime} onClick={tog(setPrefs, "betterHomeTime")} />
+                    <Chip label="Health Insurance" selected={prefs.healthInsurance} onClick={tog(setPrefs, "healthInsurance")} />
+                    <Chip label="Bonuses" selected={prefs.bonuses} onClick={tog(setPrefs, "bonuses")} />
+                    <Chip label="New Equipment" selected={prefs.newEquipment} onClick={tog(setPrefs, "newEquipment")} />
+                  </div>
+                </CollapsibleSection>
+
+                {/* Additional questions — keep as toggles */}
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-foreground">Additional Information</h3>
+                  <ToggleRow label="Interested in lease purchase?" checked={extra.leasePurchase} onChange={(v) => setExtra(p => ({ ...p, leasePurchase: v }))} />
+                  <ToggleRow label="Accidents or violations in the past 3 years?" checked={extra.accidents} onChange={(v) => setExtra(p => ({ ...p, accidents: v }))} />
+                  <ToggleRow label="License suspended or DUI/DWI in the past 10 years?" checked={extra.suspended} onChange={(v) => setExtra(p => ({ ...p, suspended: v }))} />
+                  <ToggleRow label="Sign me up for newsletters and job alerts" checked={extra.newsletters} onChange={(v) => setExtra(p => ({ ...p, newsletters: v }))} />
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Message to companies (optional):</Label>
+                  <Textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Tell companies about yourself, your experience, or anything else you'd like them to know..."
+                    rows={4}
+                    className="resize-none"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1 text-right">
+                    {notes.trim() ? notes.trim().split(/\s+/).length : 0} words
+                  </p>
+                </div>
+
+                <div className="flex justify-between pt-4">
+                  <Button type="button" variant="outline" onClick={prevStep}>Back</Button>
+                  <Button type="submit" className="px-8" disabled={submitting}>
+                    {submitting ? "Submitting..." : "Send Application"}
+                  </Button>
+                </div>
+              </div>
+            )}
 
           </div>
         </form>
