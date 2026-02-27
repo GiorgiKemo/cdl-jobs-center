@@ -229,13 +229,16 @@ const Navbar = () => {
             </Button>
           </div>
 
-          {/* Mobile menu button */}
+          {/* Mobile: truck toggle + burger */}
+          <div className="lg:hidden flex items-center gap-1">
+            <TruckToggle isDark={isDark} onClick={toggle} />
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="lg:hidden p-2 rounded-lg hover:bg-muted transition-colors"
+            className="p-2 rounded-lg hover:bg-muted transition-colors"
           >
             {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
+          </div>
         </div>
 
         {/* Mobile menu */}
@@ -303,8 +306,7 @@ const Navbar = () => {
                     </Link>
                   )
                 )}
-                <div className="flex gap-2 pt-2 items-center">
-                  <TruckToggle isDark={isDark} onClick={toggle} />
+                <div className="flex gap-2 pt-2">
                   <Button variant="outline" size="sm" className="flex-1" asChild>
                     <Link to="/signin">Sign In</Link>
                   </Button>
