@@ -65,7 +65,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
   const { signIn, register } = useAuth();
 
   // Login state
-  const [loginUsername, setLoginUsername] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
   // Shared register state
@@ -96,28 +96,36 @@ export function SignInModal({ onClose }: SignInModalProps) {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!loginUsername || !loginPassword) {
-      toast.error("Please enter your username and password.");
+    if (!loginEmail || !loginPassword) {
+      toast.error("Please enter your email and password.");
       return;
     }
-    await signIn(loginUsername, loginPassword);
-    toast.success("Welcome back!");
-    onClose();
+    try {
+      await signIn(loginEmail, loginPassword);
+      toast.success("Welcome back!");
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Sign in failed. Please try again.");
+    }
   };
 
   const handleDriverRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!regUsername || !regPassword || !regEmail) {
-      toast.error("Please fill in all fields.");
+      toast.error("Please fill in all required fields.");
       return;
     }
     if (regPassword !== regConfirm) {
       toast.error("Passwords do not match.");
       return;
     }
-    await register(regUsername, regEmail, regPassword, "driver");
-    toast.success("Account created! Welcome to CDL Jobs Center.");
-    onClose();
+    try {
+      await register(regUsername, regEmail, regPassword, "driver");
+      toast.success("Account created! Check your email to confirm, then sign in.");
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Registration failed. Please try again.");
+    }
   };
 
   const handleCompanyRegister = async (e: React.FormEvent) => {
@@ -130,9 +138,13 @@ export function SignInModal({ onClose }: SignInModalProps) {
       toast.error("Passwords do not match.");
       return;
     }
-    await register(companyName, regEmail, regPassword, "company");
-    toast.success("Company account created! Welcome to CDL Jobs Center.");
-    onClose();
+    try {
+      await register(companyName, regEmail, regPassword, "company");
+      toast.success("Company account created! Check your email to confirm, then sign in.");
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Registration failed. Please try again.");
+    }
   };
 
   const ModalHeader = ({ title }: { title: string }) => (
@@ -165,14 +177,19 @@ export function SignInModal({ onClose }: SignInModalProps) {
             </div>
             <form onSubmit={handleLogin} className="px-5 py-5 space-y-3">
               <Input
-                placeholder="Username"
-                value={loginUsername}
-                onChange={(e) => setLoginUsername(e.target.value)}
+                placeholder="Email"
+                type="email"
+                name="email"
+                aria-label="Email"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
                 autoComplete="username"
               />
               <Input
                 type="password"
                 placeholder="Password"
+                name="loginPassword"
+                aria-label="Password"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
                 autoComplete="current-password"
@@ -231,7 +248,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
             <div className="px-5 pt-4 pb-2 border-b border-border shrink-0">
               <label className="text-sm text-primary font-medium block mb-1">Who are you?</label>
               <Select value={role} onValueChange={(v) => setRole(v as "driver" | "company")}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full" aria-label="Who are you?">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -246,6 +263,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
               <form onSubmit={handleDriverRegister} className="px-5 py-4 space-y-3 overflow-y-auto flex-1">
                 <Input
                   placeholder="Username *"
+                  name="registerUsername"
+                  aria-label="Username"
                   value={regUsername}
                   onChange={(e) => setRegUsername(e.target.value)}
                   autoComplete="username"
@@ -253,6 +272,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 <Input
                   type="email"
                   placeholder="Your e-mail *"
+                  name="registerEmail"
+                  aria-label="Email address"
                   value={regEmail}
                   onChange={(e) => setRegEmail(e.target.value)}
                   autoComplete="email"
@@ -260,6 +281,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 <Input
                   type="password"
                   placeholder="Password *"
+                  name="registerPassword"
+                  aria-label="Password"
                   value={regPassword}
                   onChange={(e) => setRegPassword(e.target.value)}
                   autoComplete="new-password"
@@ -267,6 +290,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 <Input
                   type="password"
                   placeholder="Confirm password *"
+                  name="registerConfirmPassword"
+                  aria-label="Confirm password"
                   value={regConfirm}
                   onChange={(e) => setRegConfirm(e.target.value)}
                   autoComplete="new-password"
@@ -275,18 +300,24 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Driver Profile</p>
                 <Input
                   placeholder="Your name"
+                  name="driverName"
+                  aria-label="Your name"
                   value={driverName}
                   onChange={(e) => setDriverName(e.target.value)}
                   autoComplete="name"
                 />
                 <Input
                   placeholder="Home Address"
+                  name="homeAddress"
+                  aria-label="Home address"
                   value={homeAddress}
                   onChange={(e) => setHomeAddress(e.target.value)}
                   autoComplete="street-address"
                 />
                 <Input
                   placeholder="Zip Code"
+                  name="zipCode"
+                  aria-label="Zip code"
                   value={zipCode}
                   onChange={(e) => setZipCode(e.target.value)}
                   autoComplete="postal-code"
@@ -294,19 +325,23 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 <Input
                   placeholder="Phone Number"
                   type="tel"
+                  name="driverPhone"
+                  aria-label="Phone number"
                   value={driverPhone}
                   onChange={(e) => setDriverPhone(e.target.value)}
                   autoComplete="tel"
                 />
                 <Input
                   placeholder="CDL Number"
+                  name="cdlNumber"
+                  aria-label="CDL number"
                   value={cdlNumber}
                   onChange={(e) => setCdlNumber(e.target.value)}
                 />
                 <div>
                   <label className="text-sm text-primary font-medium block mb-1">I am interested in:</label>
                   <Select value={interestedIn} onValueChange={setInterestedIn}>
-                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-full" aria-label="I am interested in"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {DRIVER_INTERESTS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                     </SelectContent>
@@ -315,7 +350,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 <div>
                   <label className="text-sm text-primary font-medium block mb-1">In my next job I want:</label>
                   <Select value={nextJobWant} onValueChange={setNextJobWant}>
-                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-full" aria-label="In my next job I want"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {DRIVER_NEXT_JOB.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                     </SelectContent>
@@ -324,7 +359,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 <div>
                   <label className="text-sm text-primary font-medium block mb-1">Any accidents or violations in the last 2 years?</label>
                   <Select value={hasAccidents} onValueChange={setHasAccidents}>
-                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-full" aria-label="Any accidents or violations in the last 2 years"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="No">No</SelectItem>
                       <SelectItem value="Yes">Yes</SelectItem>
@@ -334,7 +369,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 <div>
                   <label className="text-sm text-primary font-medium block mb-1">I want CDL Jobs Center staff to contact me with employment offers</label>
                   <Select value={wantsContact} onValueChange={setWantsContact}>
-                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-full" aria-label="Contact me with employment offers"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Yes">Yes</SelectItem>
                       <SelectItem value="No">No</SelectItem>
@@ -354,6 +389,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 <Input
                   type="email"
                   placeholder="Your e-mail *"
+                  name="companyEmail"
+                  aria-label="Company email"
                   value={regEmail}
                   onChange={(e) => setRegEmail(e.target.value)}
                   autoComplete="email"
@@ -361,6 +398,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 <Input
                   type="password"
                   placeholder="Password *"
+                  name="companyPassword"
+                  aria-label="Company password"
                   value={regPassword}
                   onChange={(e) => setRegPassword(e.target.value)}
                   autoComplete="new-password"
@@ -368,6 +407,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 <Input
                   type="password"
                   placeholder="Confirm password *"
+                  name="companyConfirmPassword"
+                  aria-label="Confirm company password"
                   value={regConfirm}
                   onChange={(e) => setRegConfirm(e.target.value)}
                   autoComplete="new-password"
@@ -376,27 +417,37 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Company Profile</p>
                 <Input
                   placeholder="Your name *"
+                  name="contactName"
+                  aria-label="Contact name"
                   value={contactName}
                   onChange={(e) => setContactName(e.target.value)}
                 />
                 <Input
                   placeholder="Your title"
+                  name="contactTitle"
+                  aria-label="Contact title"
                   value={contactTitle}
                   onChange={(e) => setContactTitle(e.target.value)}
                 />
                 <Input
                   placeholder="Company Name *"
+                  name="companyName"
+                  aria-label="Company name"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                 />
                 <Input
                   placeholder="Company Address"
+                  name="companyAddress"
+                  aria-label="Company address"
                   value={companyAddress}
                   onChange={(e) => setCompanyAddress(e.target.value)}
                 />
                 <Input
                   placeholder="Company phone number"
                   type="tel"
+                  name="companyPhone"
+                  aria-label="Company phone number"
                   value={companyPhone}
                   onChange={(e) => setCompanyPhone(e.target.value)}
                 />
@@ -405,7 +456,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                     What do you want to accomplish by using CDL Jobs Center?
                   </label>
                   <Select value={companyGoal} onValueChange={setCompanyGoal}>
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="w-full" aria-label="Company goal">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
