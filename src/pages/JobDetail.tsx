@@ -2,9 +2,10 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Phone, MapPin, ExternalLink, Truck } from "lucide-react";
+import { Phone, MapPin, ExternalLink, Truck, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useJobById } from "@/hooks/useJobs";
 import { useAuth } from "@/context/auth";
+import { useDriverJobMatchScore, useMatchingRollout } from "@/hooks/useMatchScores";
 import { useState, useEffect } from "react";
 import { ApplyModal } from "@/components/ApplyModal";
 import { SignInModal } from "@/components/SignInModal";
@@ -19,6 +20,8 @@ const JobDetail = () => {
   const { job, isLoading } = useJobById(id);
   const [applyOpen, setApplyOpen] = useState(false);
   const [signInOpen, setSignInOpen] = useState(false);
+  const { data: matchScore } = useDriverJobMatchScore(user?.role === "driver" ? user.id : undefined, id);
+  const { data: rollout } = useMatchingRollout();
 
   // Fetch company profile (phone, address, website, logo)
   const { data: companyProfile } = useQuery({
@@ -104,7 +107,7 @@ const JobDetail = () => {
 
             {/* Company info */}
             <div className="flex-1 min-w-0">
-              <h2 className="font-display font-bold text-primary text-lg mb-2">
+              <h2 className="font-display font-bold text-primary text-lg mb-2 truncate">
                 {job.company}
               </h2>
               {companyProfile?.phone && (
@@ -178,6 +181,59 @@ const JobDetail = () => {
             <span className="font-medium text-green-600 dark:text-green-400">{job.pay || "—"}</span>
           </div>
         </div>
+
+        {/* Why This Matches You */}
+        {rollout?.driverUiEnabled && !rollout.shadowMode && matchScore && user?.role === "driver" && (() => {
+          const scorePct = Math.round(matchScore.overallScore);
+          const scoreColor =
+            scorePct >= 70
+              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+              : scorePct >= 40
+              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+              : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400";
+          const barColor =
+            scorePct >= 70
+              ? "bg-green-500"
+              : scorePct >= 40
+              ? "bg-amber-500"
+              : "bg-red-500";
+          return (
+            <div className="border border-border bg-card p-4 mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-display font-semibold text-base">Why This Matches You</h3>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${scoreColor}`}>
+                  {scorePct}% Match
+                </span>
+              </div>
+              {matchScore.topReasons.length > 0 && (
+                <ul className="space-y-1.5 mb-3">
+                  {matchScore.topReasons.map((reason, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                      <span>{reason.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {matchScore.cautions.length > 0 && (
+                <ul className="space-y-1.5 mb-3">
+                  {matchScore.cautions.map((caution, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                      <span>{caution.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${barColor}`}
+                  style={{ width: `${scorePct}%` }}
+                />
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Description */}
         <div className="border border-border bg-card p-5 mb-4">

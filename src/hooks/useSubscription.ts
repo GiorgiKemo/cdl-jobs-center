@@ -52,8 +52,7 @@ export function useSubscription(companyId: string | undefined) {
         .maybeSingle();
 
       if (error && error.code !== "PGRST116") {
-        // Table might not exist yet — return mock free sub
-        return mockFreeSub(companyId!);
+        throw new Error(error.message || "Failed to load subscription");
       }
 
       if (data) return rowToSub(data);
@@ -65,7 +64,7 @@ export function useSubscription(companyId: string | undefined) {
         .select()
         .single();
 
-      if (insertErr) return mockFreeSub(companyId!);
+      if (insertErr) throw new Error(insertErr.message || "Failed to create subscription");
       return rowToSub(newRow);
     },
     enabled: !!companyId,
@@ -130,19 +129,4 @@ export function useCancelSubscription() {
       qc.invalidateQueries({ queryKey: ["subscription", companyId] });
     },
   });
-}
-
-function mockFreeSub(companyId: string): Subscription {
-  return {
-    id: "mock-free",
-    companyId,
-    plan: "free",
-    leadLimit: 3,
-    leadsUsed: 0,
-    stripeCustomerId: null,
-    stripeSubscriptionId: null,
-    status: "active",
-    currentPeriodEnd: null,
-    createdAt: new Date().toISOString(),
-  };
 }

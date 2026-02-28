@@ -11,7 +11,7 @@ import { useAuth } from "@/context/auth";
 import { useJobs } from "@/hooks/useJobs";
 import { Job } from "@/data/jobs";
 import { toast } from "sonner";
-import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload, Bell, MessageSquare, Users, Phone as PhoneIcon, Mail as MailIcon, MapPin, Truck as TruckIcon, Lock, RefreshCw, CreditCard, Send } from "lucide-react";
+import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload, Bell, MessageSquare, Users, Phone as PhoneIcon, Mail as MailIcon, MapPin, Truck as TruckIcon, Lock, RefreshCw, CreditCard, Send, Briefcase, Check, Sparkles } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -24,7 +24,21 @@ import {
 import { ChatPanel } from "@/components/ChatPanel";
 import { useUnreadCount } from "@/hooks/useMessages";
 import { useLeads, useUpdateLeadStatus, useSyncLeads } from "@/hooks/useLeads";
-import { useSubscription, PLANS } from "@/hooks/useSubscription";
+import { useSubscription, useCancelSubscription, PLANS } from "@/hooks/useSubscription";
+import { useCompanyDriverMatches, useMatchingRollout } from "@/hooks/useMatchScores";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { formatDate } from "@/lib/dateUtils";
+import { Spinner } from "@/components/ui/Spinner";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const FREIGHT_TYPES = [
   "Box", "Car Hauler", "Drop and Hook", "Dry Bulk", "Dry Van", "Flatbed",
@@ -38,6 +52,28 @@ const TEAM_OPTIONS = ["Solo", "Team", "Both"];
 const JOB_STATUSES = ["Draft", "Active", "Paused", "Closed"] as const;
 
 type PipelineStage = "New" | "Reviewing" | "Interview" | "Hired" | "Rejected";
+type SaveStatus = "idle" | "saving" | "saved";
+
+type CompanyProfileForm = {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  about: string;
+  website: string;
+  logo: string;
+};
+
+const snapshotCompanyProfile = (p: CompanyProfileForm) =>
+  JSON.stringify({
+    name: p.name,
+    email: p.email,
+    phone: p.phone,
+    address: p.address,
+    about: p.about,
+    website: p.website,
+    logo: p.logo,
+  });
 
 const PIPELINE_STAGES: Array<{ label: PipelineStage; headerClass: string }> = [
   { label: "New",       headerClass: "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600" },
@@ -116,7 +152,12 @@ const EMPTY_FORM = {
   status: "Active",
 };
 
-type Tab = "jobs" | "applications" | "pipeline" | "profile" | "analytics" | "messages" | "leads" | "hired" | "subscription";
+type Tab = "jobs" | "applications" | "pipeline" | "profile" | "analytics" | "messages" | "leads" | "hired" | "subscription" | "ai-matches";
+const isCompanyDeepLinkTab = (value: string | null): value is Tab =>
+  value === "messages" ||
+  value === "leads" ||
+  value === "subscription" ||
+  value === "ai-matches";
 
 // ── Application card with expand/collapse ────────────────────────────────────
 const AppCard = ({ app }: { app: ReceivedApplication }) => {
@@ -144,7 +185,7 @@ const AppCard = ({ app }: { app: ReceivedApplication }) => {
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <span className="text-xs text-muted-foreground">
-            {app.submittedAt ? new Date(app.submittedAt).toLocaleDateString() : "—"}
+            {app.submittedAt ? formatDate(app.submittedAt) : "—"}
           </span>
           <Button variant="outline" size="sm" onClick={() => setOpen(!open)} className="flex items-center gap-1.5">
             {open ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
@@ -204,7 +245,7 @@ const PipelineCard = ({
           </p>
           {app.submittedAt && (
             <p className="text-xs text-muted-foreground">
-              Applied {new Date(app.submittedAt).toLocaleDateString()}
+              Applied {formatDate(app.submittedAt)}
             </p>
           )}
         </div>
@@ -273,6 +314,163 @@ const PipelineColumn = ({
   );
 };
 
+// ── AI Matches content (extracted so hook is only called when tab is active) ──
+const AiMatchesContent = ({
+  userId,
+  activeJobs,
+  aiJobFilter,
+  setAiJobFilter,
+  aiSourceFilter,
+  setAiSourceFilter,
+  matchLimit,
+  currentPlan,
+  switchTab,
+}: {
+  userId: string;
+  activeJobs: Job[];
+  aiJobFilter: string;
+  setAiJobFilter: (v: string) => void;
+  aiSourceFilter: string;
+  setAiSourceFilter: (v: string) => void;
+  matchLimit: number;
+  currentPlan: string;
+  switchTab: (tab: Tab) => void;
+}) => {
+  const {
+    data: matches = [],
+    isLoading: matchesLoading,
+  } = useCompanyDriverMatches(userId, {
+    jobId: aiJobFilter !== "all" ? aiJobFilter : undefined,
+    source: aiSourceFilter !== "all" ? (aiSourceFilter as "application" | "lead") : undefined,
+    limit: matchLimit,
+  });
+
+  const scoreBadgeClass = (score: number) => {
+    if (score >= 80) return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+    if (score >= 60) return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+    if (score >= 40) return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
+    return "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400";
+  };
+
+  return (
+    <div>
+      <h2 className="font-display font-semibold text-base mb-4">
+        AI-Matched Candidates
+      </h2>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 mb-4">
+        <Select value={aiJobFilter} onValueChange={setAiJobFilter}>
+          <SelectTrigger className="w-[220px] h-9 text-sm">
+            <SelectValue placeholder="All Jobs" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Jobs</SelectItem>
+            {activeJobs.map((j) => (
+              <SelectItem key={j.id} value={j.id}>{j.title}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={aiSourceFilter} onValueChange={setAiSourceFilter}>
+          <SelectTrigger className="w-[180px] h-9 text-sm">
+            <SelectValue placeholder="All Sources" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Sources</SelectItem>
+            <SelectItem value="application">Applications</SelectItem>
+            <SelectItem value="lead">Leads</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Results */}
+      {matchesLoading ? (
+        <div className="flex justify-center py-12">
+          <Spinner />
+        </div>
+      ) : matches.length === 0 ? (
+        <EmptyState
+          icon={Sparkles}
+          heading="No matches found"
+          description="Post a job to start getting AI-matched candidates."
+        />
+      ) : (
+        <div className="space-y-3">
+          {matches.map((m) => (
+            <div key={`${m.candidateId}-${m.candidateSource}`} className="border border-border bg-card px-5 py-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`inline-flex items-center px-2 py-0.5 text-xs font-bold rounded-full ${scoreBadgeClass(m.overallScore)}`}>
+                      {m.overallScore}%
+                    </span>
+                    <p className="font-semibold text-foreground">{m.candidateName || "Unknown"}</p>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                      m.candidateSource === "application"
+                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                        : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                    }`}>
+                      {m.candidateSource === "application" ? "Application" : "Lead"}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {[
+                      m.candidateDriverType && `${m.candidateDriverType}`,
+                      m.candidateLicenseClass && `CDL ${m.candidateLicenseClass}`,
+                      m.candidateYearsExp && `${m.candidateYearsExp} exp`,
+                      m.candidateState && m.candidateState,
+                    ].filter(Boolean).join(" · ") || "No details available"}
+                  </p>
+                  {m.topReasons.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {m.topReasons.slice(0, 2).map((r, i) => (
+                        <span key={i} className={`text-xs px-2 py-0.5 rounded-full ${
+                          r.positive
+                            ? "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
+                            : "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400"
+                        }`}>
+                          {r.text}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {m.candidateSource === "application" ? (
+                    <Button variant="outline" size="sm" className="text-xs" onClick={() => switchTab("applications")}>
+                      View
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" className="text-xs" onClick={() => switchTab("leads")}>
+                      View
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => switchTab("messages")}>
+                    <MessageSquare className="h-3 w-3 mr-1" /> Message
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Plan gating banner */}
+      {(currentPlan === "free" || currentPlan === "starter") && matches.length > 0 && (
+        <div className="mt-4 border border-border bg-amber-50 dark:bg-amber-950/30 px-5 py-3 flex items-center justify-between">
+          <p className="text-sm text-amber-800 dark:text-amber-300">
+            Showing top {matches.length} of available matches.{" "}
+            <Link to="/pricing" className="font-medium underline hover:no-underline">
+              Upgrade to see all candidates.
+            </Link>
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 const Dashboard = () => {
   const { user, loading } = useAuth();
@@ -285,7 +483,12 @@ const Dashboard = () => {
     }
   }, [loading, user, navigate]);
 
-  if (loading || !user || user.role !== "company") return null;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Spinner />
+    </div>
+  );
+  if (!user || user.role !== "company") return null;
 
   return <DashboardInner />;
 };
@@ -306,16 +509,20 @@ const DashboardInner = () => {
   const updateLeadStatus = useUpdateLeadStatus();
   const syncLeads = useSyncLeads();
   const { data: subscription } = useSubscription(user!.id);
+  const cancelSubscription = useCancelSubscription();
+  const rollout = useMatchingRollout();
   const [portalLoading, setPortalLoading] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const leadLimit = subscription ? PLANS[subscription.plan].leads : 3;
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const t = searchParams.get("tab");
-    if (t === "messages" || t === "leads" || t === "subscription") return t;
+    if (isCompanyDeepLinkTab(t)) return t;
     return "jobs";
   });
   const [initialChatAppId, setInitialChatAppId] = useState<string | null>(() => searchParams.get("app"));
+  const tabFromUrl = searchParams.get("tab");
   const [appPage, setAppPage] = useState(0);
   const [leadPage, setLeadPage] = useState(0);
   const [leadStateFilter, setLeadStateFilter] = useState("all");
@@ -331,6 +538,16 @@ const DashboardInner = () => {
   const [form, setForm] = useState(EMPTY_FORM);
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
   const [savingJob, setSavingJob] = useState(false);
+  const [aiJobFilter, setAiJobFilter] = useState<string>("all");
+  const [aiSourceFilter, setAiSourceFilter] = useState<string>("all");
+
+  useEffect(() => {
+    if (!isCompanyDeepLinkTab(tabFromUrl)) return;
+    setActiveTab((prev) => (prev === tabFromUrl ? prev : tabFromUrl));
+    const next = new URLSearchParams(searchParams);
+    next.delete("tab");
+    setSearchParams(next, { replace: true });
+  }, [tabFromUrl, searchParams, setSearchParams]);
 
   // Company profile state
   const [profileName, setProfileName] = useState(user!.name);
@@ -340,6 +557,19 @@ const DashboardInner = () => {
   const [profileAbout, setProfileAbout] = useState("");
   const [profileWebsite, setProfileWebsite] = useState("");
   const [profileLogo, setProfileLogo] = useState("");
+  const [profileSaveStatus, setProfileSaveStatus] = useState<SaveStatus>("idle");
+  const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string | null>(null);
+  const currentProfileSnapshot = snapshotCompanyProfile({
+    name: profileName,
+    email: profileEmail,
+    phone: profilePhone,
+    address: profileAddress,
+    about: profileAbout,
+    website: profileWebsite,
+    logo: profileLogo,
+  });
+  const hasUnsavedChanges = lastSavedSnapshot !== null && currentProfileSnapshot !== lastSavedSnapshot;
+  const isProfileSaved = profileSaveStatus === "saved" && !hasUnsavedChanges;
 
   // Fetch applications for this company
   const appsKey = ["company-applications", user!.id];
@@ -364,17 +594,31 @@ const DashboardInner = () => {
       .eq("id", user!.id)
       .maybeSingle()
       .then(({ data }) => {
-        if (data) {
-          setProfileName(data.company_name ?? user!.name);
-          setProfileEmail(data.email ?? user!.email ?? "");
-          setProfilePhone(data.phone ?? "");
-          setProfileAddress(data.address ?? "");
-          setProfileAbout(data.about ?? "");
-          setProfileWebsite(data.website ?? "");
-          setProfileLogo(data.logo_url ?? "");
-        }
+        const loadedProfile: CompanyProfileForm = {
+          name: data?.company_name ?? user!.name,
+          email: data?.email ?? user!.email ?? "",
+          phone: data?.phone ?? "",
+          address: data?.address ?? "",
+          about: data?.about ?? "",
+          website: data?.website ?? "",
+          logo: data?.logo_url ?? "",
+        };
+        setProfileName(loadedProfile.name);
+        setProfileEmail(loadedProfile.email);
+        setProfilePhone(loadedProfile.phone);
+        setProfileAddress(loadedProfile.address);
+        setProfileAbout(loadedProfile.about);
+        setProfileWebsite(loadedProfile.website);
+        setProfileLogo(loadedProfile.logo);
+        setLastSavedSnapshot(snapshotCompanyProfile(loadedProfile));
       });
   }, [user]);
+
+  useEffect(() => {
+    if (profileSaveStatus === "saved" && hasUnsavedChanges) {
+      setProfileSaveStatus("idle");
+    }
+  }, [profileSaveStatus, hasUnsavedChanges]);
 
   // Post-checkout success handling
   useEffect(() => {
@@ -440,6 +684,7 @@ const DashboardInner = () => {
   };
 
   const handleDeleteJob = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this job posting? This cannot be undone.")) return;
     try {
       await removeJob(id);
       toast.success("Job removed.");
@@ -481,9 +726,9 @@ const DashboardInner = () => {
     e.target.value = "";
   };
 
-  const [savingProfile, setSavingProfile] = useState(false);
   const handleSaveProfile = async () => {
-    setSavingProfile(true);
+    if (profileSaveStatus === "saving" || !hasUnsavedChanges) return;
+    setProfileSaveStatus("saving");
     try {
       const payload = {
         id: user!.id,
@@ -501,15 +746,16 @@ const DashboardInner = () => {
         console.error("Save profile error:", error, "payload:", payload);
         throw error;
       }
+      setLastSavedSnapshot(currentProfileSnapshot);
+      setProfileSaveStatus("saved");
       toast.success("Profile saved.");
     } catch (err: unknown) {
       const msg = err instanceof Error
         ? err.message
         : (err as { message?: string })?.message ?? "Failed to save profile.";
       console.error("Save profile catch:", err);
+      setProfileSaveStatus("idle");
       toast.error(msg);
-    } finally {
-      setSavingProfile(false);
     }
   };
 
@@ -589,11 +835,11 @@ const DashboardInner = () => {
         })()}
 
         {/* Tab bar */}
-        <div className="border-b border-border mb-6 flex overflow-x-auto">
-          <button className={tabClass("jobs")} onClick={() => switchTab("jobs")}>
+        <div className="border-b border-border mb-6 flex overflow-x-auto" role="tablist">
+          <button className={tabClass("jobs")} onClick={() => switchTab("jobs")} role="tab" aria-selected={activeTab === "jobs"}>
             My Jobs ({jobs.length})
           </button>
-          <button className={tabClass("applications")} onClick={() => switchTab("applications")}>
+          <button className={tabClass("applications")} onClick={() => switchTab("applications")} role="tab" aria-selected={activeTab === "applications"}>
             Applications ({applications.length})
             {(() => {
               const lastSeen = localStorage.getItem(`cdl-apps-seen-${user!.id}`) ?? "1970-01-01T00:00:00Z";
@@ -606,10 +852,15 @@ const DashboardInner = () => {
               );
             })()}
           </button>
-          <button className={tabClass("pipeline")} onClick={() => switchTab("pipeline")}>
+          <button className={tabClass("pipeline")} onClick={() => switchTab("pipeline")} role="tab" aria-selected={activeTab === "pipeline"}>
             Pipeline ({applications.length})
           </button>
-          <button className={tabClass("messages")} onClick={() => switchTab("messages")}>
+          <button className={tabClass("ai-matches")} onClick={() => switchTab("ai-matches")} role="tab" aria-selected={activeTab === "ai-matches"}>
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5" /> AI Matches
+            </span>
+          </button>
+          <button className={tabClass("messages")} onClick={() => switchTab("messages")} role="tab" aria-selected={activeTab === "messages"}>
             Messages
             {unreadMsgCount > 0 && (
               <span className="ml-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white px-1">
@@ -617,7 +868,7 @@ const DashboardInner = () => {
               </span>
             )}
           </button>
-          <button className={tabClass("leads")} onClick={() => switchTab("leads")}>
+          <button className={tabClass("leads")} onClick={() => switchTab("leads")} role="tab" aria-selected={activeTab === "leads"}>
             Leads ({leads.filter((l) => l.status !== "dismissed" && l.status !== "hired").length})
             {(() => {
               const newCount = leads.filter((l) => l.status === "new").length;
@@ -629,16 +880,16 @@ const DashboardInner = () => {
               );
             })()}
           </button>
-          <button className={tabClass("hired")} onClick={() => switchTab("hired")}>
+          <button className={tabClass("hired")} onClick={() => switchTab("hired")} role="tab" aria-selected={activeTab === "hired"}>
             Hired ({leads.filter((l) => l.status === "hired").length})
           </button>
-          <button className={tabClass("profile")} onClick={() => switchTab("profile")}>
+          <button className={tabClass("profile")} onClick={() => switchTab("profile")} role="tab" aria-selected={activeTab === "profile"}>
             Company Profile
           </button>
-          <button className={tabClass("analytics")} onClick={() => switchTab("analytics")}>
+          <button className={tabClass("analytics")} onClick={() => switchTab("analytics")} role="tab" aria-selected={activeTab === "analytics"}>
             Analytics
           </button>
-          <button className={tabClass("subscription")} onClick={() => switchTab("subscription")}>
+          <button className={tabClass("subscription")} onClick={() => switchTab("subscription")} role="tab" aria-selected={activeTab === "subscription"}>
             <span className="flex items-center gap-1.5">
               <CreditCard className="h-3.5 w-3.5" /> Subscription
             </span>
@@ -664,7 +915,7 @@ const DashboardInner = () => {
               <div className="border border-border bg-card p-5 mb-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-sm">{editingId ? "Edit Job" : "New Job Posting"}</h3>
-                  <button onClick={() => setShowForm(false)} className="p-1 hover:text-primary transition-colors">
+                  <button onClick={() => setShowForm(false)} className="p-1 hover:text-primary transition-colors" aria-label="Close">
                     <X className="h-4 w-4" />
                   </button>
                 </div>
@@ -737,8 +988,12 @@ const DashboardInner = () => {
 
             {/* Job list */}
             {jobs.length === 0 ? (
-              <div className="border border-border bg-card px-5 py-12 text-center text-muted-foreground text-sm">
-                No job postings yet. Click "Post New Job" to get started.
+              <div className="border border-border bg-card">
+                <EmptyState
+                  icon={Briefcase}
+                  heading="No job postings yet"
+                  description='Click "Post New Job" to get started.'
+                />
               </div>
             ) : (
               <div className="border border-border bg-card divide-y divide-border">
@@ -756,7 +1011,7 @@ const DashboardInner = () => {
                       </p>
                       {job.postedAt && (
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Posted {new Date(job.postedAt).toLocaleDateString()}
+                          Posted {formatDate(job.postedAt)}
                         </p>
                       )}
                     </div>
@@ -979,7 +1234,25 @@ const DashboardInner = () => {
                     rows={5} className="resize-none" />
                 </div>
               </div>
-              <Button onClick={handleSaveProfile} disabled={savingProfile} className="px-8">{savingProfile ? "Saving…" : "Save Changes"}</Button>
+              <Button
+                onClick={handleSaveProfile}
+                disabled={profileSaveStatus === "saving"}
+                className={isProfileSaved ? "px-8 bg-green-600 text-white hover:bg-green-600 focus-visible:ring-green-600" : "px-8"}
+              >
+                {profileSaveStatus === "saving" ? (
+                  <>
+                    <Spinner size="sm" className="h-4 w-4 border-current border-t-transparent" />
+                    <span>Saving...</span>
+                  </>
+                ) : isProfileSaved ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    <span>Saved</span>
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
             </div>
           </div>
         )}
@@ -1115,8 +1388,8 @@ const DashboardInner = () => {
               </div>
 
               {leadsLoading ? (
-                <div className="border border-border bg-card px-5 py-12 text-center text-muted-foreground text-sm">
-                  Loading leads...
+                <div className="border border-border bg-card px-5 py-12 flex justify-center">
+                  <Spinner />
                 </div>
               ) : leadsIsError ? (
                 <div className="border border-destructive/30 bg-destructive/5 px-5 py-8 text-center">
@@ -1716,6 +1989,42 @@ const DashboardInner = () => {
           );
         })()}
 
+        {/* ── Tab: AI Matches ──────────────────────────────────────────────── */}
+        {activeTab === "ai-matches" && (() => {
+          const MATCH_LIMITS: Record<string, number> = { free: 3, starter: 25, growth: 100, unlimited: 9999 };
+          const currentPlan = subscription?.plan ?? "free";
+          const matchLimit = MATCH_LIMITS[currentPlan] ?? 3;
+
+          const rolloutData = rollout.data;
+          const companyUiVisible =
+            rolloutData?.companyUiEnabled ||
+            (rolloutData?.companyBetaIds ?? []).includes(user!.id);
+
+          if (!companyUiVisible) {
+            return (
+              <EmptyState
+                icon={Sparkles}
+                heading="AI Matches coming soon"
+                description="This feature is currently in beta. Check back soon."
+              />
+            );
+          }
+
+          const activeJobs = jobs.filter((j) => j.status === "Active");
+
+          return <AiMatchesContent
+            userId={user!.id}
+            activeJobs={activeJobs}
+            aiJobFilter={aiJobFilter}
+            setAiJobFilter={setAiJobFilter}
+            aiSourceFilter={aiSourceFilter}
+            setAiSourceFilter={setAiSourceFilter}
+            matchLimit={matchLimit}
+            currentPlan={currentPlan}
+            switchTab={switchTab}
+          />;
+        })()}
+
         {/* ── Tab: Subscription ────────────────────────────────────────────── */}
         {activeTab === "subscription" && (() => {
           const plan = subscription?.plan ?? "free";
@@ -1774,8 +2083,53 @@ const DashboardInner = () => {
                 {/* Renewal date */}
                 {subscription?.currentPeriodEnd && (
                   <p className="text-xs text-muted-foreground mt-3">
-                    Renews on {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                    Renews on {formatDate(subscription.currentPeriodEnd)}
                   </p>
+                )}
+
+                {/* Cancel subscription — inline in plan card */}
+                {!isFreePlan && (
+                  <div className="mt-5 pt-5 border-t border-border flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs border-destructive/40 text-destructive bg-destructive/5 hover:bg-destructive/10 hover:text-destructive"
+                      disabled={cancelSubscription.isPending}
+                      onClick={() => setCancelOpen(true)}
+                    >
+                      {cancelSubscription.isPending ? "Canceling..." : "Cancel Subscription"}
+                    </Button>
+
+                    <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Cancel subscription</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to cancel your <strong>{planInfo.label}</strong> plan? You will be downgraded to the Free plan with a limit of 3 leads per month.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => {
+                              cancelSubscription.mutate(user!.id, {
+                                onSuccess: () => {
+                                  toast.success("Subscription canceled. You are now on the Free plan.");
+                                  setCancelOpen(false);
+                                },
+                                onError: (err) => {
+                                  toast.error(err instanceof Error ? err.message : "Failed to cancel subscription");
+                                },
+                              });
+                            }}
+                          >
+                            Yes, Cancel
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 )}
               </div>
 
@@ -1864,6 +2218,7 @@ const DashboardInner = () => {
                   </Button>
                 </div>
               )}
+
             </div>
           );
         })()}

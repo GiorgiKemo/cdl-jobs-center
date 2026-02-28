@@ -13,6 +13,8 @@ import {
 import { Phone, MapPin, CheckCircle, Building2, ExternalLink } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { Spinner } from "@/components/ui/Spinner";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 interface CompanyRow {
   id: string;
@@ -154,8 +156,8 @@ const Companies = () => {
           </div>
 
           {isLoading ? (
-            <div className="px-5 py-12 text-center text-muted-foreground text-sm">
-              Loading companies...
+            <div className="px-5 py-12 flex justify-center">
+              <Spinner />
             </div>
           ) : isError ? (
             <div className="px-5 py-12 text-center">
@@ -167,9 +169,7 @@ const Companies = () => {
               </Button>
             </div>
           ) : filtered.length === 0 ? (
-            <div className="px-5 py-12 text-center text-muted-foreground text-sm">
-              No companies match the selected filters.
-            </div>
+            <EmptyState icon={Building2} heading="No companies match the selected filters." />
           ) : (
             <div className="divide-y divide-border">
               {filtered.map((c) => (
@@ -196,7 +196,7 @@ const Companies = () => {
                   <div className="flex-1 min-w-0">
                     <Link
                       to={`/companies/${c.id}`}
-                      className="font-display font-semibold text-primary hover:underline text-left mb-1.5 block"
+                      className="font-display font-semibold text-primary hover:underline text-left mb-1.5 block truncate"
                     >
                       {c.company_name}
                     </Link>
@@ -209,7 +209,7 @@ const Companies = () => {
                     {c.address && (
                       <p className="flex items-start gap-1.5 text-sm text-muted-foreground mb-1">
                         <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden="true" />
-                        {c.address}
+                        <span className="line-clamp-1">{c.address}</span>
                       </p>
                     )}
                     {c.website && (

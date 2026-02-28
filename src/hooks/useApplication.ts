@@ -1,4 +1,6 @@
-const KEY = "cdl-application";
+import { useAuth } from "@/context/auth";
+
+const BASE_KEY = "cdl-application";
 
 export interface ApplicationData {
   firstName: string;
@@ -22,9 +24,14 @@ export interface ApplicationData {
 }
 
 export function useApplication() {
+  const { user } = useAuth();
+
+  // Scope storage key by user ID to prevent data leaking between accounts
+  const key = user?.id ? `${BASE_KEY}-${user.id}` : BASE_KEY;
+
   const load = (): Partial<ApplicationData> => {
     try {
-      const stored = localStorage.getItem(KEY);
+      const stored = localStorage.getItem(key);
       return stored ? JSON.parse(stored) : {};
     } catch {
       return {};
@@ -33,12 +40,34 @@ export function useApplication() {
 
   const save = (data: ApplicationData) => {
     try {
-      localStorage.setItem(KEY, JSON.stringify(data));
+      localStorage.setItem(key, JSON.stringify(data));
       return true;
     } catch {
       return false;
     }
   };
 
-  return { load, save };
+  const clear = () => {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // ignore
+    }
+  };
+
+  return { load, save, clear };
+}
+
+/** Remove all application draft keys from localStorage (call on sign-out) */
+export function clearAllApplicationDrafts() {
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(BASE_KEY)) keysToRemove.push(k);
+    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+  } catch {
+    // ignore
+  }
 }

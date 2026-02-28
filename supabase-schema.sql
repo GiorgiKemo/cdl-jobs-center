@@ -8,7 +8,7 @@
 CREATE TABLE public.profiles (
   id          UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   name        TEXT NOT NULL,
-  role        TEXT NOT NULL CHECK (role IN ('driver', 'company')),
+  role        TEXT NOT NULL CHECK (role IN ('driver', 'company', 'admin')),
   email       TEXT,
   created_at  TIMESTAMPTZ DEFAULT now(),
   updated_at  TIMESTAMPTZ DEFAULT now()
@@ -81,6 +81,11 @@ CREATE TABLE public.driver_profiles (
   zip_code        TEXT,
   date_of_birth   TEXT,
   about           TEXT,
+  home_address    TEXT,
+  interested_in   TEXT,
+  next_job_want   TEXT,
+  has_accidents   TEXT,
+  wants_contact   TEXT,
   created_at      TIMESTAMPTZ DEFAULT now(),
   updated_at      TIMESTAMPTZ DEFAULT now()
 );
@@ -95,6 +100,9 @@ CREATE TABLE public.company_profiles (
   address       TEXT,
   website       TEXT,
   about         TEXT,
+  contact_name  TEXT,
+  contact_title TEXT,
+  company_goal  TEXT,
   logo_url      TEXT NOT NULL DEFAULT '',
   created_at    TIMESTAMPTZ DEFAULT now(),
   updated_at    TIMESTAMPTZ DEFAULT now()
@@ -129,6 +137,7 @@ CREATE INDEX idx_messages_unread ON messages(sender_id, read_at) WHERE read_at I
 -- ============================================================================
 CREATE TABLE public.leads (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id      UUID REFERENCES profiles(id),
   source          TEXT NOT NULL DEFAULT 'facebook',
   full_name       TEXT NOT NULL,
   phone           TEXT,
@@ -140,13 +149,15 @@ CREATE TABLE public.leads (
   truck_make      TEXT,
   truck_model     TEXT,
   status          TEXT CHECK (status IN ('new','contacted','hired','dismissed')) DEFAULT 'new',
-  sheet_row_id    TEXT UNIQUE,
+  sheet_row_id    TEXT,
   synced_at       TIMESTAMPTZ DEFAULT now(),
-  created_at      TIMESTAMPTZ DEFAULT now()
+  created_at      TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(company_id, sheet_row_id)
 );
 
 CREATE INDEX idx_leads_state ON leads(state);
 CREATE INDEX idx_leads_status ON leads(status);
+CREATE INDEX idx_leads_company ON leads(company_id);
 
 -- 9. SUBSCRIPTIONS — Stripe payment plans for companies
 -- ============================================================================
@@ -190,7 +201,8 @@ CREATE POLICY "Companies can update own applications" ON applications FOR UPDATE
 
 -- driver_profiles
 ALTER TABLE driver_profiles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Public read driver profiles"            ON driver_profiles FOR SELECT USING (true);
+CREATE POLICY "Drivers read own profile"               ON driver_profiles FOR SELECT USING (id = auth.uid());
+CREATE POLICY "Authenticated read driver profiles"     ON driver_profiles FOR SELECT USING (auth.uid() IS NOT NULL);
 CREATE POLICY "Drivers can insert own profile"         ON driver_profiles FOR INSERT WITH CHECK (id = auth.uid());
 CREATE POLICY "Drivers can update own driver profile"  ON driver_profiles FOR UPDATE USING (id = auth.uid()) WITH CHECK (id = auth.uid());
 
@@ -219,14 +231,14 @@ CREATE POLICY "Mark received as read" ON messages FOR UPDATE USING (
     AND (a.driver_id = auth.uid() OR a.company_id = auth.uid()))
 );
 
--- leads
+-- leads (tenant-scoped by company_id)
 ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Companies can read leads" ON leads FOR SELECT USING (
-  EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'company')
-);
-CREATE POLICY "Companies can update lead status" ON leads FOR UPDATE USING (
-  EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'company')
-);
+CREATE POLICY "Companies read own leads" ON leads FOR SELECT
+  USING (company_id = auth.uid());
+CREATE POLICY "Companies update own leads" ON leads FOR UPDATE
+  USING (company_id = auth.uid()) WITH CHECK (company_id = auth.uid());
+CREATE POLICY "Companies insert own leads" ON leads FOR INSERT
+  WITH CHECK (company_id = auth.uid());
 
 -- subscriptions
 ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;

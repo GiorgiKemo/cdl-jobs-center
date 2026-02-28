@@ -10,6 +10,7 @@ import { SignInModal } from "@/components/SignInModal";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { Spinner } from "@/components/ui/Spinner";
 
 interface CompanyData {
   id: string;
@@ -91,7 +92,7 @@ const CompanyProfile = () => {
       <div className="min-h-screen bg-background">
         <Navbar />
         <main className="container mx-auto py-8 max-w-4xl">
-          <div className="text-center text-muted-foreground py-20">Loading...</div>
+          <div className="flex justify-center py-20"><Spinner /></div>
         </main>
         <Footer />
       </div>

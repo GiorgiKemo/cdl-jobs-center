@@ -5,6 +5,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { Spinner } from "./components/ui/Spinner";
 
 const Index = lazy(() => import("./pages/Index"));
 const ApplyNow = lazy(() => import("./pages/ApplyNow"));
@@ -27,13 +29,18 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const queryClient = new QueryClient();
 
 const App = () => (
+  <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>
-          <Suspense fallback={null}>
+          <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center">
+              <Spinner />
+            </div>
+          }>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/apply" element={<ApplyNow />} />
@@ -59,6 +66,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

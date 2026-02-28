@@ -16,7 +16,7 @@ const Footer = () => {
                 { label: "Job Search", path: "/jobs" },
                 { label: "Apply Now", path: "/apply" },
                 { label: "Company Directory", path: "/companies" },
-                { label: "Blog", path: "/" },
+                { label: "Pricing", path: "/pricing" },
               ].map((item) => (
                 <Link key={item.label} to={item.path} className="text-sm text-muted-foreground hover:text-primary transition-colors">
                   {item.label}
@@ -31,10 +31,10 @@ const Footer = () => {
             <div className="flex flex-col gap-2">
               {[
                 { label: "Company Login", path: "/signin" },
-                { label: "Advertise & Post Jobs", path: "/" },
-                { label: "Job Posting Guidelines", path: "/" },
-                { label: "Documentation", path: "/" },
-                { label: "Customization Policy", path: "/" },
+                { label: "Post Jobs", path: "/dashboard" },
+                { label: "Subscription Plans", path: "/pricing" },
+                { label: "Privacy Policy", path: "/privacy" },
+                { label: "Terms of Service", path: "/terms" },
               ].map((item) => (
                 <Link key={item.label} to={item.path} className="text-sm text-muted-foreground hover:text-primary transition-colors">
                   {item.label}

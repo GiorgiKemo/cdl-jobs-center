@@ -10,28 +10,14 @@ import {
   useMarkRead,
   type ConversationSummary,
 } from "@/hooks/useMessages";
+import { timeAgo, formatTime } from "@/lib/dateUtils";
+import { Spinner } from "@/components/ui/Spinner";
 
 interface ChatPanelProps {
   userId: string;
   userRole: "driver" | "company";
   userName: string;
   initialApplicationId?: string | null;
-}
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return "now";
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d`;
-  return new Date(iso).toLocaleDateString();
-}
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
 function getInitials(name: string): string {
@@ -85,14 +71,14 @@ export function ChatPanel({ userId, userRole, userName, initialApplicationId }: 
   };
 
   if (isLoading) {
-    return <div className="text-center text-muted-foreground py-12 text-sm">Loading conversations...</div>;
+    return <div className="flex items-center justify-center py-12"><Spinner /></div>;
   }
 
   // Mobile: show chat window if a conversation is selected
   const showList = !selectedAppId;
 
   return (
-    <div className="border border-border bg-card overflow-hidden" style={{ height: "calc(100vh - 320px)", minHeight: 400 }}>
+    <div className="border border-border bg-card overflow-hidden h-[60vh] min-h-[400px] max-h-[800px]">
       <div className="flex h-full">
         {/* Conversation list */}
         <div className={`w-full md:w-80 md:shrink-0 border-r border-border flex flex-col ${!showList ? "hidden md:flex" : "flex"}`}>
@@ -234,7 +220,7 @@ function ChatWindow({
     <>
       {/* Header */}
       <div className="px-4 py-3 border-b border-border flex items-center gap-3">
-        <button onClick={onBack} className="md:hidden text-muted-foreground hover:text-foreground">
+        <button onClick={onBack} className="md:hidden text-muted-foreground hover:text-foreground" aria-label="Go back">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="h-8 w-8 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
@@ -249,7 +235,7 @@ function ChatWindow({
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
         {isLoading ? (
-          <p className="text-center text-sm text-muted-foreground py-8">Loading messages...</p>
+          <div className="flex justify-center py-8"><Spinner size="sm" /></div>
         ) : messages.length === 0 ? (
           <div className="text-center text-sm text-muted-foreground py-8">
             <p>No messages yet.</p>
@@ -292,7 +278,7 @@ function ChatWindow({
           className="flex-1"
           disabled={sending}
         />
-        <Button size="icon" onClick={onSend} disabled={!draft.trim() || sending}>
+        <Button size="icon" onClick={onSend} disabled={!draft.trim() || sending} aria-label="Send message">
           <Send className="h-4 w-4" />
         </Button>
       </div>

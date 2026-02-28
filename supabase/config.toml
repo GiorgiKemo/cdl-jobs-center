@@ -366,6 +366,12 @@ verify_jwt = false
 [functions.create-portal-session]
 verify_jwt = false
 
+[functions.match-recompute]
+verify_jwt = false
+
+[functions.match-backfill-nightly]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

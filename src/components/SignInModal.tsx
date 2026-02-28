@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/context/auth";
 import { supabase } from "@/lib/supabase";
 
-type View = "login" | "rules" | "register";
+type View = "login" | "rules" | "register" | "forgot";
 
 const RULES_TEXT = `General rules of conduct on the website:
 
@@ -81,6 +81,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
   // Login state
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
 
   // Shared register state
   const [role, setRole] = useState<"driver" | "company">("driver");
@@ -175,6 +176,11 @@ export function SignInModal({ onClose }: SignInModalProps) {
           phone: driverPhone || "",
           cdl_number: cdlNumber || "",
           zip_code: zipCode || "",
+          home_address: homeAddress || "",
+          interested_in: interestedIn || "",
+          next_job_want: nextJobWant || "",
+          has_accidents: hasAccidents || "",
+          wants_contact: wantsContact || "",
         });
       }
       toast.success("Account created! You're now signed in.");
@@ -211,6 +217,9 @@ export function SignInModal({ onClose }: SignInModalProps) {
           phone: companyPhone || "",
           address: companyAddress || "",
           email: regEmail,
+          contact_name: contactName || "",
+          contact_title: contactTitle || "",
+          company_goal: companyGoal || "",
         });
       }
       toast.success("Company account created! You're now signed in.");
@@ -222,12 +231,12 @@ export function SignInModal({ onClose }: SignInModalProps) {
     }
   };
 
-  const modal = (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="bg-background border border-border w-full max-w-md shadow-lg max-h-[90vh] flex flex-col">
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="w-full max-w-md p-0 gap-0 max-h-[90vh] flex flex-col overflow-hidden [&>button.absolute]:hidden">
+        <DialogTitle className="sr-only">
+          {view === "login" ? "Login" : view === "forgot" ? "Reset Password" : view === "rules" ? "Rules" : "Register"}
+        </DialogTitle>
 
         {/* ── LOGIN VIEW ── */}
         {view === "login" && (
@@ -264,7 +273,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   type="button"
                   variant="outline"
                   className="flex-1"
-                  onClick={() => toast.info("Password reset coming soon.")}
+                  onClick={() => { setResetEmail(loginEmail); setView("forgot"); }}
                 >
                   Forgot it?
                 </Button>
@@ -276,6 +285,55 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   Registration
                 </Button>
               </div>
+            </form>
+          </>
+        )}
+
+        {/* ── FORGOT PASSWORD VIEW ── */}
+        {view === "forgot" && (
+          <>
+            <ModalHeader title="Reset Password" onClose={onClose} />
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!resetEmail) { toast.error("Please enter your email."); return; }
+                setSubmitting(true);
+                try {
+                  const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+                    redirectTo: `${window.location.origin}/signin`,
+                  });
+                  if (error) throw error;
+                  toast.success("Password reset email sent! Check your inbox.");
+                  setView("login");
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Failed to send reset email.");
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+              className="px-5 py-5 space-y-3"
+            >
+              <p className="text-sm text-muted-foreground">
+                Enter your email address and we'll send you a link to reset your password.
+              </p>
+              <Input
+                type="email"
+                placeholder="Email address"
+                aria-label="Email address"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                autoComplete="email"
+              />
+              <Button type="submit" disabled={submitting} className="w-full">
+                {submitting ? "Sending…" : "Send Reset Link"}
+              </Button>
+              <button
+                type="button"
+                onClick={() => setView("login")}
+                className="w-full text-center text-sm text-primary hover:underline"
+              >
+                ← Back to login
+              </button>
             </form>
           </>
         )}
@@ -538,9 +596,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
           </>
         )}
 
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
-
-  return createPortal(modal, document.body);
 }

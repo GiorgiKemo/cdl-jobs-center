@@ -4,11 +4,13 @@ import Footer from "@/components/Footer";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Eye, Heart, Lock } from "lucide-react";
+import { Eye, Heart, Lock, Users } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { Spinner } from "@/components/ui/Spinner";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const LICENSE_CLASSES = ["All", "Class A", "Class B", "Class C", "Permit Only"];
 const EXPERIENCE_OPTIONS = ["All", "None", "Less than 1 year", "1-3 years", "3-5 years", "5+ years"];
@@ -148,7 +150,7 @@ const Drivers = () => {
             <Link to="/" className="text-primary hover:underline">
               Main
             </Link>
-            <span className="mx-1">&gt;</span>
+            <span className="mx-1">»</span>
             Drivers
           </p>
           <div className="border border-border bg-card">
@@ -199,7 +201,7 @@ const Drivers = () => {
           <Link to="/" className="text-primary hover:underline">
             Main
           </Link>
-          <span className="mx-1">&gt;</span>
+          <span className="mx-1">»</span>
           Drivers
         </p>
 
@@ -276,22 +278,23 @@ const Drivers = () => {
           </div>
 
           {isLoading ? (
-            <div className="px-5 py-12 text-center text-muted-foreground text-sm">Loading drivers...</div>
+            <div className="px-5 py-12 flex justify-center"><Spinner /></div>
           ) : isError ? (
             <div className="px-5 py-12 text-center text-destructive text-sm">
               {(error as Error).message || "Failed to load drivers."}
             </div>
           ) : filtered.length === 0 ? (
-            <div className="px-5 py-12 text-center text-muted-foreground text-sm">
-              {drivers.length === 0 ? "No registered drivers yet." : "No drivers match the selected filters."}
-            </div>
+            <EmptyState
+              icon={Users}
+              heading={drivers.length === 0 ? "No registered drivers yet." : "No drivers match the selected filters."}
+            />
           ) : (
             <div className="divide-y divide-border">
               {filtered.map((driver) => (
                 <div key={driver.id} className="px-5 py-5 hover:bg-muted/30 transition-colors">
                   <div className="flex items-start justify-between mb-3">
                     <button
-                      className="font-display font-semibold text-primary hover:underline text-left"
+                      className="font-display font-semibold text-primary hover:underline text-left truncate max-w-xs"
                       onClick={() => navigate(`/drivers/${driver.id}`)}
                     >
                       {driver.name}
@@ -322,7 +325,7 @@ const Drivers = () => {
                       License State: <span className="text-primary font-medium">{driver.state}</span>
                     </p>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-4">
+                  <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
                     {driver.about || "No profile summary provided yet."}
                   </p>
 

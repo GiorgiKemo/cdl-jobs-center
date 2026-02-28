@@ -152,11 +152,11 @@ const DriverProfile = () => {
           <Link to="/" className="text-primary hover:underline">
             Main
           </Link>
-          <span className="mx-1">&gt;</span>
+          <span className="mx-1">»</span>
           <Link to="/drivers" className="text-primary hover:underline">
             Drivers
           </Link>
-          <span className="mx-1">&gt;</span>
+          <span className="mx-1">»</span>
           {driver.name}
         </p>
 

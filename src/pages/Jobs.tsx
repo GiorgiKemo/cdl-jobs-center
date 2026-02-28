@@ -9,6 +9,7 @@ import { useState, useMemo } from "react";
 import { useActiveJobs } from "@/hooks/useJobs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { useAuth } from "@/context/auth";
+import { useDriverAllJobMatches, useMatchingRollout } from "@/hooks/useMatchScores";
 import { toast } from "sonner";
 
 const urlTypeMap: Record<string, string> = {
@@ -30,6 +31,8 @@ const Jobs = () => {
   const { jobs: allActiveJobs } = useActiveJobs();
   const driverId = user?.role === "driver" ? user.id : "";
   const { savedIds, isSaved, toggle } = useSavedJobs(driverId);
+  const { data: matchScoreMap } = useDriverAllJobMatches(user?.role === "driver" ? user.id : undefined);
+  const { data: rollout } = useMatchingRollout();
 
   // Initialize all filters from URL params on first render
   const initialFreight = (() => {
@@ -89,9 +92,16 @@ const Jobs = () => {
     if (sortBy === "company-az") result = [...result].sort((a, b) => a.company.localeCompare(b.company));
     else if (sortBy === "company-za") result = [...result].sort((a, b) => b.company.localeCompare(a.company));
     else if (sortBy === "title-az") result = [...result].sort((a, b) => a.title.localeCompare(b.title));
+    else if (sortBy === "best-match" && matchScoreMap) {
+      result = [...result].sort((a, b) => {
+        const scoreA = matchScoreMap.get(a.id) ?? -1;
+        const scoreB = matchScoreMap.get(b.id) ?? -1;
+        return scoreB - scoreA;
+      });
+    }
 
     return result;
-  }, [allActiveJobs, freightType, driverType, routeType, teamDriving, searchQuery, sortBy]);
+  }, [allActiveJobs, freightType, driverType, routeType, teamDriving, searchQuery, sortBy, matchScoreMap]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -140,6 +150,9 @@ const Jobs = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="newest">Default</SelectItem>
+                {user?.role === "driver" && rollout?.driverUiEnabled && (
+                  <SelectItem value="best-match">Best Match</SelectItem>
+                )}
                 <SelectItem value="company-az">Company A–Z</SelectItem>
                 <SelectItem value="company-za">Company Z–A</SelectItem>
                 <SelectItem value="title-az">Title A–Z</SelectItem>
@@ -269,7 +282,23 @@ const Jobs = () => {
                     <div key={job.id} className="border border-border bg-card p-5 flex flex-col sm:flex-row gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-0.5">
-                          <h2 className="font-display font-semibold text-lg text-primary">{job.company}</h2>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h2 className="font-display font-semibold text-lg text-primary">{job.company}</h2>
+                            {user?.role === "driver" && rollout?.driverUiEnabled && matchScoreMap?.has(job.id) && (() => {
+                              const score = Math.round(matchScoreMap.get(job.id)!);
+                              const badgeColor =
+                                score >= 70
+                                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                  : score >= 40
+                                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                  : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400";
+                              return (
+                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badgeColor}`}>
+                                  {score}% Match
+                                </span>
+                              );
+                            })()}
+                          </div>
                           <button
                             onClick={() => handleToggleSave(job.id, job.company)}
                             aria-label={saved ? "Remove from saved" : "Save job"}
@@ -320,6 +349,8 @@ const Jobs = () => {
                           size="sm"
                           onClick={() => setPage(i)}
                           className="w-9"
+                          aria-label={`Page ${i + 1}`}
+                          aria-current={i === page ? "page" : undefined}
                         >
                           {i + 1}
                         </Button>

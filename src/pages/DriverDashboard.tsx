@@ -12,16 +12,28 @@ import { useAuth } from "@/context/auth";
 import { useActiveJobs } from "@/hooks/useJobs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { useDriverProfile, DriverProfile } from "@/hooks/useDriverProfile";
-import { Truck, Briefcase, Bookmark, User, BarChart3, ChevronDown, ChevronUp, MapPin, DollarSign, Bell, MessageSquare } from "lucide-react";
+import { Truck, Briefcase, Bookmark, User, BarChart3, ChevronDown, ChevronUp, MapPin, DollarSign, Bell, MessageSquare, Check, Sparkles } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { ChatPanel } from "@/components/ChatPanel";
 import { useUnreadCount } from "@/hooks/useMessages";
+import { formatRelativeDate } from "@/lib/dateUtils";
+import { Spinner } from "@/components/ui/Spinner";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { useDriverJobMatches, useMatchingRollout } from "@/hooks/useMatchScores";
 
 type Tab = "overview" | "applications" | "saved" | "profile" | "analytics" | "messages";
 type PipelineStage = "New" | "Reviewing" | "Interview" | "Hired" | "Rejected";
+type SaveStatus = "idle" | "saving" | "saved";
+const isDriverTab = (value: string | null): value is Tab =>
+  value === "overview" ||
+  value === "applications" ||
+  value === "saved" ||
+  value === "profile" ||
+  value === "analytics" ||
+  value === "messages";
 
 interface StoredApplication {
   id: string;
@@ -78,6 +90,34 @@ const US_STATES = [
 const LICENSE_CLASS_LABELS: Record<string, string> = { a: "Class A", b: "Class B", c: "Class C", permit: "Permit Only" };
 const YEARS_EXP_LABELS: Record<string, string> = { none: "None", "less-1": "< 1 year", "1-3": "1–3 years", "3-5": "3–5 years", "5+": "5+ years" };
 const DRIVER_TYPE_LABELS: Record<string, string> = { company: "Company Driver", "owner-operator": "Owner Operator", lease: "Lease Operator", student: "Student / Trainee" };
+const EMPTY_DRIVER_PROFILE: DriverProfile = {
+  firstName: "",
+  lastName: "",
+  phone: "",
+  cdlNumber: "",
+  driverType: "",
+  licenseClass: "",
+  yearsExp: "",
+  licenseState: "",
+  zipCode: "",
+  dateOfBirth: "",
+  about: "",
+};
+
+const snapshotDriverProfile = (p: DriverProfile) =>
+  JSON.stringify({
+    firstName: p.firstName,
+    lastName: p.lastName,
+    phone: p.phone,
+    cdlNumber: p.cdlNumber,
+    driverType: p.driverType,
+    licenseClass: p.licenseClass,
+    yearsExp: p.yearsExp,
+    licenseState: p.licenseState,
+    zipCode: p.zipCode,
+    dateOfBirth: p.dateOfBirth,
+    about: p.about,
+  });
 
 const STAGE_CONFIG: Record<PipelineStage, { label: string; className: string }> = {
   New:       { label: "New",        className: "bg-muted text-muted-foreground" },
@@ -86,16 +126,6 @@ const STAGE_CONFIG: Record<PipelineStage, { label: string; className: string }> 
   Hired:     { label: "Hired",      className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
   Rejected:  { label: "Not Moving Forward", className: "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400" },
 };
-
-function formatRelativeDate(isoString: string): string {
-  const diff = Date.now() - new Date(isoString).getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  if (days === 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 7) return `${days} days ago`;
-  if (days < 30) return `${Math.floor(days / 7)} week${Math.floor(days / 7) > 1 ? "s" : ""} ago`;
-  return new Date(isoString).toLocaleDateString();
-}
 
 const StageBadge = ({ stage }: { stage?: PipelineStage }) => {
   const cfg = STAGE_CONFIG[stage ?? "New"];
@@ -113,7 +143,12 @@ const DriverDashboard = () => {
     }
   }, [loading, user, navigate]);
 
-  if (loading || !user || user.role !== "driver") return null;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Spinner />
+    </div>
+  );
+  if (!user || user.role !== "driver") return null;
 
   return <DriverDashboardInner />;
 };
@@ -126,11 +161,13 @@ const DriverDashboardInner = () => {
   const { savedIds, toggle: toggleSave } = useSavedJobs(user!.id);
   const { profile, isLoading: profileLoading, saveProfile } = useDriverProfile(user!.id);
   const { data: unreadMsgCount = 0 } = useUnreadCount(user!.id);
+  const { data: recommendedMatches, isLoading: matchesLoading } = useDriverJobMatches(user!.id, 5);
+  const { data: rollout } = useMatchingRollout();
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const t = searchParams.get("tab");
-    return t === "messages" ? "messages" : "overview";
+    return isDriverTab(t) ? t : "overview";
   });
   const [expandedApp, setExpandedApp] = useState<string | null>(null);
   const [stageFilter, setStageFilter] = useState<PipelineStage | "All">("All");
@@ -141,6 +178,15 @@ const DriverDashboardInner = () => {
       return stored ? new Set(JSON.parse(stored)) : new Set();
     } catch { return new Set(); }
   });
+
+  const tabFromUrl = searchParams.get("tab");
+  useEffect(() => {
+    if (!isDriverTab(tabFromUrl)) return;
+    setActiveTab((prev) => (prev === tabFromUrl ? prev : tabFromUrl));
+    const next = new URLSearchParams(searchParams);
+    next.delete("tab");
+    setSearchParams(next, { replace: true });
+  }, [tabFromUrl, searchParams, setSearchParams]);
 
   // Fetch driver's applications
   const { data: applications = [] } = useQuery({
@@ -169,24 +215,38 @@ const DriverDashboardInner = () => {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [about, setAbout] = useState("");
   const [profileInit, setProfileInit] = useState(false);
+  const [profileSaveStatus, setProfileSaveStatus] = useState<SaveStatus>("idle");
+  const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string | null>(null);
+  const currentProfile: DriverProfile = { firstName, lastName, phone, cdlNumber, driverType, licenseClass, yearsExp, licenseState, zipCode, dateOfBirth, about };
+  const currentProfileSnapshot = snapshotDriverProfile(currentProfile);
+  const hasUnsavedChanges = lastSavedSnapshot !== null && currentProfileSnapshot !== lastSavedSnapshot;
+  const isProfileSaved = profileSaveStatus === "saved" && !hasUnsavedChanges;
 
   // Populate form once profile loads
   useEffect(() => {
-    if (!profileLoading && profile && !profileInit) {
-      setFirstName(profile.firstName);
-      setLastName(profile.lastName);
-      setPhone(profile.phone);
-      setCdlNumber(profile.cdlNumber);
-      setDriverType(profile.driverType);
-      setLicenseClass(profile.licenseClass);
-      setYearsExp(profile.yearsExp);
-      setLicenseState(profile.licenseState);
-      setZipCode(profile.zipCode);
-      setDateOfBirth(profile.dateOfBirth);
-      setAbout(profile.about);
+    if (!profileLoading && !profileInit) {
+      const loadedProfile = profile ?? EMPTY_DRIVER_PROFILE;
+      setFirstName(loadedProfile.firstName);
+      setLastName(loadedProfile.lastName);
+      setPhone(loadedProfile.phone);
+      setCdlNumber(loadedProfile.cdlNumber);
+      setDriverType(loadedProfile.driverType);
+      setLicenseClass(loadedProfile.licenseClass);
+      setYearsExp(loadedProfile.yearsExp);
+      setLicenseState(loadedProfile.licenseState);
+      setZipCode(loadedProfile.zipCode);
+      setDateOfBirth(loadedProfile.dateOfBirth);
+      setAbout(loadedProfile.about);
+      setLastSavedSnapshot(snapshotDriverProfile(loadedProfile));
       setProfileInit(true);
     }
   }, [profile, profileLoading, profileInit]);
+
+  useEffect(() => {
+    if (profileSaveStatus === "saved" && hasUnsavedChanges) {
+      setProfileSaveStatus("idle");
+    }
+  }, [profileSaveStatus, hasUnsavedChanges]);
 
   // Stats
   const totalApps = applications.length;
@@ -206,10 +266,15 @@ const DriverDashboardInner = () => {
   };
 
   const handleSaveProfile = async () => {
+    if (profileSaveStatus === "saving" || !hasUnsavedChanges) return;
+    setProfileSaveStatus("saving");
     try {
-      await saveProfile({ firstName, lastName, phone, cdlNumber, driverType, licenseClass, yearsExp, licenseState, zipCode, dateOfBirth, about } as DriverProfile);
+      await saveProfile(currentProfile);
+      setLastSavedSnapshot(currentProfileSnapshot);
+      setProfileSaveStatus("saved");
       toast.success("Profile saved. Your application form will pre-fill next time.");
     } catch (err: unknown) {
+      setProfileSaveStatus("idle");
       toast.error(err instanceof Error ? err.message : "Failed to save profile.");
     }
   };
@@ -278,10 +343,12 @@ const DriverDashboardInner = () => {
           </button>
         )}
 
-        <div className="flex gap-1 border-b border-border mb-6 overflow-x-auto">
+        <div className="flex gap-1 border-b border-border mb-6 overflow-x-auto" role="tablist">
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              role="tab"
+              aria-selected={activeTab === tab.id}
               onClick={() => switchTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                 activeTab === tab.id
@@ -320,6 +387,97 @@ const DriverDashboardInner = () => {
                 </div>
               ))}
             </div>
+
+            {/* Recommended Jobs For You */}
+            {rollout?.driverUiEnabled && !rollout.shadowMode && (
+              <div>
+                <div className="flex items-center gap-2 mb-3 border-l-4 border-primary pl-3">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <h2 className="font-display font-semibold text-base">Recommended Jobs For You</h2>
+                </div>
+                {matchesLoading ? (
+                  <div className="border border-border bg-card p-8 flex items-center justify-center">
+                    <Spinner />
+                  </div>
+                ) : !recommendedMatches || recommendedMatches.length === 0 ? (
+                  <div className="border border-border bg-card">
+                    <EmptyState
+                      icon={Sparkles}
+                      heading="No matches yet"
+                      description="Complete your profile to get personalized job recommendations."
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {recommendedMatches.map((match) => {
+                      const scorePct = Math.round(match.overallScore);
+                      const scoreColor =
+                        scorePct >= 70
+                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                          : scorePct >= 40
+                          ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                          : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400";
+                      return (
+                        <div key={match.jobId} className="border border-border bg-card p-4 flex flex-col sm:flex-row gap-4">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <div className="shrink-0 h-10 w-10 bg-muted flex items-center justify-center border border-border overflow-hidden">
+                              {match.jobLogoUrl ? (
+                                <img src={match.jobLogoUrl} alt={match.jobCompany} className="h-full w-full object-contain p-0.5" />
+                              ) : (
+                                <Truck className="h-5 w-5 text-muted-foreground" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-medium text-sm text-primary truncate">{match.jobCompany}</p>
+                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${scoreColor}`}>
+                                  {scorePct}% Match
+                                </span>
+                              </div>
+                              <p className="text-sm font-medium truncate">{match.jobTitle}</p>
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                                {match.jobLocation && (
+                                  <span className="flex items-center gap-1">
+                                    <MapPin className="h-3 w-3" />
+                                    {match.jobLocation}
+                                  </span>
+                                )}
+                                {match.jobPay && (
+                                  <span className="flex items-center gap-1">
+                                    <DollarSign className="h-3 w-3" />
+                                    {match.jobPay}
+                                  </span>
+                                )}
+                              </div>
+                              {match.topReasons.length > 0 && (
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                                  {match.topReasons.slice(0, 2).map((reason, i) => (
+                                    <span key={i} className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                                      <Check className="h-3 w-3" />
+                                      {reason.text}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="shrink-0 flex items-center">
+                            <Button asChild size="sm" variant="outline">
+                              <Link to={`/jobs/${match.jobId}`}>View Job</Link>
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="text-center pt-2">
+                      <Link to="/jobs" className="text-sm text-primary hover:underline">
+                        Browse All Jobs
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Recent applications */}
             <div>
@@ -666,7 +824,25 @@ const DriverDashboardInner = () => {
                   className="resize-none"
                 />
               </div>
-              <Button onClick={handleSaveProfile} className="px-6">Save Profile</Button>
+              <Button
+                onClick={handleSaveProfile}
+                disabled={profileSaveStatus === "saving"}
+                className={isProfileSaved ? "px-6 bg-green-600 text-white hover:bg-green-600 focus-visible:ring-green-600" : "px-6"}
+              >
+                {profileSaveStatus === "saving" ? (
+                  <>
+                    <Spinner size="sm" className="h-4 w-4 border-current border-t-transparent" />
+                    <span>Saving...</span>
+                  </>
+                ) : isProfileSaved ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    <span>Saved</span>
+                  </>
+                ) : (
+                  "Save Profile"
+                )}
+              </Button>
             </div>
           </div>
         )}

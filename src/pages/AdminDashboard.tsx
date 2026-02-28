@@ -31,6 +31,7 @@ import {
   MapPin,
   Phone as PhoneIcon,
   Mail as MailIcon,
+  Sparkles,
 } from "lucide-react";
 import {
   useAdminStats,
@@ -42,9 +43,14 @@ import {
   useChangeSubscriptionPlan,
 } from "@/hooks/useAdmin";
 import { PLANS, type Plan } from "@/hooks/useSubscription";
+import { formatDate } from "@/lib/dateUtils";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+import { useMatchingRollout } from "@/hooks/useMatchScores";
 
 /* ── Types ──────────────────────────────────────────────────────────── */
-type AdminTab = "overview" | "users" | "subscriptions" | "jobs" | "leads";
+type AdminTab = "overview" | "users" | "subscriptions" | "jobs" | "leads" | "matching";
 
 /* ── Outer guard ────────────────────────────────────────────────────── */
 const AdminDashboard = () => {
@@ -75,6 +81,50 @@ function AdminDashboardInner() {
   const { data: leads = [] } = useAdminLeads();
   const updateJobStatus = useAdminUpdateJobStatus();
   const changePlan = useChangeSubscriptionPlan();
+
+  /* matching diagnostics data */
+  const { data: rollout } = useMatchingRollout();
+
+  const { data: matchingStats } = useQuery({
+    queryKey: ["admin-matching-stats"],
+    queryFn: async () => {
+      const [djRes, cdRes, pendingRes, errorRes] = await Promise.all([
+        supabase.from("driver_job_match_scores").select("*", { count: "exact", head: true }),
+        supabase.from("company_driver_match_scores").select("*", { count: "exact", head: true }),
+        supabase.from("matching_recompute_queue").select("*", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("matching_recompute_queue").select("*", { count: "exact", head: true }).eq("status", "error"),
+      ]);
+      return {
+        driverJobScores: djRes.count ?? 0,
+        companyDriverScores: cdRes.count ?? 0,
+        queuePending: pendingRes.count ?? 0,
+        queueErrors: errorRes.count ?? 0,
+      };
+    },
+    staleTime: 30_000,
+  });
+
+  const { data: queueErrors = [] } = useQuery({
+    queryKey: ["admin-matching-queue-errors"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("matching_recompute_queue")
+        .select("entity_type, entity_id, reason, last_error, attempts, created_at")
+        .eq("status", "error")
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return (data ?? []) as {
+        entity_type: string;
+        entity_id: string;
+        reason: string;
+        last_error: string | null;
+        attempts: number;
+        created_at: string;
+      }[];
+    },
+    staleTime: 30_000,
+  });
 
   /* tab state */
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
@@ -221,7 +271,7 @@ function AdminDashboardInner() {
           <Link to="/" className="text-primary hover:underline">
             Main
           </Link>
-          <span className="mx-1">&raquo;</span>
+          <span className="mx-1">»</span>
           Admin Dashboard
         </p>
 
@@ -260,6 +310,11 @@ function AdminDashboardInner() {
           <button className={tabClass("leads")} onClick={() => setActiveTab("leads")}>
             <span className="flex items-center gap-1.5">
               <UserCheck className="h-3.5 w-3.5" /> Leads ({leads.length})
+            </span>
+          </button>
+          <button className={tabClass("matching")} onClick={() => setActiveTab("matching")}>
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5" /> Matching
             </span>
           </button>
         </div>
@@ -379,9 +434,8 @@ function AdminDashboardInner() {
 
                 {/* User list */}
                 {pageUsers.length === 0 ? (
-                  <div className="border border-border bg-card p-12 text-center text-sm text-muted-foreground">
-                    <Users className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-                    <p>No users found.</p>
+                  <div className="border border-border bg-card">
+                    <EmptyState icon={Users} heading="No users found." />
                   </div>
                 ) : (
                   <div className="border border-border bg-card divide-y divide-border">
@@ -435,7 +489,7 @@ function AdminDashboardInner() {
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             Joined{" "}
-                            {new Date(u.createdAt).toLocaleDateString()}
+                            {formatDate(u.createdAt)}
                           </p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -489,9 +543,8 @@ function AdminDashboardInner() {
             </h2>
 
             {subscriptions.length === 0 ? (
-              <div className="border border-border bg-card p-12 text-center text-sm text-muted-foreground">
-                <CreditCard className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-                <p>No companies registered yet.</p>
+              <div className="border border-border bg-card">
+                <EmptyState icon={CreditCard} heading="No companies registered yet." />
               </div>
             ) : (
               <div className="border border-border bg-card divide-y divide-border">
@@ -514,9 +567,7 @@ function AdminDashboardInner() {
                           ? "Unlimited"
                           : sub.leadLimit}
                         {sub.currentPeriodEnd &&
-                          ` · Renews ${new Date(
-                            sub.currentPeriodEnd
-                          ).toLocaleDateString()}`}
+                          ` · Renews ${formatDate(sub.currentPeriodEnd)}`}
                       </p>
                     </div>
                     <Button
@@ -561,9 +612,8 @@ function AdminDashboardInner() {
                 </h2>
 
                 {pageJobs.length === 0 ? (
-                  <div className="border border-border bg-card p-12 text-center text-sm text-muted-foreground">
-                    <Briefcase className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-                    <p>No jobs posted yet.</p>
+                  <div className="border border-border bg-card">
+                    <EmptyState icon={Briefcase} heading="No jobs posted yet." />
                   </div>
                 ) : (
                   <div className="border border-border bg-card divide-y divide-border">
@@ -593,7 +643,7 @@ function AdminDashboardInner() {
                           {job.postedAt && (
                             <p className="text-xs text-muted-foreground mt-0.5">
                               Posted{" "}
-                              {new Date(job.postedAt).toLocaleDateString()}
+                              {formatDate(job.postedAt)}
                             </p>
                           )}
                         </div>
@@ -672,9 +722,8 @@ function AdminDashboardInner() {
                 </h2>
 
                 {pageLeads.length === 0 ? (
-                  <div className="border border-border bg-card p-12 text-center text-sm text-muted-foreground">
-                    <UserCheck className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-                    <p>No leads synced yet.</p>
+                  <div className="border border-border bg-card">
+                    <EmptyState icon={UserCheck} heading="No leads synced yet." />
                   </div>
                 ) : (
                   <div className="border border-border bg-card divide-y divide-border">
@@ -718,7 +767,7 @@ function AdminDashboardInner() {
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {lead.source} &middot;{" "}
-                            {new Date(lead.createdAt).toLocaleDateString()}
+                            {formatDate(lead.createdAt)}
                             {lead.yearsExp && ` · ${lead.yearsExp} yrs exp`}
                           </p>
                         </div>
@@ -735,6 +784,103 @@ function AdminDashboardInner() {
               </div>
             );
           })()}
+
+        {/* ── TAB: Matching ──────────────────────────────────────────── */}
+        {activeTab === "matching" && (
+          <div className="space-y-6">
+            <h2 className="font-display font-semibold text-base">
+              Matching Diagnostics
+            </h2>
+
+            {/* Stats cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[
+                { label: "Driver-Job Scores", value: matchingStats?.driverJobScores ?? 0 },
+                { label: "Company-Driver Scores", value: matchingStats?.companyDriverScores ?? 0 },
+                { label: "Queue Pending", value: matchingStats?.queuePending ?? 0 },
+                { label: "Queue Errors", value: matchingStats?.queueErrors ?? 0 },
+              ].map((s) => (
+                <div key={s.label} className="border border-border bg-card p-5">
+                  <p className="text-2xl font-bold font-display">{s.value}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Rollout config */}
+            <div className="border border-border bg-card p-6">
+              <p className="font-semibold text-sm mb-4">Rollout Configuration</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Shadow Mode</p>
+                  <p className="text-sm font-medium mt-0.5">
+                    {rollout?.shadowMode ? "On" : "Off"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Driver UI</p>
+                  <p className="text-sm font-medium mt-0.5">
+                    {rollout?.driverUiEnabled ? "Enabled" : "Disabled"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Company UI</p>
+                  <p className="text-sm font-medium mt-0.5">
+                    {rollout?.companyUiEnabled ? "Enabled" : "Disabled"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Beta Company IDs</p>
+                  <p className="text-sm font-medium mt-0.5">
+                    {rollout?.companyBetaIds.length ?? 0}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Recent queue errors */}
+            <div className="border border-border bg-card p-6">
+              <p className="font-semibold text-sm mb-4">
+                Recent Queue Errors
+                <span className="text-muted-foreground font-normal text-xs ml-2">
+                  (last 10)
+                </span>
+              </p>
+              {queueErrors.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No errors found.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border text-left text-muted-foreground">
+                        <th className="pb-2 pr-4 font-medium">Type</th>
+                        <th className="pb-2 pr-4 font-medium">Entity ID</th>
+                        <th className="pb-2 pr-4 font-medium">Reason</th>
+                        <th className="pb-2 pr-4 font-medium">Last Error</th>
+                        <th className="pb-2 font-medium">Attempts</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {queueErrors.map((err, i) => (
+                        <tr key={i}>
+                          <td className="py-2 pr-4">{err.entity_type}</td>
+                          <td className="py-2 pr-4 font-mono">
+                            {err.entity_id.slice(0, 8)}...
+                          </td>
+                          <td className="py-2 pr-4">{err.reason}</td>
+                          <td className="py-2 pr-4 max-w-[240px] truncate">
+                            {err.last_error ?? "—"}
+                          </td>
+                          <td className="py-2">{err.attempts}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Change Plan Dialog (shared by Users + Subscriptions tabs) */}
         <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen}>

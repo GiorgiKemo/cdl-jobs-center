@@ -3,6 +3,16 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Phone, Mail, Truck, ChevronDown, LogOut, User, LayoutDashboard, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/context/auth";
 import { SignInModal } from "@/components/SignInModal";
@@ -118,6 +128,7 @@ const Navbar = () => {
   const [jobsMobileOpen, setJobsMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [signInOpen, setSignInOpen] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -176,8 +187,9 @@ const Navbar = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSignOut = () => {
-    signOut();
+  const confirmSignOut = async () => {
+    setSignOutOpen(false);
+    await signOut();
     navigate("/");
   };
 
@@ -230,6 +242,12 @@ const Navbar = () => {
                 >
                   {/* Trigger */}
                   <button
+                    aria-haspopup="true"
+                    aria-expanded={jobsDropdownOpen}
+                    onClick={() => setJobsDropdownOpen((prev) => !prev)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") setJobsDropdownOpen(false);
+                    }}
                     className={`relative flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors
                       ${location.pathname === link.path
                         ? "text-primary"
@@ -375,7 +393,7 @@ const Navbar = () => {
                         </Link>
                         <hr className="border-border my-1" />
                         <button
-                          onClick={() => { handleSignOut(); setProfileOpen(false); }}
+                          onClick={() => { setSignOutOpen(true); setProfileOpen(false); }}
                           className="w-full flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary"
                         >
                           <LogOut className="h-3.5 w-3.5 shrink-0" />
@@ -404,6 +422,8 @@ const Navbar = () => {
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="p-2 rounded-lg hover:bg-muted transition-colors"
+            aria-label={isOpen ? "Close menu" : "Open menu"}
+            aria-expanded={isOpen}
           >
             {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
@@ -499,7 +519,7 @@ const Navbar = () => {
                         <User className="h-3.5 w-3.5 text-primary shrink-0" />
                         <span className="font-medium truncate">{user.name}</span>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => { handleSignOut(); setIsOpen(false); }} className="flex items-center gap-1.5">
+                      <Button variant="outline" size="sm" onClick={() => { setSignOutOpen(true); setIsOpen(false); }} className="flex items-center gap-1.5">
                         <LogOut className="h-3.5 w-3.5" />
                         Sign Out
                       </Button>
@@ -522,6 +542,21 @@ const Navbar = () => {
       </motion.nav>
 
       {signInOpen && <SignInModal onClose={() => setSignInOpen(false)} />}
+
+      <AlertDialog open={signOutOpen} onOpenChange={setSignOutOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sign out</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to sign out of your account?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSignOut}>Sign Out</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

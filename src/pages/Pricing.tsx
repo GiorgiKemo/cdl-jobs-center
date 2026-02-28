@@ -90,7 +90,7 @@ const Pricing = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ priceId: planInfo.priceId, plan }),
+        body: JSON.stringify({ plan }),
       });
 
       if (!res.ok) {

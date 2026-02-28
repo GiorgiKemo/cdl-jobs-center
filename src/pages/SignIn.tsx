@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAuth } from "@/context/auth";
+import { supabase } from "@/lib/supabase";
 
 const SignIn = () => {
   const [email, setEmail] = useState("");
@@ -88,6 +89,21 @@ const SignIn = () => {
                   <button
                     type="button"
                     className="text-xs text-primary hover:underline"
+                    onClick={async () => {
+                      if (!email) {
+                        toast.error("Enter your email first, then click Forgot password.");
+                        return;
+                      }
+                      try {
+                        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                          redirectTo: `${window.location.origin}/signin`,
+                        });
+                        if (error) throw error;
+                        toast.success("Password reset email sent! Check your inbox.");
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : "Failed to send reset email.");
+                      }
+                    }}
                   >
                     Forgot password?
                   </button>

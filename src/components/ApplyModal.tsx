@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useApplication } from "@/hooks/useApplication";
 import { useAuth } from "@/context/auth";
@@ -217,12 +217,12 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
     }
   };
 
-  const modal = (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="bg-background border border-border w-full max-w-2xl shadow-lg max-h-[90vh] flex flex-col">
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="w-full max-w-2xl p-0 gap-0 max-h-[90vh] flex flex-col overflow-hidden [&>button.absolute]:hidden">
+        <DialogTitle className="sr-only">
+          Apply to {companyName}{jobTitle ? ` — ${jobTitle}` : ""}
+        </DialogTitle>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <div>
@@ -423,9 +423,7 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
             <Button type="button" variant="outline" className="px-8" onClick={onClose}>Cancel</Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
-
-  return createPortal(modal, document.body);
 }

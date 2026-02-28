@@ -202,7 +202,7 @@ const ApplyNow = () => {
         <main className="container mx-auto py-16 max-w-xl text-center">
           <p className="text-sm text-muted-foreground mb-6">
             <Link to="/" className="text-primary hover:underline">Main</Link>
-            <span className="mx-1">&raquo;</span>
+            <span className="mx-1">»</span>
             Add Application
           </p>
           <div className="border border-border bg-card p-12">
@@ -239,7 +239,7 @@ const ApplyNow = () => {
         <main className="container mx-auto py-8 max-w-3xl">
           <p className="text-sm text-muted-foreground mb-6">
             <Link to="/" className="text-primary hover:underline">Main</Link>
-            <span className="mx-1">&raquo;</span>
+            <span className="mx-1">»</span>
             Add Application
           </p>
           <div className="border border-border bg-card p-12 text-center">
@@ -292,6 +292,7 @@ const ApplyNow = () => {
     if (!email.trim()) e.email = "Email is required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = "Enter a valid email";
     if (!phone.trim()) e.phone = "Phone is required";
+    else if (!/^[\d\s()+-]{7,20}$/.test(phone.trim())) e.phone = "Enter a valid phone number";
     if (!cdlNumber.trim()) e.cdlNumber = "CDL number is required";
     if (!zipCode.trim()) e.zipCode = "Zip code is required";
     else if (!/^\d{5}(-\d{4})?$/.test(zipCode)) e.zipCode = "Enter a valid zip code";
@@ -403,7 +404,7 @@ const ApplyNow = () => {
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-6">
           <Link to="/" className="text-primary hover:underline">Main</Link>
-          <span className="mx-1">&raquo;</span>
+          <span className="mx-1">»</span>
           Add Application
         </p>
 

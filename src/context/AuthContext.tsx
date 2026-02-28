@@ -2,6 +2,7 @@ import { useState, useEffect, ReactNode } from "react";
 import { AuthContext, User } from "./auth";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
+import { clearAllApplicationDrafts } from "@/hooks/useApplication";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -84,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     queryClient.clear();
+    clearAllApplicationDrafts();
   };
 
   return (

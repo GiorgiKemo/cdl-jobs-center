@@ -45,17 +45,40 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Parse request body
-    const { priceId, plan } = await req.json();
-    if (!priceId || !plan) {
+    // Verify user is a company account
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!profile || profile.role !== "company") {
       return new Response(
-        JSON.stringify({ error: "Missing priceId or plan" }),
+        JSON.stringify({ error: "Only company accounts can subscribe" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Server-side allowed price/plan map — prevents arbitrary priceIds from client
+    const ALLOWED_PLANS: Record<string, string> = {
+      starter:   "price_1T5bgMBFInekdfRO2i7HVDfU",
+      growth:    "price_1T5bgmBFInekdfROyARtm9fx",
+      unlimited: "price_1T5bgyBFInekdfRO05OK8At6",
+    };
+
+    // Parse request body — only accept plan name, derive priceId server-side
+    const { plan } = await req.json();
+    if (!plan || !ALLOWED_PLANS[plan]) {
+      return new Response(
+        JSON.stringify({ error: "Invalid plan. Allowed: starter, growth, unlimited" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
+
+    const priceId = ALLOWED_PLANS[plan];
 
     // Look up existing stripe_customer_id
     const { data: sub } = await supabase

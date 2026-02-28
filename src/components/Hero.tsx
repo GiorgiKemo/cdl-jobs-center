@@ -36,7 +36,9 @@ const Hero = () => {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-6"
             >
               <Zap className="h-4 w-4" />
-              {isCompany ? "AI-Powered Driver Matching" : "AI-Powered Job Matching"}
+              {isCompany
+                ? "AI-Powered Driver Matching"
+                : "AI-Powered Job Matching"}
             </motion.div>
 
             <motion.h1
@@ -46,7 +48,9 @@ const Hero = () => {
               className="font-display text-5xl md:text-7xl font-bold text-secondary-foreground leading-tight mb-6"
             >
               {isCompany ? "Find the CDL Drivers " : "Find the Trucking Job "}
-              <span className="text-gradient">{isCompany ? "You Need" : "You Deserve"}</span>
+              <span className="text-gradient">
+                {isCompany ? "You Need" : "You Deserve"}
+              </span>
             </motion.h1>
 
             <motion.p
@@ -82,7 +86,9 @@ const Hero = () => {
                 className="text-lg px-8 border-border/50 text-secondary-foreground hover:bg-muted/20 hover:text-secondary-foreground"
                 asChild
               >
-                <Link to={isCompany ? "/drivers" : "/jobs"}>{isCompany ? "Browse Drivers" : "Browse Jobs"}</Link>
+                <Link to={isCompany ? "/drivers" : "/jobs"}>
+                  {isCompany ? "Browse Drivers" : "Browse Jobs"}
+                </Link>
               </Button>
             </motion.div>
 
@@ -95,11 +101,17 @@ const Hero = () => {
             >
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Shield className="h-5 w-5 text-primary" />
-                <span className="text-sm">{isCompany ? "Verified Drivers" : "Verified Companies"}</span>
+                <span className="text-sm">
+                  {isCompany ? "Verified Drivers" : "Verified Companies"}
+                </span>
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Users className="h-5 w-5 text-primary" />
-                <span className="text-sm">{isCompany ? "150+ Partner Companies" : "2,000+ Drivers Placed"}</span>
+                <span className="text-sm">
+                  {isCompany
+                    ? "150+ Partner Companies"
+                    : "2,000+ Drivers Placed"}
+                </span>
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Zap className="h-5 w-5 text-primary" />
@@ -114,7 +126,7 @@ const Hero = () => {
             transition={{ duration: 0.6, delay: 0.25 }}
             className="hidden lg:block justify-self-end w-full"
           >
-            <div className="overflow-hidden rounded-2xl border border-border/40 bg-card/20 p-2 backdrop-blur-sm shadow-xl lg:-translate-y-8">
+            <div className="overflow-hidden rounded-2xl border border-border/40 bg-card/20 p-2 backdrop-blur-sm shadow-xl lg:-translate-y-8 lg:-translate-x-14">
               <video
                 src={heroVideo}
                 className="h-[auto] w-full rounded-xl bg-black/30 object-contain"

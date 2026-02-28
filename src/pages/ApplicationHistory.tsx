@@ -7,6 +7,8 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth";
+import { formatDate } from "@/lib/dateUtils";
+import { Spinner } from "@/components/ui/Spinner";
 
 interface Application {
   id: string;
@@ -85,8 +87,8 @@ const ApplicationHistory = () => {
         </div>
 
         {isLoading ? (
-          <div className="border border-border bg-card p-12 text-center text-muted-foreground text-sm">
-            Loading…
+          <div className="border border-border bg-card p-12 flex justify-center">
+            <Spinner />
           </div>
         ) : applications.length === 0 ? (
           <div className="border border-border bg-card p-12 text-center">
@@ -109,9 +111,7 @@ const ApplicationHistory = () => {
                     <div>
                       <p className="font-semibold text-foreground">{app.companyName}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Submitted {new Date(app.submittedAt).toLocaleDateString("en-US", {
-                          year: "numeric", month: "short", day: "numeric",
-                        })}
+                        Submitted {formatDate(app.submittedAt)}
                       </p>
                       <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground mt-1.5">
                         {app.driverType && <span>{driverTypeLabel[app.driverType] ?? app.driverType}</span>}
