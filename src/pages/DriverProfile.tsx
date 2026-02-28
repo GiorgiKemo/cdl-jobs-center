@@ -2,7 +2,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { User, MapPin, Award, Truck } from "lucide-react";
+import { User, MapPin, Award, Truck, MessageSquare } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -40,6 +40,22 @@ const DriverProfile = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Check if this driver has applied to any of the company's jobs
+  const { data: applicationId } = useQuery({
+    queryKey: ["driver-application", id, user?.id],
+    enabled: !!id && !!user && user.role === "company",
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("applications")
+        .select("id")
+        .eq("driver_id", id)
+        .eq("company_id", user!.id)
+        .limit(1)
+        .maybeSingle();
+      return data?.id ?? null;
+    },
+  });
 
   const { data: driver, isLoading, isError, error } = useQuery({
     queryKey: ["driver-profile-public", id],
@@ -185,14 +201,19 @@ const DriverProfile = () => {
               <p className="text-sm text-muted-foreground">{driver.about || "No profile summary provided yet."}</p>
             </div>
 
-            <div className="border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-              Direct messaging is not available. Company and driver communication is handled through application notes only.
-            </div>
-
             <div className="flex gap-3 pt-2 border-t border-border">
               <Button variant="outline" onClick={() => navigate("/drivers")}>
                 Back to Directory
               </Button>
+              {applicationId && (
+                <Button
+                  onClick={() => navigate(`/dashboard?tab=messages&app=${applicationId}`)}
+                  className="gap-2"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  Message Driver
+                </Button>
+              )}
             </div>
           </div>
         </div>

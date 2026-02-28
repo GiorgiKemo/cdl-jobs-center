@@ -18,9 +18,9 @@ export interface Subscription {
 
 export const PLANS = {
   free:      { label: "Free",      price: 0,   leads: 3,    priceId: "" },
-  starter:   { label: "Starter",   price: 49,  leads: 25,   priceId: "price_starter_placeholder" },
-  growth:    { label: "Growth",    price: 149, leads: 100,  priceId: "price_growth_placeholder" },
-  unlimited: { label: "Unlimited", price: 299, leads: 9999, priceId: "price_unlimited_placeholder" },
+  starter:   { label: "Starter",   price: 49,  leads: 25,   priceId: "price_1T5bgMBFInekdfRO2i7HVDfU" },
+  growth:    { label: "Growth",    price: 149, leads: 100,  priceId: "price_1T5bgmBFInekdfROyARtm9fx" },
+  unlimited: { label: "Unlimited", price: 299, leads: 9999, priceId: "price_1T5bgyBFInekdfRO05OK8At6" },
 } as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -102,6 +102,32 @@ export function useUpgradeSubscription() {
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["subscription", vars.companyId] });
+    },
+  });
+}
+
+/** Cancel subscription — revert to free plan */
+export function useCancelSubscription() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (companyId: string) => {
+      const { error } = await supabase
+        .from("subscriptions")
+        .update({
+          plan: "free",
+          lead_limit: 3,
+          status: "active",
+          stripe_customer_id: null,
+          stripe_subscription_id: null,
+          current_period_end: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("company_id", companyId);
+      if (error) throw error;
+    },
+    onSuccess: (_data, companyId) => {
+      qc.invalidateQueries({ queryKey: ["subscription", companyId] });
     },
   });
 }

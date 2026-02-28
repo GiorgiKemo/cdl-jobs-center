@@ -1,14 +1,13 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth";
-import { PLANS, useSubscription, useUpgradeSubscription, type Plan } from "@/hooks/useSubscription";
+import { PLANS, useSubscription, type Plan } from "@/hooks/useSubscription";
+import { supabase } from "@/lib/supabase";
 import { Check, Zap, TrendingUp, Crown } from "lucide-react";
 import { toast } from "sonner";
-import { loadStripe } from "@stripe/stripe-js";
-
-const STRIPE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? "";
 
 const tierDetails: Array<{
   plan: Plan;
@@ -57,7 +56,7 @@ const Pricing = () => {
   const navigate = useNavigate();
   const isCompany = user?.role === "company";
   const { data: subscription } = useSubscription(isCompany ? user?.id : undefined);
-  const upgrade = useUpgradeSubscription();
+  const [loading, setLoading] = useState<Plan | null>(null);
 
   const handleSubscribe = async (plan: Plan) => {
     if (!user) {
@@ -70,28 +69,41 @@ const Pricing = () => {
     }
 
     const planInfo = PLANS[plan];
-
-    // If Stripe key is configured, redirect to Stripe Checkout
-    if (STRIPE_KEY && planInfo.priceId && !planInfo.priceId.includes("placeholder")) {
-      try {
-        const stripe = await loadStripe(STRIPE_KEY);
-        if (!stripe) throw new Error("Failed to load Stripe");
-
-        // In production, this would call a backend endpoint to create a Checkout Session.
-        // For now, we do a direct upgrade to demo the flow.
-        toast.info("Stripe Checkout would open here. Simulating upgrade...");
-      } catch {
-        toast.error("Payment processing unavailable. Simulating upgrade.");
-      }
+    if (!planInfo.priceId) {
+      toast.error("This plan is not available for purchase.");
+      return;
     }
 
-    // Demo mode: directly upgrade the subscription
     try {
-      await upgrade.mutateAsync({ companyId: user.id, plan });
-      toast.success(`Upgraded to ${PLANS[plan].label} plan!`);
-      navigate("/dashboard?tab=leads");
-    } catch {
-      toast.error("Failed to upgrade. Please try again.");
+      setLoading(plan);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/signin");
+        return;
+      }
+
+      const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout`;
+      const res = await fetch(fnUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ priceId: planInfo.priceId, plan }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(err.error ?? `Checkout failed (${res.status})`);
+      }
+
+      const { url } = await res.json();
+      window.location.href = url;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to start checkout");
+    } finally {
+      setLoading(null);
     }
   };
 
@@ -163,17 +175,21 @@ const Pricing = () => {
 
                 {/* CTA */}
                 {isCurrent ? (
-                  <Button variant="outline" disabled className="w-full">
-                    Current Plan
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate("/dashboard?tab=subscription")}
+                  >
+                    Manage Subscription
                   </Button>
                 ) : (
                   <Button
                     variant={popular ? "default" : "outline"}
                     className={`w-full ${popular ? "glow-orange" : ""}`}
                     onClick={() => handleSubscribe(plan)}
-                    disabled={upgrade.isPending}
+                    disabled={loading !== null}
                   >
-                    {upgrade.isPending ? "Processing..." : `Get ${info.label}`}
+                    {loading === plan ? "Redirecting..." : `Get ${info.label}`}
                   </Button>
                 )}
               </div>

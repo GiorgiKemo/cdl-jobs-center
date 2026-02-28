@@ -104,7 +104,11 @@ export function ChatPanel({ userId, userRole, userName, initialApplicationId }: 
               <div className="px-4 py-12 text-center text-sm text-muted-foreground">
                 <MessageSquare className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                 <p>No conversations yet.</p>
-                <p className="text-xs mt-1">Apply to jobs to start messaging.</p>
+                <p className="text-xs mt-1">
+                  {userRole === "company"
+                    ? "Conversations appear when drivers apply to your jobs."
+                    : "Apply to jobs to start messaging."}
+                </p>
               </div>
             ) : (
               conversations.map((conv) => (

@@ -324,7 +324,7 @@ const Navbar = () => {
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-foreground">{user.name}</span>
                       <span className="block text-[11px] text-muted-foreground">
-                        {user.role === "company" ? "Company Account" : "Driver Account"}
+                        {user.role === "admin" ? "Admin Account" : user.role === "company" ? "Company Account" : "Driver Account"}
                       </span>
                     </span>
                     <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`} />
@@ -353,15 +353,15 @@ const Navbar = () => {
                           </>
                         )}
                         <Link
-                          to={user.role === "company" ? "/dashboard" : "/driver-dashboard"}
+                          to={user.role === "admin" ? "/admin" : user.role === "company" ? "/dashboard" : "/driver-dashboard"}
                           onClick={() => setProfileOpen(false)}
                           className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary"
                         >
                           <LayoutDashboard className="h-3.5 w-3.5 shrink-0" />
-                          {user.role === "company" ? "Dashboard" : "My Dashboard"}
+                          {user.role === "admin" ? "Admin Dashboard" : user.role === "company" ? "Dashboard" : "My Dashboard"}
                         </Link>
                         <Link
-                          to={`${user.role === "company" ? "/dashboard" : "/driver-dashboard"}?tab=messages`}
+                          to={`${user.role === "admin" ? "/admin" : user.role === "company" ? "/dashboard" : "/driver-dashboard"}?tab=messages`}
                           onClick={() => setProfileOpen(false)}
                           className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary"
                         >
@@ -478,16 +478,16 @@ const Navbar = () => {
                 {user ? (
                   <>
                     <Link
-                      to={user.role === "company" ? "/dashboard" : "/driver-dashboard"}
+                      to={user.role === "admin" ? "/admin" : user.role === "company" ? "/dashboard" : "/driver-dashboard"}
                       onClick={() => setIsOpen(false)}
                       className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                        (location.pathname === "/dashboard" || location.pathname === "/driver-dashboard")
+                        (location.pathname === "/dashboard" || location.pathname === "/driver-dashboard" || location.pathname === "/admin")
                           ? "bg-primary/10 text-primary"
                           : "hover:bg-muted text-muted-foreground"
                       }`}
                     >
                       <LayoutDashboard className="h-4 w-4 shrink-0" />
-                      {user.role === "company" ? "Dashboard" : "My Dashboard"}
+                      {user.role === "admin" ? "Admin Dashboard" : user.role === "company" ? "Dashboard" : "My Dashboard"}
                       {notifCount > 0 && (
                         <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
                           {notifCount > 9 ? "9+" : notifCount}

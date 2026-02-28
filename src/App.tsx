@@ -21,6 +21,7 @@ const SignIn = lazy(() => import("./pages/SignIn"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const Pricing = lazy(() => import("./pages/Pricing"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -47,6 +48,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/driver-dashboard" element={<DriverDashboard />} />
             <Route path="/pricing" element={<Pricing />} />
+            <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />

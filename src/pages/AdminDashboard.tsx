@@ -1,0 +1,813 @@
+import { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { useAuth } from "@/context/auth";
+import { toast } from "sonner";
+import {
+  Users,
+  Briefcase,
+  Building2,
+  FileText,
+  UserCheck,
+  CreditCard,
+  MapPin,
+  Phone as PhoneIcon,
+  Mail as MailIcon,
+} from "lucide-react";
+import {
+  useAdminStats,
+  useAdminUsers,
+  useAdminSubscriptions,
+  useAdminJobs,
+  useAdminLeads,
+  useAdminUpdateJobStatus,
+  useChangeSubscriptionPlan,
+} from "@/hooks/useAdmin";
+import { PLANS, type Plan } from "@/hooks/useSubscription";
+
+/* ── Types ──────────────────────────────────────────────────────────── */
+type AdminTab = "overview" | "users" | "subscriptions" | "jobs" | "leads";
+
+/* ── Outer guard ────────────────────────────────────────────────────── */
+const AdminDashboard = () => {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && (!user || user.role !== "admin")) {
+      toast.error("Admin access only.");
+      navigate("/");
+    }
+  }, [loading, user, navigate]);
+
+  if (loading || !user || user.role !== "admin") return null;
+  return <AdminDashboardInner />;
+};
+export default AdminDashboard;
+
+/* ── Inner dashboard ────────────────────────────────────────────────── */
+function AdminDashboardInner() {
+  const { user } = useAuth();
+
+  /* data */
+  const { data: stats } = useAdminStats();
+  const { data: users = [] } = useAdminUsers();
+  const { data: subscriptions = [] } = useAdminSubscriptions();
+  const { data: jobs = [] } = useAdminJobs();
+  const { data: leads = [] } = useAdminLeads();
+  const updateJobStatus = useAdminUpdateJobStatus();
+  const changePlan = useChangeSubscriptionPlan();
+
+  /* tab state */
+  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
+
+  /* users tab state */
+  const [userSearch, setUserSearch] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState<
+    "all" | "driver" | "company"
+  >("all");
+  const [userPage, setUserPage] = useState(0);
+
+  /* jobs tab state */
+  const [jobPage, setJobPage] = useState(0);
+
+  /* leads tab state */
+  const [leadPage, setLeadPage] = useState(0);
+
+  /* subscription dialog state */
+  const [planDialogOpen, setPlanDialogOpen] = useState(false);
+  const [planDialogTarget, setPlanDialogTarget] = useState<{
+    companyId: string;
+    companyName: string;
+    currentPlan: Plan;
+  } | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<Plan>("free");
+
+  const tabClass = (tab: AdminTab) =>
+    `px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+      activeTab === tab
+        ? "border-primary text-primary"
+        : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+    }`;
+
+  const PAGE_SIZE = 15;
+
+  /* ── Badge helpers ───────────────────────────────────────────────── */
+  const roleBadge = (role: string) => {
+    const cls =
+      role === "company"
+        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+        : role === "admin"
+        ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+        : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+    return (
+      <span className={`text-xs px-1.5 py-0.5 font-medium rounded-full ${cls}`}>
+        {role}
+      </span>
+    );
+  };
+
+  const planBadge = (plan: Plan) => {
+    const cls =
+      plan === "unlimited"
+        ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+        : plan === "growth"
+        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+        : plan === "starter"
+        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+        : "bg-muted text-muted-foreground";
+    return (
+      <span className={`text-xs px-1.5 py-0.5 font-medium rounded-full ${cls}`}>
+        {PLANS[plan].label}
+      </span>
+    );
+  };
+
+  const statusBadge = (status: string) => {
+    const cls =
+      status === "active"
+        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+        : status === "past_due"
+        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+        : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400";
+    return (
+      <span className={`text-xs px-1.5 py-0.5 font-medium rounded-full ${cls}`}>
+        {status}
+      </span>
+    );
+  };
+
+  const JOB_STATUS_BADGE: Record<string, string> = {
+    Draft: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+    Active: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+    Paused: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+    Closed: "bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400",
+  };
+
+  const LEAD_STATUS_BADGE: Record<string, string> = {
+    new: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+    contacted: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+    hired: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+    dismissed: "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",
+  };
+
+  /* ── Pagination helper ──────────────────────────────────────────── */
+  const Pagination = ({
+    page,
+    setPage,
+    total,
+  }: {
+    page: number;
+    setPage: (fn: (p: number) => number) => void;
+    total: number;
+  }) => {
+    const totalPages = Math.ceil(total / PAGE_SIZE);
+    if (totalPages <= 1) return null;
+    return (
+      <div className="flex items-center justify-between mt-4 text-sm">
+        <span className="text-muted-foreground">
+          Showing {page * PAGE_SIZE + 1}&ndash;
+          {Math.min((page + 1) * PAGE_SIZE, total)} of {total}
+        </span>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => p - 1)}
+            disabled={page === 0}
+          >
+            Previous
+          </Button>
+          <span className="text-muted-foreground text-xs">
+            {page + 1} / {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => p + 1)}
+            disabled={page >= totalPages - 1}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <main className="container mx-auto py-8 max-w-[1400px]">
+        {/* Breadcrumb */}
+        <p className="text-sm text-muted-foreground mb-6">
+          <Link to="/" className="text-primary hover:underline">
+            Main
+          </Link>
+          <span className="mx-1">&raquo;</span>
+          Admin Dashboard
+        </p>
+
+        {/* Welcome header */}
+        <div className="bg-foreground text-background dark:bg-muted dark:text-foreground border border-border px-5 py-4 mb-6">
+          <h1 className="font-display font-bold text-lg">
+            Admin Panel
+          </h1>
+          <p className="text-sm opacity-70 mt-0.5">
+            Welcome, {user!.name}
+          </p>
+        </div>
+
+        {/* Tab bar */}
+        <div className="border-b border-border mb-6 flex overflow-x-auto">
+          <button className={tabClass("overview")} onClick={() => setActiveTab("overview")}>
+            <span className="flex items-center gap-1.5">
+              <Building2 className="h-3.5 w-3.5" /> Overview
+            </span>
+          </button>
+          <button className={tabClass("users")} onClick={() => setActiveTab("users")}>
+            <span className="flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5" /> Users ({users.length})
+            </span>
+          </button>
+          <button className={tabClass("subscriptions")} onClick={() => setActiveTab("subscriptions")}>
+            <span className="flex items-center gap-1.5">
+              <CreditCard className="h-3.5 w-3.5" /> Subscriptions
+            </span>
+          </button>
+          <button className={tabClass("jobs")} onClick={() => setActiveTab("jobs")}>
+            <span className="flex items-center gap-1.5">
+              <Briefcase className="h-3.5 w-3.5" /> Jobs ({jobs.length})
+            </span>
+          </button>
+          <button className={tabClass("leads")} onClick={() => setActiveTab("leads")}>
+            <span className="flex items-center gap-1.5">
+              <UserCheck className="h-3.5 w-3.5" /> Leads ({leads.length})
+            </span>
+          </button>
+        </div>
+
+        {/* ── TAB: Overview ──────────────────────────────────────────── */}
+        {activeTab === "overview" && (
+          <div className="space-y-6">
+            <h2 className="font-display font-semibold text-base">
+              Platform Overview
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {[
+                { label: "Total Users", value: stats?.totalUsers ?? 0, icon: <Users className="h-5 w-5 text-muted-foreground" /> },
+                { label: "Companies", value: stats?.totalCompanies ?? 0, icon: <Building2 className="h-5 w-5 text-muted-foreground" /> },
+                { label: "Drivers", value: stats?.totalDrivers ?? 0, icon: <UserCheck className="h-5 w-5 text-muted-foreground" /> },
+                { label: "Active Jobs", value: stats?.activeJobs ?? 0, icon: <Briefcase className="h-5 w-5 text-muted-foreground" /> },
+                { label: "Applications", value: stats?.totalApplications ?? 0, icon: <FileText className="h-5 w-5 text-muted-foreground" /> },
+                { label: "Leads", value: stats?.totalLeads ?? 0, icon: <PhoneIcon className="h-5 w-5 text-muted-foreground" /> },
+              ].map((s) => (
+                <div key={s.label} className="border border-border bg-card p-5">
+                  <div className="flex items-center justify-between mb-2">
+                    {s.icon}
+                    <span className="text-2xl font-bold font-display">
+                      {s.value}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Subscription breakdown */}
+            <div className="border border-border bg-card p-5">
+              <p className="font-semibold text-sm mb-4">
+                Subscription Breakdown
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {(Object.keys(PLANS) as Plan[]).map((p) => {
+                  const count = subscriptions.filter((s) => s.plan === p).length;
+                  return (
+                    <div key={p} className="text-center p-3 border border-border rounded">
+                      <p className="text-2xl font-bold font-display">{count}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {PLANS[p].label}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB: Users ─────────────────────────────────────────────── */}
+        {activeTab === "users" &&
+          (() => {
+            const filtered = users.filter((u) => {
+              if (userRoleFilter !== "all" && u.role !== userRoleFilter)
+                return false;
+              if (userSearch) {
+                const q = userSearch.toLowerCase();
+                const haystack = [u.name, u.email, u.phone, u.companyName]
+                  .filter(Boolean)
+                  .join(" ")
+                  .toLowerCase();
+                if (!haystack.includes(q)) return false;
+              }
+              return true;
+            });
+            const pageUsers = filtered.slice(
+              userPage * PAGE_SIZE,
+              (userPage + 1) * PAGE_SIZE
+            );
+
+            return (
+              <div>
+                {/* Filter bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                  <h2 className="font-display font-semibold text-base">
+                    All Users
+                    <span className="text-muted-foreground font-normal text-sm ml-2">
+                      ({filtered.length})
+                    </span>
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Search name, email, phone..."
+                      value={userSearch}
+                      onChange={(e) => {
+                        setUserSearch(e.target.value);
+                        setUserPage(0);
+                      }}
+                      className="w-48 h-8 text-xs"
+                    />
+                    <div className="flex border border-border rounded-md overflow-hidden">
+                      {(["all", "driver", "company"] as const).map((r) => (
+                        <button
+                          key={r}
+                          onClick={() => {
+                            setUserRoleFilter(r);
+                            setUserPage(0);
+                          }}
+                          className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                            userRoleFilter === r
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-card text-muted-foreground hover:bg-muted"
+                          }`}
+                        >
+                          {r === "all"
+                            ? "All"
+                            : r.charAt(0).toUpperCase() + r.slice(1) + "s"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* User list */}
+                {pageUsers.length === 0 ? (
+                  <div className="border border-border bg-card p-12 text-center text-sm text-muted-foreground">
+                    <Users className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                    <p>No users found.</p>
+                  </div>
+                ) : (
+                  <div className="border border-border bg-card divide-y divide-border">
+                    {pageUsers.map((u) => (
+                      <div
+                        key={u.id}
+                        className="flex items-center justify-between gap-3 px-5 py-4"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-foreground text-sm">
+                              {u.name}
+                            </p>
+                            {roleBadge(u.role)}
+                            {u.role === "company" &&
+                              (() => {
+                                const sub = subscriptions.find(
+                                  (s) => s.companyId === u.id
+                                );
+                                return planBadge(sub?.plan ?? "free");
+                              })()}
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
+                            {u.email && (
+                              <span className="flex items-center gap-1">
+                                <MailIcon className="h-3 w-3" />
+                                {u.email}
+                              </span>
+                            )}
+                            {u.phone && (
+                              <span className="flex items-center gap-1">
+                                <PhoneIcon className="h-3 w-3" />
+                                {u.phone}
+                              </span>
+                            )}
+                            {u.state && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                {u.state}
+                              </span>
+                            )}
+                            {u.yearsExp && (
+                              <span>{u.yearsExp} yrs exp</span>
+                            )}
+                            {u.companyName && (
+                              <span className="flex items-center gap-1">
+                                <Building2 className="h-3 w-3" />
+                                {u.companyName}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Joined{" "}
+                            {new Date(u.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {u.role === "company" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs h-7"
+                              onClick={() => {
+                                const sub = subscriptions.find(
+                                  (s) => s.companyId === u.id
+                                );
+                                setPlanDialogTarget({
+                                  companyId: u.id,
+                                  companyName: u.name,
+                                  currentPlan: sub?.plan ?? "free",
+                                });
+                                setSelectedPlan(sub?.plan ?? "free");
+                                setPlanDialogOpen(true);
+                              }}
+                            >
+                              Manage Plan
+                            </Button>
+                          )}
+                          <p className="text-[10px] text-muted-foreground font-mono">
+                            {u.id.slice(0, 8)}...
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <Pagination
+                  page={userPage}
+                  setPage={setUserPage}
+                  total={filtered.length}
+                />
+              </div>
+            );
+          })()}
+
+        {/* ── TAB: Subscriptions ──────────────────────────────────────── */}
+        {activeTab === "subscriptions" && (
+          <div>
+            <h2 className="font-display font-semibold text-base mb-4">
+              Company Subscriptions
+              <span className="text-muted-foreground font-normal text-sm ml-2">
+                ({subscriptions.length})
+              </span>
+            </h2>
+
+            {subscriptions.length === 0 ? (
+              <div className="border border-border bg-card p-12 text-center text-sm text-muted-foreground">
+                <CreditCard className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                <p>No companies registered yet.</p>
+              </div>
+            ) : (
+              <div className="border border-border bg-card divide-y divide-border">
+                {subscriptions.map((sub) => (
+                  <div
+                    key={sub.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-semibold text-foreground text-sm">
+                        {sub.companyName}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        {planBadge(sub.plan)}
+                        {statusBadge(sub.status)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Leads: {sub.leadsUsed}/
+                        {sub.leadLimit === 9999
+                          ? "Unlimited"
+                          : sub.leadLimit}
+                        {sub.currentPeriodEnd &&
+                          ` · Renews ${new Date(
+                            sub.currentPeriodEnd
+                          ).toLocaleDateString()}`}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() => {
+                        setPlanDialogTarget({
+                          companyId: sub.companyId,
+                          companyName: sub.companyName,
+                          currentPlan: sub.plan,
+                        });
+                        setSelectedPlan(sub.plan);
+                        setPlanDialogOpen(true);
+                      }}
+                    >
+                      Change Plan
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {/* ── TAB: Jobs ──────────────────────────────────────────────── */}
+        {activeTab === "jobs" &&
+          (() => {
+            const pageJobs = jobs.slice(
+              jobPage * PAGE_SIZE,
+              (jobPage + 1) * PAGE_SIZE
+            );
+
+            return (
+              <div>
+                <h2 className="font-display font-semibold text-base mb-4">
+                  All Jobs
+                  <span className="text-muted-foreground font-normal text-sm ml-2">
+                    ({jobs.length})
+                  </span>
+                </h2>
+
+                {pageJobs.length === 0 ? (
+                  <div className="border border-border bg-card p-12 text-center text-sm text-muted-foreground">
+                    <Briefcase className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                    <p>No jobs posted yet.</p>
+                  </div>
+                ) : (
+                  <div className="border border-border bg-card divide-y divide-border">
+                    {pageJobs.map((job) => (
+                      <div
+                        key={job.id}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                            <p className="font-semibold text-foreground text-sm">
+                              {job.title}
+                            </p>
+                            <span
+                              className={`text-xs px-1.5 py-0.5 font-medium rounded-full ${
+                                JOB_STATUS_BADGE[job.status] ?? ""
+                              }`}
+                            >
+                              {job.status}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {job.companyName}
+                            {job.location && ` · ${job.location}`}
+                            {job.pay && ` · ${job.pay}`}
+                          </p>
+                          {job.postedAt && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Posted{" "}
+                              {new Date(job.postedAt).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                        <Select
+                          value={job.status}
+                          onValueChange={(v) => {
+                            updateJobStatus.mutate(
+                              {
+                                jobId: job.id,
+                                status: v as
+                                  | "Active"
+                                  | "Paused"
+                                  | "Closed",
+                              },
+                              {
+                                onSuccess: () =>
+                                  toast.success(
+                                    `"${job.title}" set to ${v}`
+                                  ),
+                                onError: (err) =>
+                                  toast.error(
+                                    err instanceof Error
+                                      ? err.message
+                                      : "Failed"
+                                  ),
+                              }
+                            );
+                          }}
+                        >
+                          <SelectTrigger className="h-7 w-24 text-xs shrink-0">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(["Active", "Paused", "Closed"] as const).map(
+                              (s) => (
+                                <SelectItem
+                                  key={s}
+                                  value={s}
+                                  className="text-xs"
+                                >
+                                  {s}
+                                </SelectItem>
+                              )
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <Pagination
+                  page={jobPage}
+                  setPage={setJobPage}
+                  total={jobs.length}
+                />
+              </div>
+            );
+          })()}
+
+        {/* ── TAB: Leads ─────────────────────────────────────────────── */}
+        {activeTab === "leads" &&
+          (() => {
+            const pageLeads = leads.slice(
+              leadPage * PAGE_SIZE,
+              (leadPage + 1) * PAGE_SIZE
+            );
+
+            return (
+              <div>
+                <h2 className="font-display font-semibold text-base mb-4">
+                  All Leads
+                  <span className="text-muted-foreground font-normal text-sm ml-2">
+                    ({leads.length})
+                  </span>
+                </h2>
+
+                {pageLeads.length === 0 ? (
+                  <div className="border border-border bg-card p-12 text-center text-sm text-muted-foreground">
+                    <UserCheck className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                    <p>No leads synced yet.</p>
+                  </div>
+                ) : (
+                  <div className="border border-border bg-card divide-y divide-border">
+                    {pageLeads.map((lead) => (
+                      <div
+                        key={lead.id}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                            <p className="font-semibold text-foreground text-sm">
+                              {lead.fullName}
+                            </p>
+                            <span
+                              className={`text-xs px-1.5 py-0.5 font-medium rounded-full ${
+                                LEAD_STATUS_BADGE[lead.status] ?? ""
+                              }`}
+                            >
+                              {lead.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                            {lead.phone && (
+                              <span className="flex items-center gap-1">
+                                <PhoneIcon className="h-3 w-3" />
+                                {lead.phone}
+                              </span>
+                            )}
+                            {lead.email && (
+                              <span className="flex items-center gap-1">
+                                <MailIcon className="h-3 w-3" />
+                                {lead.email}
+                              </span>
+                            )}
+                            {lead.state && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                {lead.state}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {lead.source} &middot;{" "}
+                            {new Date(lead.createdAt).toLocaleDateString()}
+                            {lead.yearsExp && ` · ${lead.yearsExp} yrs exp`}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <Pagination
+                  page={leadPage}
+                  setPage={setLeadPage}
+                  total={leads.length}
+                />
+              </div>
+            );
+          })()}
+
+        {/* Change Plan Dialog (shared by Users + Subscriptions tabs) */}
+        <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Change Subscription Plan</DialogTitle>
+              <DialogDescription>
+                Update plan for{" "}
+                <strong>{planDialogTarget?.companyName}</strong>
+                {planDialogTarget &&
+                  ` (currently ${PLANS[planDialogTarget.currentPlan].label})`}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <Select
+                value={selectedPlan}
+                onValueChange={(v) => setSelectedPlan(v as Plan)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(PLANS) as Plan[]).map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {PLANS[p].label} &mdash; ${PLANS[p].price}/mo (
+                      {PLANS[p].leads === 9999 ? "Unlimited" : PLANS[p].leads}{" "}
+                      leads)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setPlanDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={changePlan.isPending}
+                onClick={() => {
+                  if (!planDialogTarget) return;
+                  changePlan.mutate(
+                    {
+                      companyId: planDialogTarget.companyId,
+                      plan: selectedPlan,
+                    },
+                    {
+                      onSuccess: () => {
+                        toast.success(
+                          `Plan updated to ${PLANS[selectedPlan].label} for ${planDialogTarget.companyName}`
+                        );
+                        setPlanDialogOpen(false);
+                      },
+                      onError: (err) => {
+                        toast.error(
+                          err instanceof Error
+                            ? err.message
+                            : "Failed to update plan"
+                        );
+                      },
+                    }
+                  );
+                }}
+              >
+                {changePlan.isPending ? "Saving..." : "Confirm"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </main>
+      <Footer />
+    </div>
+  );
+}

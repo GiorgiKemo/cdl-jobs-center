@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         id: data.id,
         name: data.name,
         email: userEmail,
-        role: data.role as "driver" | "company",
+        role: data.role as "driver" | "company" | "admin",
       });
     } else {
       setUser(null);
@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     name: string,
     email: string,
     password: string,
-    role: "driver" | "company"
+    role: "driver" | "company" | "admin"
   ) => {
     const { data, error } = await supabase.auth.signUp({
       email,
