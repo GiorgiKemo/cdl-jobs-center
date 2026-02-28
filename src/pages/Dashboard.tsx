@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useAuth } from "@/context/auth";
+import { useAuth, type User as AuthUser } from "@/context/auth";
 import { useJobs } from "@/hooks/useJobs";
 import { Job } from "@/data/jobs";
 import { toast } from "sonner";
@@ -482,12 +482,11 @@ const Dashboard = () => {
   );
   if (!user || user.role !== "company") return null;
 
-  return <DashboardInner />;
+  return <DashboardInner user={user} />;
 };
 
 // Inner component (only renders after auth is resolved and user is a company)
-const DashboardInner = () => {
-  const { user } = useAuth();
+const DashboardInner = ({ user }: { user: AuthUser }) => {
   const qc = useQueryClient();
   const { jobs, addJob, updateJob, removeJob } = useJobs(user!.id);
   const { data: unreadMsgCount = 0 } = useUnreadCount(user!.id);
@@ -921,58 +920,58 @@ const DashboardInner = () => {
                 </div>
                 <div className="grid sm:grid-cols-2 gap-4 mb-4">
                   <div className="sm:col-span-2 space-y-1">
-                    <Label className="text-xs text-muted-foreground">Job Title *</Label>
-                    <Input placeholder="e.g. OTR Dry Van Driver" value={form.title}
+                    <Label htmlFor="job-title" className="text-xs text-muted-foreground">Job Title *</Label>
+                    <Input id="job-title" name="title" placeholder="e.g. OTR Dry Van Driver" value={form.title}
                       onChange={(e) => handleFormChange("title", e.target.value)} />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Driver Type</Label>
-                    <Select value={form.driverType} onValueChange={(v) => handleFormChange("driverType", v)}>
-                      <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <Label htmlFor="job-driverType" className="text-xs text-muted-foreground">Driver Type</Label>
+                    <Select value={form.driverType} onValueChange={(v) => handleFormChange("driverType", v)} name="driverType">
+                      <SelectTrigger id="job-driverType"><SelectValue placeholder="Select..." /></SelectTrigger>
                       <SelectContent>{DRIVER_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Freight Type</Label>
-                    <Select value={form.type} onValueChange={(v) => handleFormChange("type", v)}>
-                      <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <Label htmlFor="job-freightType" className="text-xs text-muted-foreground">Freight Type</Label>
+                    <Select value={form.type} onValueChange={(v) => handleFormChange("type", v)} name="freightType">
+                      <SelectTrigger id="job-freightType"><SelectValue placeholder="Select..." /></SelectTrigger>
                       <SelectContent>{FREIGHT_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Route Type</Label>
-                    <Select value={form.routeType} onValueChange={(v) => handleFormChange("routeType", v)}>
-                      <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <Label htmlFor="job-routeType" className="text-xs text-muted-foreground">Route Type</Label>
+                    <Select value={form.routeType} onValueChange={(v) => handleFormChange("routeType", v)} name="routeType">
+                      <SelectTrigger id="job-routeType"><SelectValue placeholder="Select..." /></SelectTrigger>
                       <SelectContent>{ROUTE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Team Driving</Label>
-                    <Select value={form.teamDriving} onValueChange={(v) => handleFormChange("teamDriving", v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Label htmlFor="job-teamDriving" className="text-xs text-muted-foreground">Team Driving</Label>
+                    <Select value={form.teamDriving} onValueChange={(v) => handleFormChange("teamDriving", v)} name="teamDriving">
+                      <SelectTrigger id="job-teamDriving"><SelectValue /></SelectTrigger>
                       <SelectContent>{TEAM_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Location</Label>
-                    <Input placeholder="e.g. Illinois or Nationwide" value={form.location}
+                    <Label htmlFor="job-location" className="text-xs text-muted-foreground">Location</Label>
+                    <Input id="job-location" name="location" placeholder="e.g. Illinois or Nationwide" value={form.location}
                       onChange={(e) => handleFormChange("location", e.target.value)} />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Pay</Label>
-                    <Input placeholder="e.g. $0.65/mile or $1,500/week" value={form.pay}
+                    <Label htmlFor="job-pay" className="text-xs text-muted-foreground">Pay</Label>
+                    <Input id="job-pay" name="pay" placeholder="e.g. $0.65/mile or $1,500/week" value={form.pay}
                       onChange={(e) => handleFormChange("pay", e.target.value)} />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Status</Label>
-                    <Select value={form.status} onValueChange={(v) => handleFormChange("status", v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Label htmlFor="job-status" className="text-xs text-muted-foreground">Status</Label>
+                    <Select value={form.status} onValueChange={(v) => handleFormChange("status", v)} name="status">
+                      <SelectTrigger id="job-status"><SelectValue /></SelectTrigger>
                       <SelectContent>{JOB_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="sm:col-span-2 space-y-1">
-                    <Label className="text-xs text-muted-foreground">Description</Label>
-                    <Textarea placeholder="Describe the position, requirements, and benefits..."
+                    <Label htmlFor="job-description" className="text-xs text-muted-foreground">Description</Label>
+                    <Textarea id="job-description" name="description" placeholder="Describe the position, requirements, and benefits..."
                       value={form.description} onChange={(e) => handleFormChange("description", e.target.value)}
                       rows={3} className="resize-none" />
                   </div>
@@ -1016,7 +1015,7 @@ const DashboardInner = () => {
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                      <Select value={job.status ?? "Active"} onValueChange={(v) => handleQuickStatus(job.id, v)}>
+                      <Select value={job.status ?? "Active"} onValueChange={(v) => handleQuickStatus(job.id, v)} name="jobStatus">
                         <SelectTrigger className="h-7 w-24 text-xs">
                           <SelectValue />
                         </SelectTrigger>
@@ -1208,28 +1207,28 @@ const DashboardInner = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Company Name</Label>
-                  <Input value={profileName} onChange={(e) => setProfileName(e.target.value)} />
+                  <Label htmlFor="company-name" className="text-xs text-muted-foreground">Company Name</Label>
+                  <Input id="company-name" name="companyName" autoComplete="organization" value={profileName} onChange={(e) => setProfileName(e.target.value)} />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Company Email</Label>
-                  <Input type="email" placeholder="contact@yourcompany.com" value={profileEmail} onChange={(e) => setProfileEmail(e.target.value)} />
+                  <Label htmlFor="company-email" className="text-xs text-muted-foreground">Company Email</Label>
+                  <Input id="company-email" name="email" type="email" autoComplete="email" placeholder="contact@yourcompany.com" value={profileEmail} onChange={(e) => setProfileEmail(e.target.value)} />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Phone</Label>
-                  <Input placeholder="(555) 000-0000" value={profilePhone} onChange={(e) => setProfilePhone(e.target.value)} />
+                  <Label htmlFor="company-phone" className="text-xs text-muted-foreground">Phone</Label>
+                  <Input id="company-phone" name="phone" autoComplete="tel" placeholder="(555) 000-0000" value={profilePhone} onChange={(e) => setProfilePhone(e.target.value)} />
                 </div>
                 <div className="sm:col-span-2 space-y-1">
-                  <Label className="text-xs text-muted-foreground">Address</Label>
-                  <Input placeholder="123 Main St, City, State ZIP" value={profileAddress} onChange={(e) => setProfileAddress(e.target.value)} />
+                  <Label htmlFor="company-address" className="text-xs text-muted-foreground">Address</Label>
+                  <Input id="company-address" name="address" autoComplete="street-address" placeholder="123 Main St, City, State ZIP" value={profileAddress} onChange={(e) => setProfileAddress(e.target.value)} />
                 </div>
                 <div className="sm:col-span-2 space-y-1">
-                  <Label className="text-xs text-muted-foreground">Website (optional)</Label>
-                  <Input placeholder="https://yourcompany.com" value={profileWebsite} onChange={(e) => setProfileWebsite(e.target.value)} />
+                  <Label htmlFor="company-website" className="text-xs text-muted-foreground">Website (optional)</Label>
+                  <Input id="company-website" name="website" autoComplete="url" placeholder="https://yourcompany.com" value={profileWebsite} onChange={(e) => setProfileWebsite(e.target.value)} />
                 </div>
                 <div className="sm:col-span-2 space-y-1">
-                  <Label className="text-xs text-muted-foreground">About</Label>
-                  <Textarea placeholder="Tell drivers about your company, culture, and opportunities..."
+                  <Label htmlFor="company-about" className="text-xs text-muted-foreground">About</Label>
+                  <Textarea id="company-about" name="about" placeholder="Tell drivers about your company, culture, and opportunities..."
                     value={profileAbout} onChange={(e) => setProfileAbout(e.target.value)}
                     rows={5} className="resize-none" />
                 </div>
@@ -1679,6 +1678,8 @@ const DashboardInner = () => {
                       <div className="px-4 pb-4 space-y-3">
                         {dismissedLeads.length > DISMISSED_PAGE_SIZE && (
                           <Input
+                            id="dismissed-search"
+                            name="dismissedSearch"
                             placeholder="Search dismissed leads..."
                             value={dismissedSearch}
                             onChange={(e) => { setDismissedSearch(e.target.value); setDismissedPage(0); }}

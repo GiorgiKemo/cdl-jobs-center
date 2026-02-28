@@ -122,6 +122,50 @@ const normalizeDriverMatchOpts = (
   };
 };
 
+const invokeAuthedFunction = async <TData = unknown>(
+  fnName: string,
+  body: unknown,
+): Promise<TData> => {
+  const callOnce = async (accessToken?: string) =>
+    supabase.functions.invoke(fnName, {
+      body,
+      headers: accessToken
+        ? { Authorization: `Bearer ${accessToken}` }
+        : undefined,
+    });
+
+  const {
+    data: { session: initialSession },
+  } = await supabase.auth.getSession();
+
+  let { data, error } = await callOnce(initialSession?.access_token);
+
+  // Retry once with a freshly rotated session token if the first call failed.
+  if (error) {
+    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+    if (!refreshError && refreshed.session?.access_token) {
+      const retry = await callOnce(refreshed.session.access_token);
+      data = retry.data;
+      error = retry.error;
+    }
+  }
+
+  if (error) {
+    // If auth is no longer valid, clear local session and force a clean sign-in path.
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) {
+      await supabase.auth.signOut({ scope: "local" });
+      throw new Error("Your session expired. Please sign in again.");
+    }
+    throw new Error(error.message || `Failed to invoke ${fnName}`);
+  }
+  if ((data as { error?: unknown })?.error) {
+    throw new Error(String((data as { error?: unknown }).error));
+  }
+
+  return data as TData;
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToDriverJobMatch(row: Record<string, any>): DriverJobMatch {
   const job = row.jobs ?? {};
@@ -469,17 +513,7 @@ export function useRecordDriverMatchFeedback(driverId: string | undefined) {
 
   return useMutation({
     mutationFn: async (params: { jobId: string; feedback: DriverFeedback }) => {
-      const { data, error } = await supabase.functions.invoke(
-        "record-match-feedback",
-        { body: params },
-      );
-
-      if (error) {
-        throw new Error(error.message || "Failed to record match feedback");
-      }
-      if (data?.error) {
-        throw new Error(data.error as string);
-      }
+      await invokeAuthedFunction("record-match-feedback", params);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["driver-matches", driverId] });
@@ -513,16 +547,7 @@ export function useRefreshMyMatches(driverId: string | undefined) {
 
   return useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("refresh-my-matches", {
-        body: {},
-      });
-      if (error) {
-        throw new Error(error.message || "Failed to queue match refresh");
-      }
-      if (data?.error) {
-        throw new Error(data.error as string);
-      }
-      return data;
+      return await invokeAuthedFunction("refresh-my-matches", {});
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["driver-matches", driverId] });

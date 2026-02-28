@@ -373,10 +373,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.record-match-feedback]
-verify_jwt = true
+verify_jwt = false
 
 [functions.refresh-my-matches]
-verify_jwt = true
+verify_jwt = false
 
 [edge_runtime]
 enabled = true

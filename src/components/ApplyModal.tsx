@@ -24,12 +24,12 @@ const US_STATES = [
   "Virginia","Washington","West Virginia","Wisconsin","Wyoming",
 ];
 
-const ToggleRow = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) => (
+const ToggleRow = ({ id, name, label, checked, onChange }: { id?: string; name?: string; label: string; checked: boolean; onChange: (v: boolean) => void }) => (
   <div className="flex items-center justify-between py-1">
-    <span className="text-sm text-foreground">{label}</span>
+    <label htmlFor={id} className="text-sm text-foreground cursor-pointer">{label}</label>
     <div className="flex items-center gap-1.5">
       <span className={`text-xs font-medium ${!checked ? "text-foreground" : "text-muted-foreground"}`}>OFF</span>
-      <Switch checked={checked} onCheckedChange={onChange} className="data-[state=unchecked]:bg-muted" />
+      <Switch id={id} name={name} checked={checked} onCheckedChange={onChange} className="data-[state=unchecked]:bg-muted" />
       <span className={`text-xs font-medium ${checked ? "text-primary" : "text-muted-foreground"}`}>ON</span>
     </div>
   </div>
@@ -243,41 +243,41 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
           <div>
             <SectionHeader>What do you want in your next job selections?</SectionHeader>
             <div className="grid sm:grid-cols-2 gap-x-12 gap-y-1">
-              <ToggleRow label="Better pay" checked={prefs.betterPay} onChange={tog(setPrefs, "betterPay")} />
-              <ToggleRow label="Better home time" checked={prefs.betterHomeTime} onChange={tog(setPrefs, "betterHomeTime")} />
-              <ToggleRow label="Health Insurance" checked={prefs.healthInsurance} onChange={tog(setPrefs, "healthInsurance")} />
-              <ToggleRow label="Bonuses" checked={prefs.bonuses} onChange={tog(setPrefs, "bonuses")} />
-              <ToggleRow label="New equipment" checked={prefs.newEquipment} onChange={tog(setPrefs, "newEquipment")} />
+              <ToggleRow id="modal-betterPay" name="betterPay" label="Better pay" checked={prefs.betterPay} onChange={tog(setPrefs, "betterPay")} />
+              <ToggleRow id="modal-betterHomeTime" name="betterHomeTime" label="Better home time" checked={prefs.betterHomeTime} onChange={tog(setPrefs, "betterHomeTime")} />
+              <ToggleRow id="modal-healthInsurance" name="healthInsurance" label="Health Insurance" checked={prefs.healthInsurance} onChange={tog(setPrefs, "healthInsurance")} />
+              <ToggleRow id="modal-bonuses" name="bonuses" label="Bonuses" checked={prefs.bonuses} onChange={tog(setPrefs, "bonuses")} />
+              <ToggleRow id="modal-newEquipment" name="newEquipment" label="New equipment" checked={prefs.newEquipment} onChange={tog(setPrefs, "newEquipment")} />
             </div>
           </div>
 
           {/* Basic info */}
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <Input placeholder="First name *" value={firstName} onChange={(e) => setFirstName(e.target.value)} className={errors.firstName ? "border-destructive" : ""} />
+              <Input id="modal-firstName" name="firstName" autoComplete="given-name" placeholder="First name *" value={firstName} onChange={(e) => setFirstName(e.target.value)} className={errors.firstName ? "border-destructive" : ""} />
               {errors.firstName && <p className="text-xs text-destructive">{errors.firstName}</p>}
             </div>
             <div className="space-y-1">
-              <Input placeholder="Last name *" value={lastName} onChange={(e) => setLastName(e.target.value)} className={errors.lastName ? "border-destructive" : ""} />
+              <Input id="modal-lastName" name="lastName" autoComplete="family-name" placeholder="Last name *" value={lastName} onChange={(e) => setLastName(e.target.value)} className={errors.lastName ? "border-destructive" : ""} />
               {errors.lastName && <p className="text-xs text-destructive">{errors.lastName}</p>}
             </div>
             <div className="space-y-1">
-              <Input placeholder="Email *" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={errors.email ? "border-destructive" : ""} />
+              <Input id="modal-email" name="email" autoComplete="email" placeholder="Email *" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={errors.email ? "border-destructive" : ""} />
               {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
             </div>
             <div className="space-y-1">
-              <Input placeholder="Phone *" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={errors.phone ? "border-destructive" : ""} />
+              <Input id="modal-phone" name="phone" autoComplete="tel" placeholder="Phone *" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={errors.phone ? "border-destructive" : ""} />
               {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
             </div>
             <div className="space-y-1">
-              <Input placeholder="CDL # *" value={cdlNumber} onChange={(e) => setCdlNumber(e.target.value)} className={errors.cdlNumber ? "border-destructive" : ""} />
+              <Input id="modal-cdlNumber" name="cdlNumber" autoComplete="off" placeholder="CDL # *" value={cdlNumber} onChange={(e) => setCdlNumber(e.target.value)} className={errors.cdlNumber ? "border-destructive" : ""} />
               {errors.cdlNumber && <p className="text-xs text-destructive">{errors.cdlNumber}</p>}
             </div>
             <div className="space-y-1">
-              <Input placeholder="Zip Code *" value={zipCode} onChange={(e) => setZipCode(e.target.value)} className={errors.zipCode ? "border-destructive" : ""} />
+              <Input id="modal-zipCode" name="zipCode" autoComplete="postal-code" placeholder="Zip Code *" value={zipCode} onChange={(e) => setZipCode(e.target.value)} className={errors.zipCode ? "border-destructive" : ""} />
               {errors.zipCode && <p className="text-xs text-destructive">{errors.zipCode}</p>}
             </div>
-            <Input placeholder="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <Input id="modal-date" name="availableDate" autoComplete="off" placeholder="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
 
           {/* Driving experience */}
@@ -285,9 +285,9 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
             <SectionHeader>Tell us about your driving experience.</SectionHeader>
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Driver Type *</Label>
-                <Select value={driverType} onValueChange={(v) => { setDriverType(v); setErrors((p) => ({ ...p, driverType: "" })); }}>
-                  <SelectTrigger className={errors.driverType ? "border-destructive" : ""}><SelectValue placeholder="Select driver type" /></SelectTrigger>
+                <Label htmlFor="modal-driverType" className="text-xs text-muted-foreground">Driver Type *</Label>
+                <Select value={driverType} onValueChange={(v) => { setDriverType(v); setErrors((p) => ({ ...p, driverType: "" })); }} name="driverType">
+                  <SelectTrigger id="modal-driverType" className={errors.driverType ? "border-destructive" : ""}><SelectValue placeholder="Select driver type" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="company">Company Driver</SelectItem>
                     <SelectItem value="owner-operator">Owner Operator</SelectItem>
@@ -298,9 +298,9 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
                 {errors.driverType && <p className="text-xs text-destructive">{errors.driverType}</p>}
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">License Class *</Label>
-                <Select value={licenseClass} onValueChange={(v) => { setLicenseClass(v); setErrors((p) => ({ ...p, licenseClass: "" })); }}>
-                  <SelectTrigger className={errors.licenseClass ? "border-destructive" : ""}><SelectValue placeholder="Select class" /></SelectTrigger>
+                <Label htmlFor="modal-licenseClass" className="text-xs text-muted-foreground">License Class *</Label>
+                <Select value={licenseClass} onValueChange={(v) => { setLicenseClass(v); setErrors((p) => ({ ...p, licenseClass: "" })); }} name="licenseClass">
+                  <SelectTrigger id="modal-licenseClass" className={errors.licenseClass ? "border-destructive" : ""}><SelectValue placeholder="Select class" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="a">Class A</SelectItem>
                     <SelectItem value="b">Class B</SelectItem>
@@ -311,9 +311,9 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
                 {errors.licenseClass && <p className="text-xs text-destructive">{errors.licenseClass}</p>}
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Years Experience *</Label>
-                <Select value={yearsExp} onValueChange={(v) => { setYearsExp(v); setErrors((p) => ({ ...p, yearsExp: "" })); }}>
-                  <SelectTrigger className={errors.yearsExp ? "border-destructive" : ""}><SelectValue placeholder="Select experience" /></SelectTrigger>
+                <Label htmlFor="modal-yearsExp" className="text-xs text-muted-foreground">Years Experience *</Label>
+                <Select value={yearsExp} onValueChange={(v) => { setYearsExp(v); setErrors((p) => ({ ...p, yearsExp: "" })); }} name="yearsExp">
+                  <SelectTrigger id="modal-yearsExp" className={errors.yearsExp ? "border-destructive" : ""}><SelectValue placeholder="Select experience" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
                     <SelectItem value="less-1">Less than 1 year</SelectItem>
@@ -325,9 +325,9 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
                 {errors.yearsExp && <p className="text-xs text-destructive">{errors.yearsExp}</p>}
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">License State *</Label>
-                <Select value={licenseState} onValueChange={(v) => { setLicenseState(v); setErrors((p) => ({ ...p, licenseState: "" })); }}>
-                  <SelectTrigger className={errors.licenseState ? "border-destructive" : ""}><SelectValue placeholder="Select state" /></SelectTrigger>
+                <Label htmlFor="modal-licenseState" className="text-xs text-muted-foreground">License State *</Label>
+                <Select value={licenseState} onValueChange={(v) => { setLicenseState(v); setErrors((p) => ({ ...p, licenseState: "" })); }} name="licenseState">
+                  <SelectTrigger id="modal-licenseState" className={errors.licenseState ? "border-destructive" : ""}><SelectValue placeholder="Select state" /></SelectTrigger>
                   <SelectContent>
                     {US_STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
@@ -341,10 +341,10 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
           <div>
             <SectionHeader>Endorsements (optional):</SectionHeader>
             <div className="grid sm:grid-cols-2 gap-x-12 gap-y-1">
-              <ToggleRow label="Doubles/Triples (T)" checked={endorse.doublesTriples} onChange={tog(setEndorse, "doublesTriples")} />
-              <ToggleRow label="HAZMAT (H)" checked={endorse.hazmat} onChange={tog(setEndorse, "hazmat")} />
-              <ToggleRow label="Tank Vehicles (N)" checked={endorse.tankVehicles} onChange={tog(setEndorse, "tankVehicles")} />
-              <ToggleRow label="Tanker + HAZMAT (X)" checked={endorse.tankerHazmat} onChange={tog(setEndorse, "tankerHazmat")} />
+              <ToggleRow id="modal-doublesTriples" name="doublesTriples" label="Doubles/Triples (T)" checked={endorse.doublesTriples} onChange={tog(setEndorse, "doublesTriples")} />
+              <ToggleRow id="modal-hazmat" name="hazmat" label="HAZMAT (H)" checked={endorse.hazmat} onChange={tog(setEndorse, "hazmat")} />
+              <ToggleRow id="modal-tankVehicles" name="tankVehicles" label="Tank Vehicles (N)" checked={endorse.tankVehicles} onChange={tog(setEndorse, "tankVehicles")} />
+              <ToggleRow id="modal-tankerHazmat" name="tankerHazmat" label="Tanker + HAZMAT (X)" checked={endorse.tankerHazmat} onChange={tog(setEndorse, "tankerHazmat")} />
             </div>
           </div>
 
@@ -352,18 +352,18 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
           <div>
             <SectionHeader>Hauler Experience:</SectionHeader>
             <div className="grid sm:grid-cols-3 gap-x-8 gap-y-1">
-              <ToggleRow label="Box" checked={hauler.box} onChange={tog(setHauler, "box")} />
-              <ToggleRow label="Car Hauler" checked={hauler.carHaul} onChange={tog(setHauler, "carHaul")} />
-              <ToggleRow label="Drop and Hook" checked={hauler.dropAndHook} onChange={tog(setHauler, "dropAndHook")} />
-              <ToggleRow label="Dry Bulk" checked={hauler.dryBulk} onChange={tog(setHauler, "dryBulk")} />
-              <ToggleRow label="Dry Van" checked={hauler.dryVan} onChange={tog(setHauler, "dryVan")} />
-              <ToggleRow label="Flatbed" checked={hauler.flatbed} onChange={tog(setHauler, "flatbed")} />
-              <ToggleRow label="Hopper Bottom" checked={hauler.hopperBottom} onChange={tog(setHauler, "hopperBottom")} />
-              <ToggleRow label="Intermodal" checked={hauler.intermodal} onChange={tog(setHauler, "intermodal")} />
-              <ToggleRow label="Oil Field" checked={hauler.oilField} onChange={tog(setHauler, "oilField")} />
-              <ToggleRow label="Oversize Load" checked={hauler.oversizeLoad} onChange={tog(setHauler, "oversizeLoad")} />
-              <ToggleRow label="Refrigerated" checked={hauler.refrigerated} onChange={tog(setHauler, "refrigerated")} />
-              <ToggleRow label="Tanker" checked={hauler.tanker} onChange={tog(setHauler, "tanker")} />
+              <ToggleRow id="modal-box" name="box" label="Box" checked={hauler.box} onChange={tog(setHauler, "box")} />
+              <ToggleRow id="modal-carHaul" name="carHaul" label="Car Hauler" checked={hauler.carHaul} onChange={tog(setHauler, "carHaul")} />
+              <ToggleRow id="modal-dropAndHook" name="dropAndHook" label="Drop and Hook" checked={hauler.dropAndHook} onChange={tog(setHauler, "dropAndHook")} />
+              <ToggleRow id="modal-dryBulk" name="dryBulk" label="Dry Bulk" checked={hauler.dryBulk} onChange={tog(setHauler, "dryBulk")} />
+              <ToggleRow id="modal-dryVan" name="dryVan" label="Dry Van" checked={hauler.dryVan} onChange={tog(setHauler, "dryVan")} />
+              <ToggleRow id="modal-flatbed" name="flatbed" label="Flatbed" checked={hauler.flatbed} onChange={tog(setHauler, "flatbed")} />
+              <ToggleRow id="modal-hopperBottom" name="hopperBottom" label="Hopper Bottom" checked={hauler.hopperBottom} onChange={tog(setHauler, "hopperBottom")} />
+              <ToggleRow id="modal-intermodal" name="intermodal" label="Intermodal" checked={hauler.intermodal} onChange={tog(setHauler, "intermodal")} />
+              <ToggleRow id="modal-oilField" name="oilField" label="Oil Field" checked={hauler.oilField} onChange={tog(setHauler, "oilField")} />
+              <ToggleRow id="modal-oversizeLoad" name="oversizeLoad" label="Oversize Load" checked={hauler.oversizeLoad} onChange={tog(setHauler, "oversizeLoad")} />
+              <ToggleRow id="modal-refrigerated" name="refrigerated" label="Refrigerated" checked={hauler.refrigerated} onChange={tog(setHauler, "refrigerated")} />
+              <ToggleRow id="modal-tanker" name="tanker" label="Tanker" checked={hauler.tanker} onChange={tog(setHauler, "tanker")} />
             </div>
           </div>
 
@@ -371,11 +371,11 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
           <div>
             <SectionHeader>Route Preference:</SectionHeader>
             <div className="grid sm:grid-cols-3 gap-x-8 gap-y-1">
-              <ToggleRow label="Dedicated" checked={route.dedicated} onChange={tog(setRoute, "dedicated")} />
-              <ToggleRow label="Local" checked={route.local} onChange={tog(setRoute, "local")} />
-              <ToggleRow label="LTL" checked={route.ltl} onChange={tog(setRoute, "ltl")} />
-              <ToggleRow label="OTR" checked={route.otr} onChange={tog(setRoute, "otr")} />
-              <ToggleRow label="Regional" checked={route.regional} onChange={tog(setRoute, "regional")} />
+              <ToggleRow id="modal-dedicated" name="dedicated" label="Dedicated" checked={route.dedicated} onChange={tog(setRoute, "dedicated")} />
+              <ToggleRow id="modal-local" name="local" label="Local" checked={route.local} onChange={tog(setRoute, "local")} />
+              <ToggleRow id="modal-ltl" name="ltl" label="LTL" checked={route.ltl} onChange={tog(setRoute, "ltl")} />
+              <ToggleRow id="modal-otr" name="otr" label="OTR" checked={route.otr} onChange={tog(setRoute, "otr")} />
+              <ToggleRow id="modal-regional" name="regional" label="Regional" checked={route.regional} onChange={tog(setRoute, "regional")} />
             </div>
           </div>
 
@@ -385,8 +385,8 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-foreground">Interested in solo or team driving?</span>
-              <Select value={soloTeam} onValueChange={setSoloTeam}>
-                <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+              <Select value={soloTeam} onValueChange={setSoloTeam} name="soloTeam">
+                <SelectTrigger id="modal-soloTeam" className="w-32"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Solo">Solo</SelectItem>
                   <SelectItem value="Team">Team</SelectItem>
@@ -394,16 +394,18 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
                 </SelectContent>
               </Select>
             </div>
-            <ToggleRow label="Interested in lease purchase?" checked={extra.leasePurchase} onChange={tog(setExtra, "leasePurchase")} />
-            <ToggleRow label="Have you had any accidents or violations in the past 3 years?" checked={extra.accidents} onChange={tog(setExtra, "accidents")} />
-            <ToggleRow label="Have you had your license suspended or DUI/DWI charges in the past 10 years?" checked={extra.suspended} onChange={tog(setExtra, "suspended")} />
-            <ToggleRow label="Yes! Sign me up to receive newsletters and job alerts" checked={extra.newsletters} onChange={tog(setExtra, "newsletters")} />
+            <ToggleRow id="modal-leasePurchase" name="leasePurchase" label="Interested in lease purchase?" checked={extra.leasePurchase} onChange={tog(setExtra, "leasePurchase")} />
+            <ToggleRow id="modal-accidents" name="accidents" label="Have you had any accidents or violations in the past 3 years?" checked={extra.accidents} onChange={tog(setExtra, "accidents")} />
+            <ToggleRow id="modal-suspended" name="suspended" label="Have you had your license suspended or DUI/DWI charges in the past 10 years?" checked={extra.suspended} onChange={tog(setExtra, "suspended")} />
+            <ToggleRow id="modal-newsletters" name="newsletters" label="Yes! Sign me up to receive newsletters and job alerts" checked={extra.newsletters} onChange={tog(setExtra, "newsletters")} />
           </div>
 
           {/* Notes */}
           <div>
-            <Label className="text-sm font-medium mb-2 block">Message to {companyName} (optional):</Label>
+            <Label htmlFor="modal-notes" className="text-sm font-medium mb-2 block">Message to {companyName} (optional):</Label>
             <Textarea
+              id="modal-notes"
+              name="notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Tell them about yourself, your experience, or anything else you'd like them to know..."

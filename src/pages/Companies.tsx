@@ -114,11 +114,11 @@ const Companies = () => {
           <div className="px-5 py-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
               <div>
-                <label className="text-xs font-medium uppercase tracking-wide opacity-70 block mb-1.5">
+                <label htmlFor="companies-state" className="text-xs font-medium uppercase tracking-wide opacity-70 block mb-1.5">
                   Company State:
                 </label>
-                <Select value={stateFilter} onValueChange={setStateFilter}>
-                  <SelectTrigger className="bg-background/10 border-white/20 dark:bg-background dark:border-border text-inherit">
+                <Select value={stateFilter} onValueChange={setStateFilter} name="stateFilter">
+                  <SelectTrigger id="companies-state" className="bg-background/10 border-white/20 dark:bg-background dark:border-border text-inherit">
                     <SelectValue placeholder="Choose an option..." />
                   </SelectTrigger>
                   <SelectContent>

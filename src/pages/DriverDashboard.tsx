@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { useAuth } from "@/context/auth";
+import { useAuth, type User as AuthUser } from "@/context/auth";
 import { useActiveJobs } from "@/hooks/useJobs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { useDriverProfile, DriverProfile } from "@/hooks/useDriverProfile";
@@ -166,25 +166,21 @@ const DriverDashboard = () => {
   );
   if (!user || user.role !== "driver") return null;
 
-  return <DriverDashboardInner />;
+  return <DriverDashboardInner user={user} />;
 };
 
 // Inner component — only renders when auth is confirmed as driver
-const DriverDashboardInner = () => {
-  const { user } = useAuth();
+const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
   const qc = useQueryClient();
   const { jobs: allActiveJobs } = useActiveJobs();
   const { savedIds, toggle: toggleSave } = useSavedJobs(user!.id);
   const { profile, isLoading: profileLoading, saveProfile } = useDriverProfile(user!.id);
   const { data: unreadMsgCount = 0 } = useUnreadCount(user!.id);
-  const { data: recommendedMatches = [], isLoading: matchesLoading } = useDriverJobMatches(
-    user!.id,
-    { limit: 5, minScore: 30, excludeHidden: true },
-  );
   const { data: aiMatches = [], isLoading: aiMatchesLoading } = useDriverJobMatches(
     user!.id,
     { limit: 20, minScore: 0, excludeHidden: true },
   );
+  const matchesLoading = aiMatchesLoading;
   const { data: rollout } = useMatchingRollout();
   const feedbackMutation = useRecordDriverMatchFeedback(user!.id);
   const trackEventMutation = useTrackDriverMatchEvent(user!.id);
@@ -309,6 +305,10 @@ const DriverDashboardInner = () => {
     }
     return scored;
   }, [aiMatches, aiMinScoreValue, aiSort]);
+  const recommendedMatches = useMemo(
+    () => aiMatches.filter((m) => m.overallScore >= 30).slice(0, 5),
+    [aiMatches],
+  );
 
   const bestMatch = filteredAiMatches[0] ?? null;
   const newSinceYesterdayCount = filteredAiMatches.filter(
@@ -994,25 +994,25 @@ const DriverDashboardInner = () => {
             <div className="border border-border bg-card p-5 space-y-5">
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">First Name</Label>
-                  <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" />
+                  <Label htmlFor="driver-firstName" className="text-xs text-muted-foreground">First Name</Label>
+                  <Input id="driver-firstName" name="firstName" autoComplete="given-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Last Name</Label>
-                  <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" />
+                  <Label htmlFor="driver-lastName" className="text-xs text-muted-foreground">Last Name</Label>
+                  <Input id="driver-lastName" name="lastName" autoComplete="family-name" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Phone</Label>
-                  <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 000-0000" type="tel" />
+                  <Label htmlFor="driver-phone" className="text-xs text-muted-foreground">Phone</Label>
+                  <Input id="driver-phone" name="phone" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 000-0000" type="tel" />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">CDL Number</Label>
-                  <Input value={cdlNumber} onChange={(e) => setCdlNumber(e.target.value)} placeholder="CDL-XX-000000" />
+                  <Label htmlFor="driver-cdlNumber" className="text-xs text-muted-foreground">CDL Number</Label>
+                  <Input id="driver-cdlNumber" name="cdlNumber" autoComplete="off" value={cdlNumber} onChange={(e) => setCdlNumber(e.target.value)} placeholder="CDL-XX-000000" />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Driver Type</Label>
-                  <Select value={driverType} onValueChange={setDriverType}>
-                    <SelectTrigger><SelectValue placeholder="Select driver type" /></SelectTrigger>
+                  <Label htmlFor="driver-driverType" className="text-xs text-muted-foreground">Driver Type</Label>
+                  <Select value={driverType} onValueChange={setDriverType} name="driverType">
+                    <SelectTrigger id="driver-driverType"><SelectValue placeholder="Select driver type" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="company">Company Driver</SelectItem>
                       <SelectItem value="owner-operator">Owner Operator</SelectItem>
@@ -1022,17 +1022,17 @@ const DriverDashboardInner = () => {
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Zip Code</Label>
-                  <Input value={zipCode} onChange={(e) => setZipCode(e.target.value)} placeholder="00000" />
+                  <Label htmlFor="driver-zipCode" className="text-xs text-muted-foreground">Zip Code</Label>
+                  <Input id="driver-zipCode" name="zipCode" autoComplete="postal-code" value={zipCode} onChange={(e) => setZipCode(e.target.value)} placeholder="00000" />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Date of Birth</Label>
-                  <Input value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} type="date" />
+                  <Label htmlFor="driver-dob" className="text-xs text-muted-foreground">Date of Birth</Label>
+                  <Input id="driver-dob" name="dateOfBirth" autoComplete="bday" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} type="date" />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">License Class</Label>
-                  <Select value={licenseClass} onValueChange={setLicenseClass}>
-                    <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
+                  <Label htmlFor="driver-licenseClass" className="text-xs text-muted-foreground">License Class</Label>
+                  <Select value={licenseClass} onValueChange={setLicenseClass} name="licenseClass">
+                    <SelectTrigger id="driver-licenseClass"><SelectValue placeholder="Select class" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="a">Class A</SelectItem>
                       <SelectItem value="b">Class B</SelectItem>
@@ -1042,9 +1042,9 @@ const DriverDashboardInner = () => {
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Years of Experience</Label>
-                  <Select value={yearsExp} onValueChange={setYearsExp}>
-                    <SelectTrigger><SelectValue placeholder="Select experience" /></SelectTrigger>
+                  <Label htmlFor="driver-yearsExp" className="text-xs text-muted-foreground">Years of Experience</Label>
+                  <Select value={yearsExp} onValueChange={setYearsExp} name="yearsExp">
+                    <SelectTrigger id="driver-yearsExp"><SelectValue placeholder="Select experience" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
                       <SelectItem value="less-1">Less than 1 year</SelectItem>
@@ -1055,9 +1055,9 @@ const DriverDashboardInner = () => {
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">License State</Label>
-                  <Select value={licenseState} onValueChange={setLicenseState}>
-                    <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
+                  <Label htmlFor="driver-licenseState" className="text-xs text-muted-foreground">License State</Label>
+                  <Select value={licenseState} onValueChange={setLicenseState} name="licenseState">
+                    <SelectTrigger id="driver-licenseState"><SelectValue placeholder="Select state" /></SelectTrigger>
                     <SelectContent>
                       {US_STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                     </SelectContent>
@@ -1065,8 +1065,10 @@ const DriverDashboardInner = () => {
                 </div>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">About Me (optional)</Label>
+                <Label htmlFor="driver-about" className="text-xs text-muted-foreground">About Me (optional)</Label>
                 <Textarea
+                  id="driver-about"
+                  name="about"
                   value={about}
                   onChange={(e) => setAbout(e.target.value)}
                   placeholder="Tell companies a bit about yourself, your experience, what you're looking for..."

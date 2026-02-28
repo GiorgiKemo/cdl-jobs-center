@@ -13,8 +13,12 @@ import { Link } from "react-router-dom";
 import { useApplication } from "@/hooks/useApplication";
 import { useAuth } from "@/context/auth";
 import { useDriverProfile } from "@/hooks/useDriverProfile";
+import { useRefreshMyMatches, useDriverJobMatches } from "@/hooks/useMatchScores";
+import { useQueryClient } from "@tanstack/react-query";
 import { SignInModal } from "@/components/SignInModal";
-import { Truck, CheckCircle2, ChevronDown, ChevronUp, Check, Clock, User, Briefcase, Settings, X } from "lucide-react";
+import { AIGenerationScreen } from "@/components/matching/AIGenerationScreen";
+import { MatchResultsReveal } from "@/components/matching/MatchResultsReveal";
+import { Sparkles, ChevronDown, ChevronUp, Check, Clock, User, Briefcase, Settings, CheckCircle2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 const US_STATES = [
@@ -27,20 +31,6 @@ const US_STATES = [
   "Virginia","Washington","West Virginia","Wisconsin","Wyoming",
 ];
 
-const DRIVER_TYPE_LABELS: Record<string, string> = {
-  company: "Company Driver",
-  "owner-operator": "Owner Operator",
-  lease: "Lease Operator",
-  student: "Student / Trainee",
-};
-
-const LICENSE_CLASS_LABELS: Record<string, string> = {
-  a: "Class A",
-  b: "Class B",
-  c: "Class C",
-  permit: "Permit Only",
-};
-
 // ── Inline helpers ──
 
 const ProgressBar = ({ step }: { step: number }) => {
@@ -48,11 +38,17 @@ const ProgressBar = ({ step }: { step: number }) => {
     { num: 1, label: "Personal Info", icon: User },
     { num: 2, label: "Experience", icon: Briefcase },
     { num: 3, label: "Preferences", icon: Settings },
+    { num: 4, label: "AI Matching", icon: Sparkles },
+    { num: 5, label: "Results", icon: CheckCircle2 },
   ];
+
+  // For steps 4 & 5, hide the form-style progress and show a simpler indicator
+  if (step >= 4) return null;
+
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between mb-2">
-        {steps.map((s, i) => (
+        {steps.slice(0, 3).map((s, i) => (
           <div key={s.num} className="flex items-center flex-1">
             <div className="flex items-center gap-2">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
@@ -64,7 +60,7 @@ const ProgressBar = ({ step }: { step: number }) => {
                 {s.label}
               </span>
             </div>
-            {i < steps.length - 1 && (
+            {i < 2 && (
               <div className={`flex-1 h-0.5 mx-3 transition-colors ${step > s.num ? "bg-green-500" : "bg-muted"}`} />
             )}
           </div>
@@ -108,10 +104,10 @@ const CollapsibleSection = ({ title, children, defaultOpen = false }: { title: s
   );
 };
 
-const ToggleRow = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) => (
+const ToggleRow = ({ id, name, label, checked, onChange }: { id?: string; name?: string; label: string; checked: boolean; onChange: (v: boolean) => void }) => (
   <div className="flex items-center justify-between py-1.5">
-    <span className="text-sm text-foreground">{label}</span>
-    <Switch checked={checked} onCheckedChange={onChange} className="data-[state=unchecked]:bg-muted" />
+    <label htmlFor={id} className="text-sm text-foreground cursor-pointer">{label}</label>
+    <Switch id={id} name={name} checked={checked} onCheckedChange={onChange} className="data-[state=unchecked]:bg-muted" />
   </div>
 );
 
@@ -120,13 +116,18 @@ const ApplyNow = () => {
   const [signInOpen, setSignInOpen] = useState(false);
   const { load, save } = useApplication();
   const saved = load();
-  const { profile } = useDriverProfile(user?.id ?? "");
+  const { profile, saveProfile } = useDriverProfile(user?.id ?? "");
+  const refreshMyMatches = useRefreshMyMatches(user?.id);
+  const queryClient = useQueryClient();
 
   const [step, setStep] = useState(1);
-  const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
+
+  // AI matching state
+  const [matchesStartedAt, setMatchesStartedAt] = useState<number | null>(null);
+  const [animationComplete, setAnimationComplete] = useState(false);
 
   const [firstName, setFirstName] = useState(saved.firstName ?? "");
   const [lastName, setLastName] = useState(saved.lastName ?? "");
@@ -171,6 +172,47 @@ const ApplyNow = () => {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Fetch matches — only when step >= 4
+  const { data: matches = [] } = useDriverJobMatches(
+    step >= 4 ? user?.id : undefined,
+    { limit: 20, minScore: 0, excludeHidden: true },
+  );
+
+  // Poll for fresh matches during step 4
+  useEffect(() => {
+    if (step !== 4 || !user?.id) return;
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ["driver-matches", user.id] });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [step, user?.id, queryClient]);
+
+  // Transition from step 4 → 5 when animation complete
+  useEffect(() => {
+    if (step !== 4 || !animationComplete || !matchesStartedAt) return;
+
+    // If we have any matches (fresh or stale), show them immediately
+    if (matches.length > 0) {
+      setStep(5);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    // No matches at all — wait up to 15s for results, then show empty state
+    const elapsed = Date.now() - matchesStartedAt;
+    if (elapsed > 15000) {
+      setStep(5);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    // Check again in 1s
+    const timer = setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ["driver-matches", user?.id] });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [step, animationComplete, matchesStartedAt, matches, queryClient, user?.id]);
+
   // Pre-fill empty fields from driver profile (Supabase)
   useEffect(() => {
     if (!profile) return;
@@ -202,16 +244,16 @@ const ApplyNow = () => {
         <main className="container mx-auto py-16 max-w-xl text-center">
           <p className="text-sm text-muted-foreground mb-6">
             <Link to="/" className="text-primary hover:underline">Main</Link>
-            <span className="mx-1">»</span>
-            Add Application
+            <span className="mx-1">&raquo;</span>
+            AI Job Matching
           </p>
           <div className="border border-border bg-card p-12">
-            <Truck className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+            <Sparkles className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
             {!user ? (
               <>
-                <h2 className="font-display font-bold text-lg mb-2">Sign in to apply</h2>
+                <h2 className="font-display font-bold text-lg mb-2">Sign in to find your matches</h2>
                 <p className="text-sm text-muted-foreground mb-6">
-                  You need a driver account to submit an application.
+                  You need a driver account to use AI job matching.
                 </p>
                 <Button onClick={() => setSignInOpen(true)}>Sign In / Register</Button>
               </>
@@ -219,7 +261,7 @@ const ApplyNow = () => {
               <>
                 <h2 className="font-display font-bold text-lg mb-2">Not available</h2>
                 <p className="text-sm text-muted-foreground">
-                  Company accounts cannot submit driver applications.
+                  Company accounts cannot use driver job matching.
                 </p>
               </>
             )}
@@ -227,44 +269,6 @@ const ApplyNow = () => {
         </main>
         <Footer />
         {signInOpen && <SignInModal onClose={() => setSignInOpen(false)} />}
-      </div>
-    );
-  }
-
-  // Confirmation screen
-  if (submitted) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <main className="container mx-auto py-8 max-w-3xl">
-          <p className="text-sm text-muted-foreground mb-6">
-            <Link to="/" className="text-primary hover:underline">Main</Link>
-            <span className="mx-1">»</span>
-            Add Application
-          </p>
-          <div className="border border-border bg-card p-12 text-center">
-            <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <h2 className="font-display font-bold text-2xl mb-2">Application Submitted!</h2>
-            <p className="text-sm text-muted-foreground mb-1">
-              <strong>{firstName} {lastName}</strong>
-            </p>
-            <p className="text-sm text-muted-foreground mb-6">
-              {DRIVER_TYPE_LABELS[driverType] ?? driverType} &mdash; {LICENSE_CLASS_LABELS[licenseClass] ?? licenseClass}
-            </p>
-            <p className="text-sm text-muted-foreground mb-8 max-w-md mx-auto">
-              Your application has been received. You can track its status from your driver dashboard.
-            </p>
-            <div className="flex gap-3 justify-center flex-wrap">
-              <Button asChild>
-                <Link to="/driver-dashboard">View My Applications</Link>
-              </Button>
-              <Button variant="outline" asChild>
-                <Link to="/jobs">Browse Jobs</Link>
-              </Button>
-            </div>
-          </div>
-        </main>
-        <Footer />
       </div>
     );
   }
@@ -342,51 +346,35 @@ const ApplyNow = () => {
     try {
       saveDraft();
 
-      const insertPromise = supabase.from("applications").insert({
-        driver_id: user.id,
-        company_id: null,
-        job_id: null,
-        company_name: "General Application",
-        job_title: "General Application",
-        first_name: firstName,
-        last_name: lastName,
-        email,
-        phone,
-        cdl_number: cdlNumber,
-        zip_code: zipCode,
-        available_date: date || null,
-        driver_type: driverType,
-        license_class: licenseClass,
-        years_exp: yearsExp,
-        license_state: licenseState,
-        solo_team: soloTeam,
-        notes,
-        prefs,
-        endorse,
-        hauler,
-        route,
-        extra,
-        pipeline_stage: "New",
-      });
+      // Run profile save + application insert + match refresh in parallel
+      await Promise.all([
+        // 1. Upsert driver profile
+        saveProfile({
+          firstName, lastName, phone, cdlNumber, driverType, licenseClass,
+          yearsExp, licenseState, zipCode, dateOfBirth: date, about: notes,
+        }),
+        // 2. Insert enrichment application (non-fatal)
+        supabase.from("applications").insert({
+          driver_id: user.id, company_id: null, job_id: null,
+          company_name: "General Application", job_title: "AI Match Profile",
+          first_name: firstName, last_name: lastName, email, phone,
+          cdl_number: cdlNumber, zip_code: zipCode, available_date: date || null,
+          driver_type: driverType, license_class: licenseClass,
+          years_exp: yearsExp, license_state: licenseState, solo_team: soloTeam,
+          notes, prefs, endorse, hauler, route, extra, pipeline_stage: "New",
+        }).then(({ error }) => { if (error) console.error("Application insert error:", error); }),
+        // 3. Trigger match refresh (non-fatal)
+        refreshMyMatches.mutateAsync().catch(() => {}),
+      ]);
 
-      const timeoutPromise = new Promise<never>((_res, reject) =>
-        setTimeout(() => reject(new Error("Request timed out. Check your connection and try again.")), 30000)
-      );
-
-      const { error } = await Promise.race([insertPromise, timeoutPromise]) as { error: unknown };
-      if (error) {
-        const msg =
-          error instanceof Error
-            ? error.message
-            : (error as { message?: string })?.message ?? "Submission failed.";
-        console.error("Application insert error:", error);
-        toast.error(msg);
-        return;
-      }
-      setSubmitted(true);
+      // 4. Transition to AI generation screen
+      setMatchesStartedAt(Date.now());
+      setAnimationComplete(false);
+      setStep(4);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Submission failed. Please try again.";
-      console.error("Application submit error:", err);
+      const msg = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+      console.error("Submit error:", err);
       toast.error(msg);
     } finally {
       setSubmitting(false);
@@ -396,6 +384,11 @@ const ApplyNow = () => {
   // Check if profile has enough data for summary card
   const hasProfileData = firstName && lastName && email && cdlNumber;
 
+  // Determine if matches are still computing (no fresh results since submission)
+  const isStillComputing = matchesStartedAt
+    ? !matches.some((m) => new Date(m.computedAt).getTime() > matchesStartedAt)
+    : false;
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -404,18 +397,18 @@ const ApplyNow = () => {
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-6">
           <Link to="/" className="text-primary hover:underline">Main</Link>
-          <span className="mx-1">»</span>
-          Add Application
+          <span className="mx-1">&raquo;</span>
+          AI Job Matching
         </p>
 
-        <form onSubmit={handleSubmit} className="bg-card border border-border shadow-sm">
+        <div className="bg-card border border-border shadow-sm">
           <div className="px-6 pt-6 pb-8">
 
-            {/* Progress bar */}
+            {/* Progress bar — only shows for steps 1-3 */}
             <ProgressBar step={step} />
 
             {/* Draft saved indicator */}
-            {draftSaved && (
+            {draftSaved && step <= 3 && (
               <p className="text-xs text-green-500 mb-4 flex items-center gap-1">
                 <Check className="h-3 w-3" /> Draft saved
               </p>
@@ -423,256 +416,287 @@ const ApplyNow = () => {
 
             {/* ── STEP 1: Personal Info ── */}
             {step === 1 && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-display font-semibold text-lg">Personal Information</h2>
-                  {editingProfile && (
-                    <button type="button" onClick={() => setEditingProfile(false)} className="text-muted-foreground hover:text-foreground transition-colors" title="Cancel editing">
-                      <X className="h-5 w-5" />
-                    </button>
+              <form onSubmit={handleSubmit}>
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-display font-semibold text-lg">Personal Information</h2>
+                    {editingProfile && (
+                      <button type="button" onClick={() => setEditingProfile(false)} className="text-muted-foreground hover:text-foreground transition-colors" title="Cancel editing">
+                        <X className="h-5 w-5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Profile summary card for logged-in users with data */}
+                  {hasProfileData && !editingProfile ? (
+                    <div className="border border-border rounded-lg p-4 bg-muted/30">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-sm font-medium text-foreground">Your profile:</p>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setEditingProfile(true)} className="text-xs">
+                          Edit details
+                        </Button>
+                      </div>
+                      <div className="grid sm:grid-cols-2 gap-2 text-sm">
+                        <p><span className="text-muted-foreground">Name:</span> {firstName} {lastName}</p>
+                        <p><span className="text-muted-foreground">Email:</span> {email}</p>
+                        <p><span className="text-muted-foreground">Phone:</span> {phone || "—"}</p>
+                        <p><span className="text-muted-foreground">CDL #:</span> {cdlNumber}</p>
+                        <p><span className="text-muted-foreground">Zip:</span> {zipCode || "—"}</p>
+                        <p><span className="text-muted-foreground">Available:</span> {date || "—"}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <Label htmlFor="apply-firstName" className="text-xs text-muted-foreground">First Name *</Label>
+                          <Input id="apply-firstName" name="firstName" autoComplete="given-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" className={errors.firstName ? "border-destructive" : ""} />
+                          {errors.firstName && <p className="text-xs text-destructive">{errors.firstName}</p>}
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="apply-lastName" className="text-xs text-muted-foreground">Last Name *</Label>
+                          <Input id="apply-lastName" name="lastName" autoComplete="family-name" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" className={errors.lastName ? "border-destructive" : ""} />
+                          {errors.lastName && <p className="text-xs text-destructive">{errors.lastName}</p>}
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="apply-email" className="text-xs text-muted-foreground">Email *</Label>
+                          <Input id="apply-email" name="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" className={errors.email ? "border-destructive" : ""} />
+                          {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="apply-phone" className="text-xs text-muted-foreground">Phone *</Label>
+                          <Input id="apply-phone" name="phone" type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 000-0000" className={errors.phone ? "border-destructive" : ""} />
+                          {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="apply-cdlNumber" className="text-xs text-muted-foreground">CDL Number *</Label>
+                          <Input id="apply-cdlNumber" name="cdlNumber" autoComplete="off" value={cdlNumber} onChange={(e) => setCdlNumber(e.target.value)} placeholder="CDL-XX-000000" className={errors.cdlNumber ? "border-destructive" : ""} />
+                          {errors.cdlNumber && <p className="text-xs text-destructive">{errors.cdlNumber}</p>}
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="apply-zipCode" className="text-xs text-muted-foreground">Zip Code *</Label>
+                          <Input id="apply-zipCode" name="zipCode" autoComplete="postal-code" value={zipCode} onChange={(e) => setZipCode(e.target.value)} placeholder="00000" className={errors.zipCode ? "border-destructive" : ""} />
+                          {errors.zipCode && <p className="text-xs text-destructive">{errors.zipCode}</p>}
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="apply-availableDate" className="text-xs text-muted-foreground">Available Date</Label>
+                          <Input id="apply-availableDate" name="availableDate" type="date" autoComplete="off" value={date} onChange={(e) => setDate(e.target.value)} />
+                        </div>
+                      </div>
+                    </div>
                   )}
-                </div>
 
-                {/* Profile summary card for logged-in users with data */}
-                {hasProfileData && !editingProfile ? (
-                  <div className="border border-border rounded-lg p-4 bg-muted/30">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm font-medium text-foreground">Applying as:</p>
-                      <Button type="button" variant="ghost" size="sm" onClick={() => setEditingProfile(true)} className="text-xs">
-                        Edit details
-                      </Button>
-                    </div>
-                    <div className="grid sm:grid-cols-2 gap-2 text-sm">
-                      <p><span className="text-muted-foreground">Name:</span> {firstName} {lastName}</p>
-                      <p><span className="text-muted-foreground">Email:</span> {email}</p>
-                      <p><span className="text-muted-foreground">Phone:</span> {phone || "—"}</p>
-                      <p><span className="text-muted-foreground">CDL #:</span> {cdlNumber}</p>
-                      <p><span className="text-muted-foreground">Zip:</span> {zipCode || "—"}</p>
-                      <p><span className="text-muted-foreground">Available:</span> {date || "—"}</p>
-                    </div>
+                  <div className="flex justify-between pt-4">
+                    {editingProfile ? (
+                      <Button type="button" variant="outline" onClick={() => setEditingProfile(false)}>Cancel editing</Button>
+                    ) : <div />}
+                    <Button type="button" onClick={nextStep} className="px-8">
+                      Next
+                    </Button>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">First Name *</Label>
-                        <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" className={errors.firstName ? "border-destructive" : ""} />
-                        {errors.firstName && <p className="text-xs text-destructive">{errors.firstName}</p>}
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Last Name *</Label>
-                        <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" className={errors.lastName ? "border-destructive" : ""} />
-                        {errors.lastName && <p className="text-xs text-destructive">{errors.lastName}</p>}
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Email *</Label>
-                        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" className={errors.email ? "border-destructive" : ""} />
-                        {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Phone *</Label>
-                        <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 000-0000" className={errors.phone ? "border-destructive" : ""} />
-                        {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">CDL Number *</Label>
-                        <Input value={cdlNumber} onChange={(e) => setCdlNumber(e.target.value)} placeholder="CDL-XX-000000" className={errors.cdlNumber ? "border-destructive" : ""} />
-                        {errors.cdlNumber && <p className="text-xs text-destructive">{errors.cdlNumber}</p>}
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Zip Code *</Label>
-                        <Input value={zipCode} onChange={(e) => setZipCode(e.target.value)} placeholder="00000" className={errors.zipCode ? "border-destructive" : ""} />
-                        {errors.zipCode && <p className="text-xs text-destructive">{errors.zipCode}</p>}
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Available Date</Label>
-                        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex justify-between pt-4">
-                  {editingProfile ? (
-                    <Button type="button" variant="outline" onClick={() => setEditingProfile(false)}>Cancel editing</Button>
-                  ) : <div />}
-                  <Button type="button" onClick={nextStep} className="px-8">
-                    Next
-                  </Button>
                 </div>
-              </div>
+              </form>
             )}
 
             {/* ── STEP 2: Experience ── */}
             {step === 2 && (
-              <div className="space-y-6">
-                <h2 className="font-display font-semibold text-lg">Driving Experience</h2>
+              <form onSubmit={handleSubmit}>
+                <div className="space-y-6">
+                  <h2 className="font-display font-semibold text-lg">Driving Experience</h2>
 
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Driver Type *</Label>
-                    <Select value={driverType} onValueChange={(v) => { setDriverType(v); setErrors((p) => ({ ...p, driverType: "" })); }}>
-                      <SelectTrigger className={errors.driverType ? "border-destructive" : ""}><SelectValue placeholder="Select driver type" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="company">Company Driver</SelectItem>
-                        <SelectItem value="owner-operator">Owner Operator</SelectItem>
-                        <SelectItem value="lease">Lease Operator</SelectItem>
-                        <SelectItem value="student">Student / Trainee</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {errors.driverType && <p className="text-xs text-destructive">{errors.driverType}</p>}
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="apply-driverType" className="text-xs text-muted-foreground">Driver Type *</Label>
+                      <Select value={driverType} onValueChange={(v) => { setDriverType(v); setErrors((p) => ({ ...p, driverType: "" })); }} name="driverType">
+                        <SelectTrigger id="apply-driverType" className={errors.driverType ? "border-destructive" : ""}><SelectValue placeholder="Select driver type" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="company">Company Driver</SelectItem>
+                          <SelectItem value="owner-operator">Owner Operator</SelectItem>
+                          <SelectItem value="lease">Lease Operator</SelectItem>
+                          <SelectItem value="student">Student / Trainee</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {errors.driverType && <p className="text-xs text-destructive">{errors.driverType}</p>}
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="apply-licenseClass" className="text-xs text-muted-foreground">License Class *</Label>
+                      <Select value={licenseClass} onValueChange={(v) => { setLicenseClass(v); setErrors((p) => ({ ...p, licenseClass: "" })); }} name="licenseClass">
+                        <SelectTrigger id="apply-licenseClass" className={errors.licenseClass ? "border-destructive" : ""}><SelectValue placeholder="Select class" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="a">Class A</SelectItem>
+                          <SelectItem value="b">Class B</SelectItem>
+                          <SelectItem value="c">Class C</SelectItem>
+                          <SelectItem value="permit">Permit Only</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {errors.licenseClass && <p className="text-xs text-destructive">{errors.licenseClass}</p>}
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="apply-yearsExp" className="text-xs text-muted-foreground">Years Experience *</Label>
+                      <Select value={yearsExp} onValueChange={(v) => { setYearsExp(v); setErrors((p) => ({ ...p, yearsExp: "" })); }} name="yearsExp">
+                        <SelectTrigger id="apply-yearsExp" className={errors.yearsExp ? "border-destructive" : ""}><SelectValue placeholder="Select experience" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="less-1">Less than 1 year</SelectItem>
+                          <SelectItem value="1-3">1-3 years</SelectItem>
+                          <SelectItem value="3-5">3-5 years</SelectItem>
+                          <SelectItem value="5+">5+ years</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {errors.yearsExp && <p className="text-xs text-destructive">{errors.yearsExp}</p>}
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="apply-licenseState" className="text-xs text-muted-foreground">License State *</Label>
+                      <Select value={licenseState} onValueChange={(v) => { setLicenseState(v); setErrors((p) => ({ ...p, licenseState: "" })); }} name="licenseState">
+                        <SelectTrigger id="apply-licenseState" className={errors.licenseState ? "border-destructive" : ""}><SelectValue placeholder="Select state" /></SelectTrigger>
+                        <SelectContent>
+                          {US_STATES.map((s) => (
+                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {errors.licenseState && <p className="text-xs text-destructive">{errors.licenseState}</p>}
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">License Class *</Label>
-                    <Select value={licenseClass} onValueChange={(v) => { setLicenseClass(v); setErrors((p) => ({ ...p, licenseClass: "" })); }}>
-                      <SelectTrigger className={errors.licenseClass ? "border-destructive" : ""}><SelectValue placeholder="Select class" /></SelectTrigger>
+
+                  {/* Solo/Team */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-foreground">Interested in solo or team driving?</span>
+                    <Select value={soloTeam} onValueChange={setSoloTeam} name="soloTeam">
+                      <SelectTrigger id="apply-soloTeam" className="w-32"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="a">Class A</SelectItem>
-                        <SelectItem value="b">Class B</SelectItem>
-                        <SelectItem value="c">Class C</SelectItem>
-                        <SelectItem value="permit">Permit Only</SelectItem>
+                        <SelectItem value="Solo">Solo</SelectItem>
+                        <SelectItem value="Team">Team</SelectItem>
+                        <SelectItem value="Either">Either</SelectItem>
                       </SelectContent>
                     </Select>
-                    {errors.licenseClass && <p className="text-xs text-destructive">{errors.licenseClass}</p>}
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Years Experience *</Label>
-                    <Select value={yearsExp} onValueChange={(v) => { setYearsExp(v); setErrors((p) => ({ ...p, yearsExp: "" })); }}>
-                      <SelectTrigger className={errors.yearsExp ? "border-destructive" : ""}><SelectValue placeholder="Select experience" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        <SelectItem value="less-1">Less than 1 year</SelectItem>
-                        <SelectItem value="1-3">1-3 years</SelectItem>
-                        <SelectItem value="3-5">3-5 years</SelectItem>
-                        <SelectItem value="5+">5+ years</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {errors.yearsExp && <p className="text-xs text-destructive">{errors.yearsExp}</p>}
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">License State *</Label>
-                    <Select value={licenseState} onValueChange={(v) => { setLicenseState(v); setErrors((p) => ({ ...p, licenseState: "" })); }}>
-                      <SelectTrigger className={errors.licenseState ? "border-destructive" : ""}><SelectValue placeholder="Select state" /></SelectTrigger>
-                      <SelectContent>
-                        {US_STATES.map((s) => (
-                          <SelectItem key={s} value={s}>{s}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.licenseState && <p className="text-xs text-destructive">{errors.licenseState}</p>}
+
+                  {/* Endorsements — collapsible with chips */}
+                  <CollapsibleSection title="Endorsements (optional)">
+                    <div className="flex flex-wrap gap-2">
+                      <Chip label="Doubles/Triples (T)" selected={endorse.doublesTriples} onClick={tog(setEndorse, "doublesTriples")} />
+                      <Chip label="HAZMAT (H)" selected={endorse.hazmat} onClick={tog(setEndorse, "hazmat")} />
+                      <Chip label="Tank Vehicles (N)" selected={endorse.tankVehicles} onClick={tog(setEndorse, "tankVehicles")} />
+                      <Chip label="Tanker + HAZMAT (X)" selected={endorse.tankerHazmat} onClick={tog(setEndorse, "tankerHazmat")} />
+                    </div>
+                  </CollapsibleSection>
+
+                  <div className="flex justify-between pt-4">
+                    <Button type="button" variant="outline" onClick={prevStep}>Back</Button>
+                    <Button type="button" onClick={nextStep} className="px-8">Next</Button>
                   </div>
                 </div>
-
-                {/* Solo/Team */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-foreground">Interested in solo or team driving?</span>
-                  <Select value={soloTeam} onValueChange={setSoloTeam}>
-                    <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Solo">Solo</SelectItem>
-                      <SelectItem value="Team">Team</SelectItem>
-                      <SelectItem value="Either">Either</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Endorsements — collapsible with chips */}
-                <CollapsibleSection title="Endorsements (optional)">
-                  <div className="flex flex-wrap gap-2">
-                    <Chip label="Doubles/Triples (T)" selected={endorse.doublesTriples} onClick={tog(setEndorse, "doublesTriples")} />
-                    <Chip label="HAZMAT (H)" selected={endorse.hazmat} onClick={tog(setEndorse, "hazmat")} />
-                    <Chip label="Tank Vehicles (N)" selected={endorse.tankVehicles} onClick={tog(setEndorse, "tankVehicles")} />
-                    <Chip label="Tanker + HAZMAT (X)" selected={endorse.tankerHazmat} onClick={tog(setEndorse, "tankerHazmat")} />
-                  </div>
-                </CollapsibleSection>
-
-                <div className="flex justify-between pt-4">
-                  <Button type="button" variant="outline" onClick={prevStep}>Back</Button>
-                  <Button type="button" onClick={nextStep} className="px-8">Next</Button>
-                </div>
-              </div>
+              </form>
             )}
 
             {/* ── STEP 3: Preferences & Submit ── */}
             {step === 3 && (
-              <div className="space-y-6">
-                <h2 className="font-display font-semibold text-lg">Preferences</h2>
+              <form onSubmit={handleSubmit}>
+                <div className="space-y-6">
+                  <h2 className="font-display font-semibold text-lg">Preferences</h2>
 
-                {/* Hauler experience — chips */}
-                <CollapsibleSection title="Hauler Experience (optional)">
-                  <div className="flex flex-wrap gap-2">
-                    <Chip label="Box" selected={hauler.box} onClick={tog(setHauler, "box")} />
-                    <Chip label="Car Hauler" selected={hauler.carHaul} onClick={tog(setHauler, "carHaul")} />
-                    <Chip label="Drop and Hook" selected={hauler.dropAndHook} onClick={tog(setHauler, "dropAndHook")} />
-                    <Chip label="Dry Bulk" selected={hauler.dryBulk} onClick={tog(setHauler, "dryBulk")} />
-                    <Chip label="Dry Van" selected={hauler.dryVan} onClick={tog(setHauler, "dryVan")} />
-                    <Chip label="Flatbed" selected={hauler.flatbed} onClick={tog(setHauler, "flatbed")} />
-                    <Chip label="Hopper Bottom" selected={hauler.hopperBottom} onClick={tog(setHauler, "hopperBottom")} />
-                    <Chip label="Intermodal" selected={hauler.intermodal} onClick={tog(setHauler, "intermodal")} />
-                    <Chip label="Oil Field" selected={hauler.oilField} onClick={tog(setHauler, "oilField")} />
-                    <Chip label="Oversize Load" selected={hauler.oversizeLoad} onClick={tog(setHauler, "oversizeLoad")} />
-                    <Chip label="Refrigerated" selected={hauler.refrigerated} onClick={tog(setHauler, "refrigerated")} />
-                    <Chip label="Tanker" selected={hauler.tanker} onClick={tog(setHauler, "tanker")} />
+                  {/* Hauler experience — chips */}
+                  <CollapsibleSection title="Hauler Experience (optional)">
+                    <div className="flex flex-wrap gap-2">
+                      <Chip label="Box" selected={hauler.box} onClick={tog(setHauler, "box")} />
+                      <Chip label="Car Hauler" selected={hauler.carHaul} onClick={tog(setHauler, "carHaul")} />
+                      <Chip label="Drop and Hook" selected={hauler.dropAndHook} onClick={tog(setHauler, "dropAndHook")} />
+                      <Chip label="Dry Bulk" selected={hauler.dryBulk} onClick={tog(setHauler, "dryBulk")} />
+                      <Chip label="Dry Van" selected={hauler.dryVan} onClick={tog(setHauler, "dryVan")} />
+                      <Chip label="Flatbed" selected={hauler.flatbed} onClick={tog(setHauler, "flatbed")} />
+                      <Chip label="Hopper Bottom" selected={hauler.hopperBottom} onClick={tog(setHauler, "hopperBottom")} />
+                      <Chip label="Intermodal" selected={hauler.intermodal} onClick={tog(setHauler, "intermodal")} />
+                      <Chip label="Oil Field" selected={hauler.oilField} onClick={tog(setHauler, "oilField")} />
+                      <Chip label="Oversize Load" selected={hauler.oversizeLoad} onClick={tog(setHauler, "oversizeLoad")} />
+                      <Chip label="Refrigerated" selected={hauler.refrigerated} onClick={tog(setHauler, "refrigerated")} />
+                      <Chip label="Tanker" selected={hauler.tanker} onClick={tog(setHauler, "tanker")} />
+                    </div>
+                  </CollapsibleSection>
+
+                  {/* Route preference — chips */}
+                  <CollapsibleSection title="Route Preference (optional)">
+                    <div className="flex flex-wrap gap-2">
+                      <Chip label="Dedicated" selected={route.dedicated} onClick={tog(setRoute, "dedicated")} />
+                      <Chip label="Local" selected={route.local} onClick={tog(setRoute, "local")} />
+                      <Chip label="LTL" selected={route.ltl} onClick={tog(setRoute, "ltl")} />
+                      <Chip label="OTR" selected={route.otr} onClick={tog(setRoute, "otr")} />
+                      <Chip label="Regional" selected={route.regional} onClick={tog(setRoute, "regional")} />
+                    </div>
+                  </CollapsibleSection>
+
+                  {/* Job priorities — chips */}
+                  <CollapsibleSection title="What do you want in your next job? (optional)" defaultOpen>
+                    <div className="flex flex-wrap gap-2">
+                      <Chip label="Better Pay" selected={prefs.betterPay} onClick={tog(setPrefs, "betterPay")} />
+                      <Chip label="Better Home Time" selected={prefs.betterHomeTime} onClick={tog(setPrefs, "betterHomeTime")} />
+                      <Chip label="Health Insurance" selected={prefs.healthInsurance} onClick={tog(setPrefs, "healthInsurance")} />
+                      <Chip label="Bonuses" selected={prefs.bonuses} onClick={tog(setPrefs, "bonuses")} />
+                      <Chip label="New Equipment" selected={prefs.newEquipment} onClick={tog(setPrefs, "newEquipment")} />
+                    </div>
+                  </CollapsibleSection>
+
+                  {/* Additional questions — keep as toggles */}
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium text-foreground">Additional Information</h3>
+                    <ToggleRow id="apply-leasePurchase" name="leasePurchase" label="Interested in lease purchase?" checked={extra.leasePurchase} onChange={(v) => setExtra(p => ({ ...p, leasePurchase: v }))} />
+                    <ToggleRow id="apply-accidents" name="accidents" label="Accidents or violations in the past 3 years?" checked={extra.accidents} onChange={(v) => setExtra(p => ({ ...p, accidents: v }))} />
+                    <ToggleRow id="apply-suspended" name="suspended" label="License suspended or DUI/DWI in the past 10 years?" checked={extra.suspended} onChange={(v) => setExtra(p => ({ ...p, suspended: v }))} />
+                    <ToggleRow id="apply-newsletters" name="newsletters" label="Sign me up for newsletters and job alerts" checked={extra.newsletters} onChange={(v) => setExtra(p => ({ ...p, newsletters: v }))} />
                   </div>
-                </CollapsibleSection>
 
-                {/* Route preference — chips */}
-                <CollapsibleSection title="Route Preference (optional)">
-                  <div className="flex flex-wrap gap-2">
-                    <Chip label="Dedicated" selected={route.dedicated} onClick={tog(setRoute, "dedicated")} />
-                    <Chip label="Local" selected={route.local} onClick={tog(setRoute, "local")} />
-                    <Chip label="LTL" selected={route.ltl} onClick={tog(setRoute, "ltl")} />
-                    <Chip label="OTR" selected={route.otr} onClick={tog(setRoute, "otr")} />
-                    <Chip label="Regional" selected={route.regional} onClick={tog(setRoute, "regional")} />
+                  {/* Notes */}
+                  <div>
+                    <Label htmlFor="apply-notes" className="text-sm font-medium mb-2 block">Anything else we should know? (optional):</Label>
+                    <Textarea
+                      id="apply-notes"
+                      name="notes"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Tell us about yourself, your experience, or what you're looking for..."
+                      rows={4}
+                      className="resize-none"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1 text-right">
+                      {notes.trim() ? notes.trim().split(/\s+/).length : 0} words
+                    </p>
                   </div>
-                </CollapsibleSection>
 
-                {/* Job priorities — chips */}
-                <CollapsibleSection title="What do you want in your next job? (optional)" defaultOpen>
-                  <div className="flex flex-wrap gap-2">
-                    <Chip label="Better Pay" selected={prefs.betterPay} onClick={tog(setPrefs, "betterPay")} />
-                    <Chip label="Better Home Time" selected={prefs.betterHomeTime} onClick={tog(setPrefs, "betterHomeTime")} />
-                    <Chip label="Health Insurance" selected={prefs.healthInsurance} onClick={tog(setPrefs, "healthInsurance")} />
-                    <Chip label="Bonuses" selected={prefs.bonuses} onClick={tog(setPrefs, "bonuses")} />
-                    <Chip label="New Equipment" selected={prefs.newEquipment} onClick={tog(setPrefs, "newEquipment")} />
+                  <div className="flex justify-between pt-4">
+                    <Button type="button" variant="outline" onClick={prevStep}>Back</Button>
+                    <Button type="submit" className="px-8" disabled={submitting}>
+                      {submitting ? (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Find My Matches
+                        </>
+                      )}
+                    </Button>
                   </div>
-                </CollapsibleSection>
-
-                {/* Additional questions — keep as toggles */}
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium text-foreground">Additional Information</h3>
-                  <ToggleRow label="Interested in lease purchase?" checked={extra.leasePurchase} onChange={(v) => setExtra(p => ({ ...p, leasePurchase: v }))} />
-                  <ToggleRow label="Accidents or violations in the past 3 years?" checked={extra.accidents} onChange={(v) => setExtra(p => ({ ...p, accidents: v }))} />
-                  <ToggleRow label="License suspended or DUI/DWI in the past 10 years?" checked={extra.suspended} onChange={(v) => setExtra(p => ({ ...p, suspended: v }))} />
-                  <ToggleRow label="Sign me up for newsletters and job alerts" checked={extra.newsletters} onChange={(v) => setExtra(p => ({ ...p, newsletters: v }))} />
                 </div>
+              </form>
+            )}
 
-                {/* Notes */}
-                <div>
-                  <Label className="text-sm font-medium mb-2 block">Message to companies (optional):</Label>
-                  <Textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Tell companies about yourself, your experience, or anything else you'd like them to know..."
-                    rows={4}
-                    className="resize-none"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1 text-right">
-                    {notes.trim() ? notes.trim().split(/\s+/).length : 0} words
-                  </p>
-                </div>
+            {/* ── STEP 4: AI Generation Animation ── */}
+            {step === 4 && (
+              <AIGenerationScreen onAllPhasesComplete={() => setAnimationComplete(true)} />
+            )}
 
-                <div className="flex justify-between pt-4">
-                  <Button type="button" variant="outline" onClick={prevStep}>Back</Button>
-                  <Button type="submit" className="px-8" disabled={submitting}>
-                    {submitting ? "Submitting..." : "Send Application"}
-                  </Button>
-                </div>
-              </div>
+            {/* ── STEP 5: Match Results ── */}
+            {step === 5 && (
+              <MatchResultsReveal
+                matches={matches}
+                isStillComputing={isStillComputing}
+              />
             )}
 
           </div>
-        </form>
+        </div>
       </main>
 
       <Footer />

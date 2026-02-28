@@ -144,8 +144,8 @@ const Jobs = () => {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:block">Sort:</span>
-            <Select value={sortBy} onValueChange={(v) => { setSortBy(v); setPage(0); }}>
-              <SelectTrigger className="w-44 h-8 text-xs">
+            <Select value={sortBy} onValueChange={(v) => { setSortBy(v); setPage(0); }} name="sortBy">
+              <SelectTrigger id="jobs-sortBy" className="w-44 h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -171,10 +171,12 @@ const Jobs = () => {
 
               {/* Keyword search */}
               <div>
-                <label className="text-sm text-primary font-medium block mb-1">Search:</label>
+                <label htmlFor="jobs-search" className="text-sm text-primary font-medium block mb-1">Search:</label>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                   <Input
+                    id="jobs-search"
+                    name="search"
                     placeholder="Company, title, location..."
                     value={searchQuery}
                     onChange={(e) => setSearch(e.target.value)}
@@ -185,9 +187,9 @@ const Jobs = () => {
 
               {/* Driver Type */}
               <div>
-                <label className="text-sm text-primary font-medium block mb-1">Driver Type:</label>
-                <Select value={driverType} onValueChange={setDriver}>
-                  <SelectTrigger className="w-full">
+                <label htmlFor="jobs-driverType" className="text-sm text-primary font-medium block mb-1">Driver Type:</label>
+                <Select value={driverType} onValueChange={setDriver} name="driverType">
+                  <SelectTrigger id="jobs-driverType" className="w-full">
                     <SelectValue placeholder="Choose an option..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -201,9 +203,9 @@ const Jobs = () => {
 
               {/* Freight Type */}
               <div>
-                <label className="text-sm text-primary font-medium block mb-1">Freight Type:</label>
-                <Select value={freightType} onValueChange={setFreight}>
-                  <SelectTrigger className="w-full">
+                <label htmlFor="jobs-freightType" className="text-sm text-primary font-medium block mb-1">Freight Type:</label>
+                <Select value={freightType} onValueChange={setFreight} name="freightType">
+                  <SelectTrigger id="jobs-freightType" className="w-full">
                     <SelectValue placeholder="Choose an option..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -227,9 +229,9 @@ const Jobs = () => {
 
               {/* Route Type */}
               <div>
-                <label className="text-sm text-primary font-medium block mb-1">Route Type:</label>
-                <Select value={routeType} onValueChange={setRoute}>
-                  <SelectTrigger className="w-full">
+                <label htmlFor="jobs-routeType" className="text-sm text-primary font-medium block mb-1">Route Type:</label>
+                <Select value={routeType} onValueChange={setRoute} name="routeType">
+                  <SelectTrigger id="jobs-routeType" className="w-full">
                     <SelectValue placeholder="Choose an option..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -245,9 +247,9 @@ const Jobs = () => {
 
               {/* Team Driving */}
               <div>
-                <label className="text-sm text-primary font-medium block mb-1">Team Driving:</label>
-                <Select value={teamDriving} onValueChange={setTeam}>
-                  <SelectTrigger className="w-full">
+                <label htmlFor="jobs-teamDriving" className="text-sm text-primary font-medium block mb-1">Team Driving:</label>
+                <Select value={teamDriving} onValueChange={setTeam} name="teamDriving">
+                  <SelectTrigger id="jobs-teamDriving" className="w-full">
                     <SelectValue placeholder="Choose an option..." />
                   </SelectTrigger>
                   <SelectContent>

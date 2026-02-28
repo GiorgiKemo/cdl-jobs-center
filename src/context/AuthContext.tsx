@@ -1,4 +1,4 @@
-import { useState, useEffect, ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, ReactNode } from "react";
 import { AuthContext, User } from "./auth";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
@@ -9,7 +9,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const queryClient = useQueryClient();
 
-  const loadProfile = async (userId: string, userEmail: string) => {
+  const loadProfile = useCallback(async (userId: string, userEmail: string) => {
     // Retry up to 4 times with 600ms delay — the DB trigger that creates the
     // profiles row runs asynchronously and may not be committed yet on the
     // first attempt (especially right after signUp).
@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
     }
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     // Hydrate session on mount
@@ -60,14 +60,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [loadProfile]);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-  };
+  }, []);
 
-  const register = async (
+  const register = useCallback(async (
     name: string,
     email: string,
     password: string,
@@ -80,16 +80,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (error) throw error;
     return data.user;
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     queryClient.clear();
     clearAllApplicationDrafts();
-  };
+  }, [queryClient]);
+
+  const authValue = useMemo(
+    () => ({ user, loading, signIn, register, signOut }),
+    [user, loading, signIn, register, signOut],
+  );
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, register, signOut }}>
+    <AuthContext.Provider value={authValue}>
       {children}
     </AuthContext.Provider>
   );

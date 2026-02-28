@@ -249,6 +249,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
             </div>
             <form onSubmit={handleLogin} className="px-5 py-5 space-y-3">
               <Input
+                id="login-email"
                 placeholder="Email"
                 type="email"
                 name="email"
@@ -258,6 +259,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 autoComplete="username"
               />
               <Input
+                id="login-password"
                 type="password"
                 placeholder="Password"
                 name="loginPassword"
@@ -317,8 +319,10 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 Enter your email address and we'll send you a link to reset your password.
               </p>
               <Input
+                id="reset-email"
                 type="email"
                 placeholder="Email address"
+                name="resetEmail"
                 aria-label="Email address"
                 value={resetEmail}
                 onChange={(e) => setResetEmail(e.target.value)}
@@ -368,8 +372,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
             {/* Role selector — always visible at top */}
             <div className="px-5 pt-4 pb-2 border-b border-border shrink-0">
               <label className="text-sm text-primary font-medium block mb-1">Who are you?</label>
-              <Select value={role} onValueChange={(v) => setRole(v as "driver" | "company")}>
-                <SelectTrigger className="w-full" aria-label="Who are you?">
+              <Select value={role} onValueChange={(v) => setRole(v as "driver" | "company")} name="role">
+                <SelectTrigger id="reg-role" className="w-full" aria-label="Who are you?">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -383,6 +387,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
             {role === "driver" && (
               <form onSubmit={handleDriverRegister} className="px-5 py-4 space-y-3 overflow-y-auto flex-1">
                 <Input
+                  id="reg-username"
                   placeholder="Username *"
                   name="registerUsername"
                   aria-label="Username"
@@ -391,6 +396,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   autoComplete="username"
                 />
                 <Input
+                  id="reg-email"
                   type="email"
                   placeholder="Your e-mail *"
                   name="registerEmail"
@@ -400,6 +406,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   autoComplete="email"
                 />
                 <Input
+                  id="reg-password"
                   type="password"
                   placeholder="Password *"
                   name="registerPassword"
@@ -409,6 +416,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   autoComplete="new-password"
                 />
                 <Input
+                  id="reg-confirmPassword"
                   type="password"
                   placeholder="Confirm password *"
                   name="registerConfirmPassword"
@@ -420,6 +428,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 <hr className="border-border" />
                 <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Driver Profile</p>
                 <Input
+                  id="reg-driverName"
                   placeholder="Your name"
                   name="driverName"
                   aria-label="Your name"
@@ -428,6 +437,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   autoComplete="name"
                 />
                 <Input
+                  id="reg-homeAddress"
                   placeholder="Home Address"
                   name="homeAddress"
                   aria-label="Home address"
@@ -436,6 +446,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   autoComplete="street-address"
                 />
                 <Input
+                  id="reg-zipCode"
                   placeholder="Zip Code"
                   name="zipCode"
                   aria-label="Zip code"
@@ -444,6 +455,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   autoComplete="postal-code"
                 />
                 <Input
+                  id="reg-driverPhone"
                   placeholder="Phone Number"
                   type="tel"
                   name="driverPhone"
@@ -453,16 +465,18 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   autoComplete="tel"
                 />
                 <Input
+                  id="reg-cdlNumber"
                   placeholder="CDL Number"
                   name="cdlNumber"
                   aria-label="CDL number"
                   value={cdlNumber}
                   onChange={(e) => setCdlNumber(e.target.value)}
+                  autoComplete="off"
                 />
                 <div>
                   <label className="text-sm text-primary font-medium block mb-1">I am interested in:</label>
-                  <Select value={interestedIn} onValueChange={setInterestedIn}>
-                    <SelectTrigger className="w-full" aria-label="I am interested in"><SelectValue /></SelectTrigger>
+                  <Select value={interestedIn} onValueChange={setInterestedIn} name="interestedIn">
+                    <SelectTrigger id="reg-interestedIn" className="w-full" aria-label="I am interested in"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {DRIVER_INTERESTS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                     </SelectContent>
@@ -470,8 +484,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 </div>
                 <div>
                   <label className="text-sm text-primary font-medium block mb-1">In my next job I want:</label>
-                  <Select value={nextJobWant} onValueChange={setNextJobWant}>
-                    <SelectTrigger className="w-full" aria-label="In my next job I want"><SelectValue /></SelectTrigger>
+                  <Select value={nextJobWant} onValueChange={setNextJobWant} name="nextJobWant">
+                    <SelectTrigger id="reg-nextJobWant" className="w-full" aria-label="In my next job I want"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {DRIVER_NEXT_JOB.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                     </SelectContent>
@@ -479,8 +493,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 </div>
                 <div>
                   <label className="text-sm text-primary font-medium block mb-1">Any accidents or violations in the last 2 years?</label>
-                  <Select value={hasAccidents} onValueChange={setHasAccidents}>
-                    <SelectTrigger className="w-full" aria-label="Any accidents or violations in the last 2 years"><SelectValue /></SelectTrigger>
+                  <Select value={hasAccidents} onValueChange={setHasAccidents} name="hasAccidents">
+                    <SelectTrigger id="reg-hasAccidents" className="w-full" aria-label="Any accidents or violations in the last 2 years"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="No">No</SelectItem>
                       <SelectItem value="Yes">Yes</SelectItem>
@@ -489,8 +503,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 </div>
                 <div>
                   <label className="text-sm text-primary font-medium block mb-1">I want CDL Jobs Center staff to contact me with employment offers</label>
-                  <Select value={wantsContact} onValueChange={setWantsContact}>
-                    <SelectTrigger className="w-full" aria-label="Contact me with employment offers"><SelectValue /></SelectTrigger>
+                  <Select value={wantsContact} onValueChange={setWantsContact} name="wantsContact">
+                    <SelectTrigger id="reg-wantsContact" className="w-full" aria-label="Contact me with employment offers"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Yes">Yes</SelectItem>
                       <SelectItem value="No">No</SelectItem>
@@ -508,6 +522,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
             {role === "company" && (
               <form onSubmit={handleCompanyRegister} className="px-5 py-4 space-y-3 overflow-y-auto flex-1">
                 <Input
+                  id="co-email"
                   type="email"
                   placeholder="Your e-mail *"
                   name="companyEmail"
@@ -517,6 +532,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   autoComplete="email"
                 />
                 <Input
+                  id="co-password"
                   type="password"
                   placeholder="Password *"
                   name="companyPassword"
@@ -526,6 +542,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   autoComplete="new-password"
                 />
                 <Input
+                  id="co-confirmPassword"
                   type="password"
                   placeholder="Confirm password *"
                   name="companyConfirmPassword"
@@ -537,47 +554,57 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 <hr className="border-border" />
                 <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Company Profile</p>
                 <Input
+                  id="co-contactName"
                   placeholder="Your name *"
                   name="contactName"
                   aria-label="Contact name"
                   value={contactName}
                   onChange={(e) => setContactName(e.target.value)}
+                  autoComplete="name"
                 />
                 <Input
+                  id="co-contactTitle"
                   placeholder="Your title"
                   name="contactTitle"
                   aria-label="Contact title"
                   value={contactTitle}
                   onChange={(e) => setContactTitle(e.target.value)}
+                  autoComplete="organization-title"
                 />
                 <Input
+                  id="co-companyName"
                   placeholder="Company Name *"
                   name="companyName"
                   aria-label="Company name"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
+                  autoComplete="organization"
                 />
                 <Input
+                  id="co-companyAddress"
                   placeholder="Company Address"
                   name="companyAddress"
                   aria-label="Company address"
                   value={companyAddress}
                   onChange={(e) => setCompanyAddress(e.target.value)}
+                  autoComplete="street-address"
                 />
                 <Input
+                  id="co-companyPhone"
                   placeholder="Company phone number"
                   type="tel"
                   name="companyPhone"
                   aria-label="Company phone number"
                   value={companyPhone}
                   onChange={(e) => setCompanyPhone(e.target.value)}
+                  autoComplete="tel"
                 />
                 <div>
                   <label className="text-sm text-primary font-medium block mb-1">
                     What do you want to accomplish by using CDL Jobs Center?
                   </label>
-                  <Select value={companyGoal} onValueChange={setCompanyGoal}>
-                    <SelectTrigger className="w-full" aria-label="Company goal">
+                  <Select value={companyGoal} onValueChange={setCompanyGoal} name="companyGoal">
+                    <SelectTrigger id="co-companyGoal" className="w-full" aria-label="Company goal">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

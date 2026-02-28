@@ -137,13 +137,13 @@ const EasyApplyDialog = ({ trigger, companyName = "General Application" }: EasyA
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 p-4 sm:p-5">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Input placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-              <Input placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
-              <Input placeholder="CDL #" value={cdl} onChange={(e) => setCdl(e.target.value)} />
-              <Input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-              <Input placeholder="Phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              <Select value={driverType} onValueChange={setDriverType}>
-                <SelectTrigger>
+              <Input id="easy-firstName" name="firstName" autoComplete="given-name" placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+              <Input id="easy-lastName" name="lastName" autoComplete="family-name" placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+              <Input id="easy-cdl" name="cdlNumber" autoComplete="off" placeholder="CDL #" value={cdl} onChange={(e) => setCdl(e.target.value)} />
+              <Input id="easy-email" name="email" autoComplete="email" placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input id="easy-phone" name="phone" autoComplete="tel" placeholder="Phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <Select value={driverType} onValueChange={setDriverType} name="driverType">
+                <SelectTrigger id="easy-driverType">
                   <SelectValue placeholder="Driver Type" />
                 </SelectTrigger>
                 <SelectContent>

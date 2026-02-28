@@ -269,6 +269,8 @@ function ChatWindow({
       {/* Input */}
       <div className="px-4 py-3 border-t border-border flex items-center gap-2">
         <Input
+          id="chat-message"
+          name="message"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}

@@ -401,6 +401,8 @@ function AdminDashboardInner() {
                   </h2>
                   <div className="flex items-center gap-2">
                     <Input
+                      id="admin-userSearch"
+                      name="userSearch"
                       placeholder="Search name, email, phone..."
                       value={userSearch}
                       onChange={(e) => {
@@ -672,6 +674,7 @@ function AdminDashboardInner() {
                               }
                             );
                           }}
+                          name="jobStatus"
                         >
                           <SelectTrigger className="h-7 w-24 text-xs shrink-0">
                             <SelectValue />
@@ -898,8 +901,9 @@ function AdminDashboardInner() {
               <Select
                 value={selectedPlan}
                 onValueChange={(v) => setSelectedPlan(v as Plan)}
+                name="subscriptionPlan"
               >
-                <SelectTrigger>
+                <SelectTrigger id="admin-plan">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
