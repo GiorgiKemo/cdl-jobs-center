@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -12,7 +12,7 @@ import { useAuth } from "@/context/auth";
 import { useActiveJobs } from "@/hooks/useJobs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { useDriverProfile, DriverProfile } from "@/hooks/useDriverProfile";
-import { Truck, Briefcase, Bookmark, User, BarChart3, ChevronDown, ChevronUp, MapPin, DollarSign, Bell, MessageSquare, Check, Sparkles } from "lucide-react";
+import { Truck, Briefcase, Bookmark, User, BarChart3, ChevronDown, ChevronUp, MapPin, DollarSign, Bell, MessageSquare, Check, Sparkles, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
@@ -22,9 +22,24 @@ import { useUnreadCount } from "@/hooks/useMessages";
 import { formatRelativeDate } from "@/lib/dateUtils";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { useDriverJobMatches, useMatchingRollout } from "@/hooks/useMatchScores";
+import {
+  useDriverJobMatches,
+  useMatchingRollout,
+  useRecordDriverMatchFeedback,
+  useRefreshMyMatches,
+  useTrackDriverMatchEvent,
+  type DriverFeedback,
+} from "@/hooks/useMatchScores";
+import { DriverMatchCard } from "@/components/matching/DriverMatchCard";
 
-type Tab = "overview" | "applications" | "saved" | "profile" | "analytics" | "messages";
+type Tab =
+  | "overview"
+  | "applications"
+  | "saved"
+  | "profile"
+  | "analytics"
+  | "messages"
+  | "ai-matches";
 type PipelineStage = "New" | "Reviewing" | "Interview" | "Hired" | "Rejected";
 type SaveStatus = "idle" | "saving" | "saved";
 const isDriverTab = (value: string | null): value is Tab =>
@@ -33,7 +48,8 @@ const isDriverTab = (value: string | null): value is Tab =>
   value === "saved" ||
   value === "profile" ||
   value === "analytics" ||
-  value === "messages";
+  value === "messages" ||
+  value === "ai-matches";
 
 interface StoredApplication {
   id: string;
@@ -161,16 +177,35 @@ const DriverDashboardInner = () => {
   const { savedIds, toggle: toggleSave } = useSavedJobs(user!.id);
   const { profile, isLoading: profileLoading, saveProfile } = useDriverProfile(user!.id);
   const { data: unreadMsgCount = 0 } = useUnreadCount(user!.id);
-  const { data: recommendedMatches, isLoading: matchesLoading } = useDriverJobMatches(user!.id, 5);
+  const { data: recommendedMatches = [], isLoading: matchesLoading } = useDriverJobMatches(
+    user!.id,
+    { limit: 5, minScore: 30, excludeHidden: true },
+  );
+  const { data: aiMatches = [], isLoading: aiMatchesLoading } = useDriverJobMatches(
+    user!.id,
+    { limit: 20, minScore: 0, excludeHidden: true },
+  );
   const { data: rollout } = useMatchingRollout();
+  const feedbackMutation = useRecordDriverMatchFeedback(user!.id);
+  const trackEventMutation = useTrackDriverMatchEvent(user!.id);
+  const refreshMatchesMutation = useRefreshMyMatches(user!.id);
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const lastConsumedTab = useRef<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const t = searchParams.get("tab");
-    return isDriverTab(t) ? t : "overview";
+    if (isDriverTab(t)) {
+      lastConsumedTab.current = t;
+      return t;
+    }
+    return "overview";
   });
   const [expandedApp, setExpandedApp] = useState<string | null>(null);
   const [stageFilter, setStageFilter] = useState<PipelineStage | "All">("All");
+  const [aiSort, setAiSort] = useState<"best-fit" | "recent">("best-fit");
+  const [aiMinScore, setAiMinScore] = useState<"all" | "40" | "60" | "80">("all");
+  const [feedbackPendingByJob, setFeedbackPendingByJob] = useState<Record<string, DriverFeedback | null>>({});
+  const [trackedViewJobIds, setTrackedViewJobIds] = useState<Set<string>>(new Set());
   const [initialChatAppId, setInitialChatAppId] = useState<string | null>(null);
   const [dismissedApps, setDismissedApps] = useState<Set<string>>(() => {
     try {
@@ -179,14 +214,17 @@ const DriverDashboardInner = () => {
     } catch { return new Set(); }
   });
 
-  const tabFromUrl = searchParams.get("tab");
+  // Consume deep-link tab from URL (fires on navigation, not on unrelated param changes)
   useEffect(() => {
-    if (!isDriverTab(tabFromUrl)) return;
-    setActiveTab((prev) => (prev === tabFromUrl ? prev : tabFromUrl));
+    const tabFromUrl = searchParams.get("tab");
+    if (!tabFromUrl || !isDriverTab(tabFromUrl)) return;
+    if (lastConsumedTab.current === tabFromUrl) return;
+    lastConsumedTab.current = tabFromUrl;
+    setActiveTab(tabFromUrl);
     const next = new URLSearchParams(searchParams);
     next.delete("tab");
     setSearchParams(next, { replace: true });
-  }, [tabFromUrl, searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams]);
 
   // Fetch driver's applications
   const { data: applications = [] } = useQuery({
@@ -259,10 +297,89 @@ const DriverDashboardInner = () => {
 
   // Saved jobs data — full job objects for the saved tab
   const savedJobs = allActiveJobs.filter((j) => savedIds.includes(j.id));
+  const aiMinScoreValue = aiMinScore === "all" ? 0 : Number(aiMinScore);
+
+  const filteredAiMatches = useMemo(() => {
+    const scored = aiMatches.filter((m) => m.overallScore >= aiMinScoreValue);
+    if (aiSort === "recent") {
+      return [...scored].sort(
+        (a, b) =>
+          new Date(b.computedAt).getTime() - new Date(a.computedAt).getTime(),
+      );
+    }
+    return scored;
+  }, [aiMatches, aiMinScoreValue, aiSort]);
+
+  const bestMatch = filteredAiMatches[0] ?? null;
+  const newSinceYesterdayCount = filteredAiMatches.filter(
+    (m) => Date.now() - new Date(m.computedAt).getTime() <= 24 * 60 * 60 * 1000,
+  ).length;
+  const needsProfileInfoCount = filteredAiMatches.filter(
+    (m) => m.missingFields.length > 0,
+  ).length;
 
   const handleRemoveSaved = async (id: string) => {
     await toggleSave(id);
     toast.success("Removed from saved jobs");
+  };
+
+  const handleTrackEvent = useCallback(
+    (jobId: string, eventType: "view" | "click" | "save" | "apply") => {
+      trackEventMutation.mutate({ jobId, eventType });
+    },
+    [trackEventMutation],
+  );
+
+  useEffect(() => {
+    if (activeTab !== "ai-matches" || filteredAiMatches.length === 0) return;
+    const unseen = filteredAiMatches
+      .slice(0, 10)
+      .map((m) => m.jobId)
+      .filter((jobId) => !trackedViewJobIds.has(jobId));
+    if (unseen.length === 0) return;
+
+    unseen.forEach((jobId) => {
+      handleTrackEvent(jobId, "view");
+    });
+
+    setTrackedViewJobIds((prev) => {
+      const next = new Set(prev);
+      unseen.forEach((jobId) => next.add(jobId));
+      return next;
+    });
+  }, [activeTab, filteredAiMatches, handleTrackEvent, trackedViewJobIds]);
+
+  const handleFeedback = async (jobId: string, feedback: DriverFeedback) => {
+    setFeedbackPendingByJob((prev) => ({ ...prev, [jobId]: feedback }));
+    try {
+      await feedbackMutation.mutateAsync({ jobId, feedback });
+      if (feedback === "hide") toast.success("Job hidden from AI matches.");
+      else if (feedback === "not_relevant") toast.success("We'll show fewer matches like this.");
+      else toast.success("Thanks for the feedback.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save feedback.");
+    } finally {
+      setFeedbackPendingByJob((prev) => ({ ...prev, [jobId]: null }));
+    }
+  };
+
+  const handleToggleSavedFromMatch = async (jobId: string) => {
+    try {
+      const wasSaved = savedIds.includes(jobId);
+      await toggleSave(jobId);
+      toast.success(wasSaved ? "Removed from saved jobs" : "Saved job");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update saved jobs.");
+    }
+  };
+
+  const handleRefreshMatches = async () => {
+    try {
+      await refreshMatchesMutation.mutateAsync();
+      toast.success("AI refresh queued. Updated matches should appear shortly.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Unable to refresh matches.");
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -305,6 +422,7 @@ const DriverDashboardInner = () => {
   const tabs: { id: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
     { id: "overview",      label: "Overview",        icon: <BarChart3 className="h-4 w-4" /> },
     { id: "applications",  label: `My Applications (${totalApps})`, icon: <Briefcase className="h-4 w-4" />, badge: unseenUpdates },
+    { id: "ai-matches",    label: "AI Matches",      icon: <Sparkles className="h-4 w-4" /> },
     { id: "saved",         label: `Saved Jobs (${savedCount})`,     icon: <Bookmark className="h-4 w-4" /> },
     { id: "messages",      label: "Messages",        icon: <MessageSquare className="h-4 w-4" />, badge: unreadMsgCount },
     { id: "profile",       label: "My Profile",      icon: <User className="h-4 w-4" /> },
@@ -314,7 +432,7 @@ const DriverDashboardInner = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="container mx-auto py-8 max-w-5xl">
+      <main className="container mx-auto py-8 max-w-[1400px]">
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-6">
           <Link to="/" className="text-primary hover:underline">Main</Link>
@@ -343,14 +461,14 @@ const DriverDashboardInner = () => {
           </button>
         )}
 
-        <div className="flex gap-1 border-b border-border mb-6 overflow-x-auto" role="tablist">
+        <div className="flex border-b border-border mb-6 overflow-x-auto" role="tablist">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               role="tab"
               aria-selected={activeTab === tab.id}
               onClick={() => switchTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                 activeTab === tab.id
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -404,7 +522,11 @@ const DriverDashboardInner = () => {
                     <EmptyState
                       icon={Sparkles}
                       heading="No matches yet"
-                      description="Complete your profile to get personalized job recommendations."
+                      description={
+                        profile && profile.licenseClass && profile.yearsExp && profile.licenseState && profile.driverType
+                          ? "We're still computing your matches. Check back shortly."
+                          : "Complete your profile to get personalized job recommendations."
+                      }
                     />
                   </div>
                 ) : (
@@ -531,6 +653,134 @@ const DriverDashboardInner = () => {
                 <Button variant="outline" onClick={() => setActiveTab("profile")}>Edit My Profile</Button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* AI MATCHES */}
+        {activeTab === "ai-matches" && (
+          <div className="space-y-5">
+            {!rollout?.driverUiEnabled || rollout.shadowMode ? (
+              <div className="border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+                <Sparkles className="h-8 w-8 mx-auto mb-3 text-primary" />
+                <p className="font-medium text-foreground mb-1">AI Matches is not available yet</p>
+                <p>This feature is currently in staged rollout for driver accounts.</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border border-border bg-card p-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Best Match</p>
+                    {bestMatch ? (
+                      <>
+                        <p className="font-display font-bold text-lg text-foreground">
+                          {bestMatch.overallScore}%
+                        </p>
+                        <p className="text-sm font-medium truncate">{bestMatch.jobTitle}</p>
+                        <p className="text-xs text-muted-foreground truncate">{bestMatch.jobCompany}</p>
+                      </>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No ranked matches yet.</p>
+                    )}
+                  </div>
+                  <div className="rounded-xl border border-border bg-card p-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">New Since Yesterday</p>
+                    <p className="font-display font-bold text-lg text-foreground">{newSinceYesterdayCount}</p>
+                    <p className="text-xs text-muted-foreground">Matches computed in the last 24 hours.</p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-card p-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Needs Profile Info</p>
+                    <p className="font-display font-bold text-lg text-foreground">{needsProfileInfoCount}</p>
+                    <p className="text-xs text-muted-foreground">Improve profile fields to increase confidence.</p>
+                  </div>
+                </div>
+
+                <div className="sticky top-20 z-10 flex flex-col gap-3 rounded-xl border border-border bg-card/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-card/85 sm:static sm:flex-row sm:items-end sm:justify-between">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <div className="min-w-[170px]">
+                      <Label className="text-xs text-muted-foreground mb-1 block">Sort</Label>
+                      <Select value={aiSort} onValueChange={(value) => setAiSort(value as "best-fit" | "recent")}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="best-fit">Best fit</SelectItem>
+                          <SelectItem value="recent">Most recent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="min-w-[170px]">
+                      <Label className="text-xs text-muted-foreground mb-1 block">Minimum Score</Label>
+                      <Select value={aiMinScore} onValueChange={(value) => setAiMinScore(value as "all" | "40" | "60" | "80")}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All matches</SelectItem>
+                          <SelectItem value="40">40+</SelectItem>
+                          <SelectItem value="60">60+</SelectItem>
+                          <SelectItem value="80">80+</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleRefreshMatches}
+                      disabled={refreshMatchesMutation.isPending}
+                    >
+                      <RefreshCw className={`h-4 w-4 ${refreshMatchesMutation.isPending ? "animate-spin" : ""}`} />
+                      {refreshMatchesMutation.isPending ? "Refreshing..." : "Refresh Matches"}
+                    </Button>
+                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <SlidersHorizontal className="h-3.5 w-3.5" />
+                      Precomputed ranking
+                    </span>
+                  </div>
+                </div>
+
+                {aiMatchesLoading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map((item) => (
+                      <div key={`ai-skeleton-${item}`} className="h-52 animate-pulse rounded-xl border border-border bg-card" />
+                    ))}
+                  </div>
+                ) : filteredAiMatches.length === 0 ? (
+                  <div className="border border-border bg-card p-8">
+                    <EmptyState
+                      icon={Sparkles}
+                      heading="No AI matches right now"
+                      description="Update your profile details and request a refresh to generate stronger matches."
+                    />
+                    <div className="mt-4 flex flex-wrap gap-2 justify-center">
+                      <Button variant="outline" onClick={() => switchTab("profile")}>Complete Profile</Button>
+                      <Button variant="outline" onClick={handleRefreshMatches} disabled={refreshMatchesMutation.isPending}>
+                        {refreshMatchesMutation.isPending ? "Refreshing..." : "Refresh"}
+                      </Button>
+                      <Button asChild>
+                        <Link to="/jobs">Browse Jobs</Link>
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredAiMatches.map((match) => (
+                      <DriverMatchCard
+                        key={match.jobId}
+                        match={match}
+                        isSaved={savedIds.includes(match.jobId)}
+                        pendingFeedback={feedbackPendingByJob[match.jobId] ?? null}
+                        onToggleSave={handleToggleSavedFromMatch}
+                        onFeedback={handleFeedback}
+                        onTrackEvent={handleTrackEvent}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 

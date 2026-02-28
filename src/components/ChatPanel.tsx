@@ -70,10 +70,6 @@ export function ChatPanel({ userId, userRole, userName, initialApplicationId }: 
     }
   };
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center py-12"><Spinner /></div>;
-  }
-
   // Mobile: show chat window if a conversation is selected
   const showList = !selectedAppId;
 
@@ -86,7 +82,9 @@ export function ChatPanel({ userId, userRole, userName, initialApplicationId }: 
             <p className="font-semibold text-sm">Messages</p>
           </div>
           <ScrollArea className="flex-1">
-            {conversations.length === 0 ? (
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12"><Spinner size="sm" /></div>
+            ) : conversations.length === 0 ? (
               <div className="px-4 py-12 text-center text-sm text-muted-foreground">
                 <MessageSquare className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                 <p>No conversations yet.</p>

@@ -372,6 +372,12 @@ verify_jwt = false
 [functions.match-backfill-nightly]
 verify_jwt = false
 
+[functions.record-match-feedback]
+verify_jwt = true
+
+[functions.refresh-my-matches]
+verify_jwt = true
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -27,14 +27,6 @@ import { useLeads, useUpdateLeadStatus, useSyncLeads } from "@/hooks/useLeads";
 import { useSubscription, useCancelSubscription, PLANS } from "@/hooks/useSubscription";
 import { useCompanyDriverMatches, useMatchingRollout } from "@/hooks/useMatchScores";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatDate } from "@/lib/dateUtils";
 import { Spinner } from "@/components/ui/Spinner";
@@ -512,17 +504,20 @@ const DashboardInner = () => {
   const cancelSubscription = useCancelSubscription();
   const rollout = useMatchingRollout();
   const [portalLoading, setPortalLoading] = useState(false);
-  const [cancelOpen, setCancelOpen] = useState(false);
+
   const leadLimit = subscription ? PLANS[subscription.plan].leads : 3;
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const lastConsumedTab = useRef<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const t = searchParams.get("tab");
-    if (isCompanyDeepLinkTab(t)) return t;
+    if (isCompanyDeepLinkTab(t)) {
+      lastConsumedTab.current = t;
+      return t;
+    }
     return "jobs";
   });
   const [initialChatAppId, setInitialChatAppId] = useState<string | null>(() => searchParams.get("app"));
-  const tabFromUrl = searchParams.get("tab");
   const [appPage, setAppPage] = useState(0);
   const [leadPage, setLeadPage] = useState(0);
   const [leadStateFilter, setLeadStateFilter] = useState("all");
@@ -541,13 +536,18 @@ const DashboardInner = () => {
   const [aiJobFilter, setAiJobFilter] = useState<string>("all");
   const [aiSourceFilter, setAiSourceFilter] = useState<string>("all");
 
+  // Consume deep-link tab from URL (fires on navigation, not on unrelated param changes)
   useEffect(() => {
-    if (!isCompanyDeepLinkTab(tabFromUrl)) return;
-    setActiveTab((prev) => (prev === tabFromUrl ? prev : tabFromUrl));
+    const tabFromUrl = searchParams.get("tab");
+    if (!tabFromUrl || !isCompanyDeepLinkTab(tabFromUrl)) return;
+    // Skip if we already consumed this exact tab value (prevents re-fire loops)
+    if (lastConsumedTab.current === tabFromUrl) return;
+    lastConsumedTab.current = tabFromUrl;
+    setActiveTab(tabFromUrl);
     const next = new URLSearchParams(searchParams);
     next.delete("tab");
     setSearchParams(next, { replace: true });
-  }, [tabFromUrl, searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams]);
 
   // Company profile state
   const [profileName, setProfileName] = useState(user!.name);
@@ -2087,7 +2087,7 @@ const DashboardInner = () => {
                   </p>
                 )}
 
-                {/* Cancel subscription — inline in plan card */}
+                {/* Cancel subscription — redirects to Stripe billing portal */}
                 {!isFreePlan && (
                   <div className="mt-5 pt-5 border-t border-border flex justify-end">
                     <Button
@@ -2095,40 +2095,16 @@ const DashboardInner = () => {
                       size="sm"
                       className="text-xs border-destructive/40 text-destructive bg-destructive/5 hover:bg-destructive/10 hover:text-destructive"
                       disabled={cancelSubscription.isPending}
-                      onClick={() => setCancelOpen(true)}
+                      onClick={() => {
+                        cancelSubscription.mutate(user!.id, {
+                          onError: (err) => {
+                            toast.error(err instanceof Error ? err.message : "Failed to open billing portal");
+                          },
+                        });
+                      }}
                     >
-                      {cancelSubscription.isPending ? "Canceling..." : "Cancel Subscription"}
+                      {cancelSubscription.isPending ? "Opening Portal..." : "Cancel Subscription"}
                     </Button>
-
-                    <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Cancel subscription</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to cancel your <strong>{planInfo.label}</strong> plan? You will be downgraded to the Free plan with a limit of 3 leads per month.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            onClick={() => {
-                              cancelSubscription.mutate(user!.id, {
-                                onSuccess: () => {
-                                  toast.success("Subscription canceled. You are now on the Free plan.");
-                                  setCancelOpen(false);
-                                },
-                                onError: (err) => {
-                                  toast.error(err instanceof Error ? err.message : "Failed to cancel subscription");
-                                },
-                              });
-                            }}
-                          >
-                            Yes, Cancel
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
                   </div>
                 )}
               </div>

@@ -39,7 +39,7 @@ function rowToSub(row: Record<string, any>): Subscription {
   };
 }
 
-/** Get (or create) the company's subscription */
+/** Get (or auto-create free) the company's subscription */
 export function useSubscription(companyId: string | undefined) {
   return useQuery({
     queryKey: ["subscription", companyId],
@@ -57,7 +57,7 @@ export function useSubscription(companyId: string | undefined) {
 
       if (data) return rowToSub(data);
 
-      // No subscription row — create a free one
+      // No subscription row — create a free one (RLS restricts to plan='free' only)
       const { data: newRow, error: insertErr } = await supabase
         .from("subscriptions")
         .insert({ company_id: companyId!, plan: "free", lead_limit: 3, leads_used: 0 })
@@ -71,59 +71,35 @@ export function useSubscription(companyId: string | undefined) {
   });
 }
 
-/** Upgrade subscription (called after Stripe Checkout success) */
-export function useUpgradeSubscription() {
-  const qc = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (params: {
-      companyId: string;
-      plan: Plan;
-      stripeCustomerId?: string;
-      stripeSubscriptionId?: string;
-    }) => {
-      const planInfo = PLANS[params.plan];
-      const { error } = await supabase
-        .from("subscriptions")
-        .upsert({
-          company_id: params.companyId,
-          plan: params.plan,
-          lead_limit: planInfo.leads,
-          leads_used: 0,
-          stripe_customer_id: params.stripeCustomerId ?? null,
-          stripe_subscription_id: params.stripeSubscriptionId ?? null,
-          status: "active",
-          current_period_start: new Date().toISOString(),
-          current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "company_id" });
-      if (error) throw error;
-    },
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["subscription", vars.companyId] });
-    },
-  });
-}
-
-/** Cancel subscription — revert to free plan */
+/**
+ * Cancel subscription — redirects to Stripe billing portal.
+ * The portal handles the actual cancellation; the stripe-webhook
+ * updates the DB when Stripe fires customer.subscription.deleted.
+ */
 export function useCancelSubscription() {
   const qc = useQueryClient();
 
   return useMutation({
     mutationFn: async (companyId: string) => {
-      const { error } = await supabase
-        .from("subscriptions")
-        .update({
-          plan: "free",
-          lead_limit: 3,
-          status: "active",
-          stripe_customer_id: null,
-          stripe_subscription_id: null,
-          current_period_end: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("company_id", companyId);
-      if (error) throw error;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-portal-session`;
+      const res = await fetch(fnUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(err.error ?? `Portal request failed (${res.status})`);
+      }
+
+      const { url } = await res.json();
+      window.location.href = url;
     },
     onSuccess: (_data, companyId) => {
       qc.invalidateQueries({ queryKey: ["subscription", companyId] });

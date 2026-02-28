@@ -1,7 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-
-// ── Types ──────────────────────────────────────────────────
 
 export interface ScoreBreakdown {
   [component: string]: { score: number; maxScore: number; detail: string };
@@ -12,17 +10,30 @@ export interface MatchReason {
   positive: boolean;
 }
 
+export type DriverConfidence = "high" | "medium" | "low";
+export type DriverFeedback = "helpful" | "not_relevant" | "hide";
+export type DriverMatchEventType = "view" | "click" | "save" | "apply";
+
+export interface DriverMatchActions {
+  canApply: boolean;
+  canSave: boolean;
+  feedback: DriverFeedback[];
+}
+
 export interface DriverJobMatch {
   jobId: string;
   overallScore: number;
   rulesScore: number;
   semanticScore: number | null;
+  behaviorScore: number;
+  confidence: DriverConfidence;
   topReasons: MatchReason[];
   cautions: MatchReason[];
   scoreBreakdown: ScoreBreakdown;
+  missingFields: string[];
+  actions: DriverMatchActions;
   degradedMode: boolean;
   computedAt: string;
-  // Joined job data
   jobTitle: string;
   jobCompany: string;
   jobLocation: string;
@@ -46,7 +57,6 @@ export interface CompanyDriverMatch {
   scoreBreakdown: ScoreBreakdown;
   degradedMode: boolean;
   computedAt: string;
-  // Joined candidate data
   candidateName: string;
   candidatePhone: string | null;
   candidateEmail: string | null;
@@ -63,7 +73,54 @@ export interface RolloutConfig {
   companyBetaIds: string[];
 }
 
-// ── Row mappers ────────────────────────────────────────────
+export interface DriverMatchQueryOpts {
+  minScore?: number;
+  excludeHidden?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+const DEFAULT_ACTIONS: DriverMatchActions = {
+  canApply: true,
+  canSave: true,
+  feedback: ["helpful", "not_relevant", "hide"],
+};
+
+const asDriverConfidence = (value: unknown): DriverConfidence => {
+  if (value === "high" || value === "medium" || value === "low") return value;
+  return "medium";
+};
+
+const parseActions = (raw: unknown): DriverMatchActions => {
+  if (!raw || typeof raw !== "object") return DEFAULT_ACTIONS;
+  const record = raw as Record<string, unknown>;
+  const feedback = Array.isArray(record.feedback)
+    ? record.feedback.filter(
+        (item): item is DriverFeedback =>
+          item === "helpful" || item === "not_relevant" || item === "hide",
+      )
+    : DEFAULT_ACTIONS.feedback;
+
+  return {
+    canApply: record.canApply !== false,
+    canSave: record.canSave !== false,
+    feedback: feedback.length > 0 ? feedback : DEFAULT_ACTIONS.feedback,
+  };
+};
+
+const normalizeDriverMatchOpts = (
+  optsOrLimit?: number | DriverMatchQueryOpts,
+): DriverMatchQueryOpts => {
+  if (typeof optsOrLimit === "number") {
+    return { limit: optsOrLimit, excludeHidden: false };
+  }
+  return {
+    minScore: optsOrLimit?.minScore,
+    excludeHidden: optsOrLimit?.excludeHidden ?? false,
+    limit: optsOrLimit?.limit ?? 5,
+    offset: optsOrLimit?.offset,
+  };
+};
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToDriverJobMatch(row: Record<string, any>): DriverJobMatch {
@@ -73,9 +130,15 @@ function rowToDriverJobMatch(row: Record<string, any>): DriverJobMatch {
     overallScore: row.overall_score,
     rulesScore: row.rules_score,
     semanticScore: row.semantic_score ?? null,
+    behaviorScore: row.behavior_score ?? 0,
+    confidence: asDriverConfidence(row.confidence),
     topReasons: (row.top_reasons ?? []) as MatchReason[],
     cautions: (row.cautions ?? []) as MatchReason[],
     scoreBreakdown: (row.score_breakdown ?? {}) as ScoreBreakdown,
+    missingFields: Array.isArray(row.missing_fields)
+      ? (row.missing_fields as string[])
+      : [],
+    actions: parseActions(row.actions),
     degradedMode: row.degraded_mode ?? false,
     computedAt: row.computed_at,
     jobTitle: job.title ?? "",
@@ -90,8 +153,10 @@ function rowToDriverJobMatch(row: Record<string, any>): DriverJobMatch {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function rowToCompanyDriverMatch(row: Record<string, any>, candidateData?: Record<string, any>): CompanyDriverMatch {
+function rowToCompanyDriverMatch(
+  row: Record<string, unknown>,
+  candidateData?: Record<string, unknown>,
+): CompanyDriverMatch {
   let name = "";
   let phone: string | null = null;
   let email: string | null = null;
@@ -121,16 +186,16 @@ function rowToCompanyDriverMatch(row: Record<string, any>, candidateData?: Recor
 
   return {
     candidateId: row.candidate_id,
-    candidateSource: row.candidate_source,
-    candidateDriverId: row.candidate_driver_id ?? null,
-    overallScore: row.overall_score,
-    rulesScore: row.rules_score,
-    semanticScore: row.semantic_score ?? null,
+    candidateSource: row.candidate_source as CompanyDriverMatch["candidateSource"],
+    candidateDriverId: (row.candidate_driver_id as string | null) ?? null,
+    overallScore: row.overall_score as number,
+    rulesScore: row.rules_score as number,
+    semanticScore: (row.semantic_score as number | null) ?? null,
     topReasons: (row.top_reasons ?? []) as MatchReason[],
     cautions: (row.cautions ?? []) as MatchReason[],
     scoreBreakdown: (row.score_breakdown ?? {}) as ScoreBreakdown,
-    degradedMode: row.degraded_mode ?? false,
-    computedAt: row.computed_at,
+    degradedMode: (row.degraded_mode as boolean) ?? false,
+    computedAt: row.computed_at as string,
     candidateName: name,
     candidatePhone: phone,
     candidateEmail: email,
@@ -141,9 +206,6 @@ function rowToCompanyDriverMatch(row: Record<string, any>, candidateData?: Recor
   };
 }
 
-// ── Hooks ──────────────────────────────────────────────────
-
-/** Rollout configuration (singleton) */
 export function useMatchingRollout() {
   return useQuery({
     queryKey: ["matching-rollout"],
@@ -155,7 +217,6 @@ export function useMatchingRollout() {
         .maybeSingle();
 
       if (error || !data) {
-        // Default: everything off
         return {
           shadowMode: true,
           driverUiEnabled: false,
@@ -171,37 +232,104 @@ export function useMatchingRollout() {
         companyBetaIds: (data.company_beta_ids ?? []) as string[],
       };
     },
-    staleTime: 60_000, // cache for 1 minute
+    staleTime: 60_000,
   });
 }
 
-/** Top N job matches for a driver (with joined job data) */
-export function useDriverJobMatches(driverId: string | undefined, limit = 5) {
+export function useDriverJobMatches(
+  driverId: string | undefined,
+  optsOrLimit?: number | DriverMatchQueryOpts,
+) {
+  const opts = normalizeDriverMatchOpts(optsOrLimit);
+
   return useQuery({
-    queryKey: ["driver-matches", driverId, limit],
+    queryKey: [
+      "driver-matches",
+      driverId,
+      opts.minScore ?? null,
+      opts.excludeHidden ?? false,
+      opts.limit ?? null,
+      opts.offset ?? null,
+    ],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("driver_job_match_scores")
-        .select("*, jobs(title, company_name, location, pay, type, route_type, driver_type, team_driving, status, company_profiles(logo_url))")
+        .select(
+          "*, jobs(title, company_name, company_id, location, pay, type, route_type, driver_type, team_driving, status)",
+        )
         .eq("driver_id", driverId!)
         .order("overall_score", { ascending: false })
-        .limit(limit);
+        .order("computed_at", { ascending: false });
 
+      if (typeof opts.minScore === "number") {
+        query = query.gte("overall_score", opts.minScore);
+      }
+
+      if (typeof opts.offset === "number" && typeof opts.limit === "number") {
+        query = query.range(opts.offset, opts.offset + opts.limit - 1);
+      } else if (typeof opts.limit === "number") {
+        query = query.limit(opts.limit);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
 
-      // Filter out non-active jobs on the client side
-      return ((data ?? []) as Record<string, unknown>[])
+      const activeRows = ((data ?? []) as Record<string, unknown>[])
         .filter((row) => {
           const job = row.jobs as Record<string, unknown> | null;
           return job && job.status === "Active";
-        })
-        .map(rowToDriverJobMatch);
+        });
+
+      // Batch-fetch company logos separately (no direct FK from jobs to company_profiles)
+      const companyIds = [
+        ...new Set(
+          activeRows
+            .map((row) => (row.jobs as Record<string, unknown> | null)?.company_id as string | undefined)
+            .filter(Boolean),
+        ),
+      ] as string[];
+
+      const logoMap = new Map<string, string | null>();
+      if (companyIds.length > 0) {
+        const { data: logos } = await supabase
+          .from("company_profiles")
+          .select("id, logo_url")
+          .in("id", companyIds);
+        for (const row of logos ?? []) {
+          logoMap.set(row.id, row.logo_url ?? null);
+        }
+      }
+
+      let rows = activeRows.map((row) => {
+        const job = row.jobs as Record<string, unknown> | null;
+        const companyId = job?.company_id as string | undefined;
+        const logoUrl = companyId ? logoMap.get(companyId) ?? null : null;
+        // Inject logo into job data for rowToDriverJobMatch
+        if (job) {
+          (job as Record<string, unknown>).company_profiles = { logo_url: logoUrl };
+        }
+        return rowToDriverJobMatch(row as Record<string, unknown>);
+      });
+
+      if (opts.excludeHidden && rows.length > 0) {
+        const { data: hiddenRows } = await supabase
+          .from("driver_match_feedback")
+          .select("job_id")
+          .eq("driver_id", driverId!)
+          .eq("feedback", "hide");
+
+        const hiddenJobIds = new Set(
+          (hiddenRows ?? []).map((row) => row.job_id as string),
+        );
+        rows = rows.filter((row) => !hiddenJobIds.has(row.jobId));
+      }
+
+      return rows;
     },
     enabled: !!driverId,
   });
 }
 
-/** All driver→job match scores (for sort-by-match on Jobs page) */
 export function useDriverAllJobMatches(driverId: string | undefined) {
   return useQuery({
     queryKey: ["driver-all-matches", driverId],
@@ -213,7 +341,6 @@ export function useDriverAllJobMatches(driverId: string | undefined) {
 
       if (error) throw error;
 
-      // Return as a Map for O(1) lookup
       const map = new Map<string, number>();
       for (const row of data ?? []) {
         map.set(row.job_id, row.overall_score);
@@ -224,8 +351,10 @@ export function useDriverAllJobMatches(driverId: string | undefined) {
   });
 }
 
-/** Single driver→job match score (for job detail page) */
-export function useDriverJobMatchScore(driverId: string | undefined, jobId: string | undefined) {
+export function useDriverJobMatchScore(
+  driverId: string | undefined,
+  jobId: string | undefined,
+) {
   return useQuery({
     queryKey: ["driver-match-score", driverId, jobId],
     queryFn: async () => {
@@ -243,9 +372,13 @@ export function useDriverJobMatchScore(driverId: string | undefined, jobId: stri
         overallScore: data.overall_score as number,
         rulesScore: data.rules_score as number,
         semanticScore: data.semantic_score as number | null,
+        behaviorScore: (data.behavior_score ?? 0) as number,
+        confidence: asDriverConfidence(data.confidence),
         topReasons: (data.top_reasons ?? []) as MatchReason[],
         cautions: (data.cautions ?? []) as MatchReason[],
         scoreBreakdown: (data.score_breakdown ?? {}) as ScoreBreakdown,
+        missingFields: (data.missing_fields ?? []) as string[],
+        actions: parseActions(data.actions),
         degradedMode: data.degraded_mode as boolean,
         computedAt: data.computed_at as string,
       };
@@ -254,7 +387,6 @@ export function useDriverJobMatchScore(driverId: string | undefined, jobId: stri
   });
 }
 
-/** Company→Driver match scores with filters */
 export function useCompanyDriverMatches(
   companyId: string | undefined,
   opts: {
@@ -266,7 +398,6 @@ export function useCompanyDriverMatches(
   return useQuery({
     queryKey: ["company-matches", companyId, opts.jobId, opts.source, opts.limit],
     queryFn: async () => {
-      // 1. Fetch match scores (no joins — candidate_id has no FK)
       let query = supabase
         .from("company_driver_match_scores")
         .select("*")
@@ -287,18 +418,22 @@ export function useCompanyDriverMatches(
       if (error) throw error;
       if (!scores || scores.length === 0) return [];
 
-      // 2. Collect candidate IDs by source for batch lookups
-      const appIds = scores.filter((s) => s.candidate_source === "application").map((s) => s.candidate_id);
-      const leadIds = scores.filter((s) => s.candidate_source === "lead").map((s) => s.candidate_id);
+      const appIds = scores
+        .filter((s) => s.candidate_source === "application")
+        .map((s) => s.candidate_id);
+      const leadIds = scores
+        .filter((s) => s.candidate_source === "lead")
+        .map((s) => s.candidate_id);
 
-      // 3. Batch fetch applications and leads in parallel
       const candidateMap = new Map<string, Record<string, unknown>>();
 
       const [appsResult, leadsResult] = await Promise.all([
         appIds.length > 0
           ? supabase
               .from("applications")
-              .select("id, first_name, last_name, phone, email, license_state, years_exp, driver_type, license_class")
+              .select(
+                "id, first_name, last_name, phone, email, license_state, years_exp, driver_type, license_class",
+              )
               .in("id", appIds)
           : Promise.resolve({ data: [] }),
         leadIds.length > 0
@@ -316,11 +451,83 @@ export function useCompanyDriverMatches(
         candidateMap.set(row.id, row as Record<string, unknown>);
       }
 
-      // 4. Map scores with enriched candidate data
       return (scores as Record<string, unknown>[]).map((row) =>
-        rowToCompanyDriverMatch(row, candidateMap.get(row.candidate_id as string) as Record<string, unknown> | undefined),
+        rowToCompanyDriverMatch(
+          row,
+          candidateMap.get(row.candidate_id as string) as
+            | Record<string, unknown>
+            | undefined,
+        ),
       );
     },
     enabled: !!companyId,
+  });
+}
+
+export function useRecordDriverMatchFeedback(driverId: string | undefined) {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { jobId: string; feedback: DriverFeedback }) => {
+      const { data, error } = await supabase.functions.invoke(
+        "record-match-feedback",
+        { body: params },
+      );
+
+      if (error) {
+        throw new Error(error.message || "Failed to record match feedback");
+      }
+      if (data?.error) {
+        throw new Error(data.error as string);
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["driver-matches", driverId] });
+      qc.invalidateQueries({ queryKey: ["driver-all-matches", driverId] });
+      qc.invalidateQueries({ queryKey: ["driver-match-score", driverId] });
+    },
+  });
+}
+
+export function useTrackDriverMatchEvent(driverId: string | undefined) {
+  return useMutation({
+    mutationFn: async (params: {
+      jobId: string;
+      eventType: DriverMatchEventType;
+      metadata?: Record<string, unknown>;
+    }) => {
+      if (!driverId) return;
+      const { error } = await supabase.from("driver_match_events").insert({
+        driver_id: driverId,
+        job_id: params.jobId,
+        event_type: params.eventType,
+        metadata: params.metadata ?? {},
+      });
+      if (error) throw error;
+    },
+  });
+}
+
+export function useRefreshMyMatches(driverId: string | undefined) {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("refresh-my-matches", {
+        body: {},
+      });
+      if (error) {
+        throw new Error(error.message || "Failed to queue match refresh");
+      }
+      if (data?.error) {
+        throw new Error(data.error as string);
+      }
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["driver-matches", driverId] });
+      qc.invalidateQueries({ queryKey: ["driver-all-matches", driverId] });
+      qc.invalidateQueries({ queryKey: ["driver-match-score", driverId] });
+    },
   });
 }

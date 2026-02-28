@@ -14,6 +14,7 @@ import {
   buildDriverText,
   buildJobText,
   buildLeadText,
+  normalizeRouteType,
   type DriverFeatures,
   type JobFeatures,
   type CandidateFeatures,
@@ -37,11 +38,18 @@ Deno.serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    // Auth: service-role key via Authorization header
+    // Auth: only allow service-role key or cron secret
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing auth header" }), {
-        status: 401,
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const cronSecret = Deno.env.get("MATCH_CRON_SECRET");
+    const token = authHeader?.replace("Bearer ", "") ?? "";
+
+    const isServiceRole = token === serviceRoleKey;
+    const isCronSecret = cronSecret && token === cronSecret;
+
+    if (!isServiceRole && !isCronSecret) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -148,6 +156,190 @@ Deno.serve(async (req) => {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseClient = ReturnType<typeof createClient>;
 
+const RULES_RAW_MAX = 90;
+const RULES_WEIGHT_MAX = 70;
+const SEMANTIC_WEIGHT_MAX = 20;
+const BEHAVIOR_WEIGHT_MAX = 10;
+const DRIVER_PROFILE_FIELD_COUNT = 9;
+const MATCH_ACTIONS = {
+  canApply: true,
+  canSave: true,
+  feedback: ["helpful", "not_relevant", "hide"],
+};
+
+type DriverFeedbackValue = "helpful" | "not_relevant" | "hide";
+type DriverConfidence = "high" | "medium" | "low";
+
+interface DriverBehaviorContext {
+  feedbackByJob: Map<string, DriverFeedbackValue>;
+  hiddenJobIds: Set<string>;
+  positiveCompanyIds: Set<string>;
+  positiveRouteTypes: Set<string>;
+  jobEventBoost: Map<string, number>;
+}
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, value));
+
+function deriveMissingFields(driver: DriverFeatures): string[] {
+  const missing: string[] = [];
+  if (!driver.driverType) missing.push("driver type");
+  if (!driver.licenseClass) missing.push("license class");
+  if (!driver.yearsExp) missing.push("years of experience");
+  if (!driver.licenseState) missing.push("license state");
+  if (!driver.zipCode) missing.push("zip code");
+  if (!driver.about) missing.push("about me");
+  if (!Object.values(driver.routePrefs).some(Boolean)) missing.push("route preferences");
+  if (!Object.values(driver.haulerExperience).some(Boolean)) missing.push("freight experience");
+  if (!Object.values(driver.endorsements).some(Boolean)) missing.push("endorsements");
+  return missing.slice(0, DRIVER_PROFILE_FIELD_COUNT);
+}
+
+function deriveConfidence(
+  missingFields: string[],
+  semanticScore: number | null,
+  behaviorScore: number,
+): DriverConfidence {
+  const completeness = clamp(
+    (DRIVER_PROFILE_FIELD_COUNT - missingFields.length) / DRIVER_PROFILE_FIELD_COUNT,
+    0,
+    1,
+  );
+  const signalQuality =
+    (semanticScore !== null ? 1 : 0) + (behaviorScore >= 4 ? 1 : 0);
+
+  if (completeness >= 0.78 && signalQuality >= 1) return "high";
+  if (completeness >= 0.42 || signalQuality >= 1) return "medium";
+  return "low";
+}
+
+async function getDriverBehaviorContext(
+  supabase: SupabaseClient,
+  driverId: string,
+): Promise<DriverBehaviorContext> {
+  const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [{ data: feedbackRows }, { data: eventRows }] = await Promise.all([
+    supabase
+      .from("driver_match_feedback")
+      .select("job_id, feedback")
+      .eq("driver_id", driverId),
+    supabase
+      .from("driver_match_events")
+      .select("job_id, event_type, jobs(company_id, route_type)")
+      .eq("driver_id", driverId)
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(500),
+  ]);
+
+  const feedbackByJob = new Map<string, DriverFeedbackValue>();
+  const hiddenJobIds = new Set<string>();
+  const helpfulJobIds: string[] = [];
+
+  for (const row of feedbackRows ?? []) {
+    const feedback = row.feedback as DriverFeedbackValue;
+    feedbackByJob.set(row.job_id as string, feedback);
+    if (feedback === "hide") hiddenJobIds.add(row.job_id as string);
+    if (feedback === "helpful") helpfulJobIds.push(row.job_id as string);
+  }
+
+  const positiveCompanyIds = new Set<string>();
+  const positiveRouteTypes = new Set<string>();
+  const jobEventBoost = new Map<string, number>();
+
+  for (const row of eventRows ?? []) {
+    const jobId = row.job_id as string;
+    const eventType = row.event_type as string;
+    const jobMeta = row.jobs as { company_id?: string; route_type?: string } | null;
+
+    const increment =
+      eventType === "apply" ? 3 : eventType === "save" ? 2 : eventType === "click" ? 1 : 0;
+    if (increment > 0) {
+      const next = (jobEventBoost.get(jobId) ?? 0) + increment;
+      jobEventBoost.set(jobId, Math.min(6, next));
+    }
+
+    if (eventType === "save" || eventType === "apply") {
+      if (jobMeta?.company_id) positiveCompanyIds.add(jobMeta.company_id);
+      const routeType = normalizeRouteType(jobMeta?.route_type ?? null);
+      if (routeType) positiveRouteTypes.add(routeType);
+    }
+  }
+
+  if (helpfulJobIds.length > 0) {
+    const { data: helpfulJobs } = await supabase
+      .from("jobs")
+      .select("id, company_id, route_type")
+      .in("id", helpfulJobIds);
+
+    for (const row of helpfulJobs ?? []) {
+      if (row.company_id) positiveCompanyIds.add(row.company_id as string);
+      const routeType = normalizeRouteType((row.route_type as string | null) ?? null);
+      if (routeType) positiveRouteTypes.add(routeType);
+    }
+  }
+
+  return {
+    feedbackByJob,
+    hiddenJobIds,
+    positiveCompanyIds,
+    positiveRouteTypes,
+    jobEventBoost,
+  };
+}
+
+function computeBehaviorScore(
+  jobRow: Record<string, any>,
+  context: DriverBehaviorContext,
+): { score: number; hidden: boolean; detail: string; caution?: string; reason?: string } {
+  const feedback = context.feedbackByJob.get(jobRow.id as string);
+  if (feedback === "hide") {
+    return {
+      score: 0,
+      hidden: true,
+      detail: "Driver marked this match as hidden.",
+      caution: "Hidden by your prior feedback.",
+    };
+  }
+
+  let score = 0;
+  const details: string[] = [];
+
+  const interactionBoost = context.jobEventBoost.get(jobRow.id as string) ?? 0;
+  if (interactionBoost > 0) {
+    score += Math.min(4, interactionBoost);
+    details.push(`Recent interactions +${Math.min(4, interactionBoost)}`);
+  }
+
+  if (context.positiveCompanyIds.has(jobRow.company_id as string)) {
+    score += 2;
+    details.push("Company affinity +2");
+  }
+
+  const routeType = normalizeRouteType((jobRow.route_type as string | null) ?? null);
+  if (routeType && context.positiveRouteTypes.has(routeType)) {
+    score += 1;
+    details.push("Route affinity +1");
+  }
+
+  if (feedback === "helpful") {
+    score += 4;
+    details.push("Marked helpful +4");
+  } else if (feedback === "not_relevant") {
+    score -= 5;
+    details.push("Marked not relevant");
+  }
+
+  return {
+    score: clamp(Math.round(score), 0, BEHAVIOR_WEIGHT_MAX),
+    hidden: false,
+    detail: details.length > 0 ? details.join("; ") : "No behavior signal yet.",
+    caution: feedback === "not_relevant" ? "You marked this job as not relevant." : undefined,
+    reason: feedback === "helpful" ? "You marked this job as helpful before." : undefined,
+  };
+}
+
 async function processDriverProfile(
   supabase: SupabaseClient,
   driverId: string,
@@ -171,6 +363,8 @@ async function processDriverProfile(
     .maybeSingle();
 
   const driverFeatures = extractDriverFeatures(profile, latestApp);
+  const missingFields = deriveMissingFields(driverFeatures);
+  const behaviorContext = await getDriverBehaviorContext(supabase, driverId);
 
   // Fetch all active jobs
   const { data: jobs } = await supabase
@@ -191,8 +385,15 @@ async function processDriverProfile(
   // Score against each active job
   const upsertRows = [];
   for (const jobRow of jobs) {
+    if (behaviorContext.hiddenJobIds.has(jobRow.id as string)) continue;
+
     const jobFeatures = extractJobFeatures(jobRow);
     const result = computeDriverJobRulesScore(driverFeatures, jobFeatures);
+    const behavior = computeBehaviorScore(jobRow, behaviorContext);
+    if (behavior.hidden) continue;
+
+    let semanticScore: number | null = null;
+    let semanticDetail = "Semantic similarity unavailable (rules-only mode).";
 
     // Add semantic score if embeddings available
     if (driverEmbedding) {
@@ -205,25 +406,73 @@ async function processDriverProfile(
       );
       if (jobEmbedding) {
         const sim = cosineSimilarity(driverEmbedding, jobEmbedding);
-        result.semanticScore = Math.round(Math.max(0, sim) * 10);
-        result.overallScore = result.rulesScore + result.semanticScore;
+        semanticScore = Math.round(clamp(Math.max(0, sim), 0, 1) * SEMANTIC_WEIGHT_MAX);
+        semanticDetail = `Embedding similarity contribution (${semanticScore}/${SEMANTIC_WEIGHT_MAX}).`;
       }
     }
+
+    const normalizedRulesScore = clamp(
+      Math.round((result.rulesScore / RULES_RAW_MAX) * RULES_WEIGHT_MAX),
+      0,
+      RULES_WEIGHT_MAX,
+    );
+    const overall = clamp(
+      normalizedRulesScore + (semanticScore ?? 0) + behavior.score,
+      0,
+      100,
+    );
+    const degradedMode = semanticScore === null;
+
+    const topReasons = [...result.topReasons];
+    if (behavior.reason) topReasons.push({ text: behavior.reason, positive: true });
+    if (semanticScore !== null && semanticScore >= 12) {
+      topReasons.push({
+        text: "Strong semantic similarity between your profile and this job.",
+        positive: true,
+      });
+    }
+
+    const cautions = [...result.cautions];
+    if (behavior.caution) cautions.push({ text: behavior.caution, positive: false });
+
+    const scoreBreakdown = {
+      ...result.scoreBreakdown,
+      rulesNormalized: {
+        score: normalizedRulesScore,
+        maxScore: RULES_WEIGHT_MAX,
+        detail: `Normalized from raw rules score ${result.rulesScore}/${RULES_RAW_MAX}.`,
+      },
+      semantic: {
+        score: semanticScore ?? 0,
+        maxScore: SEMANTIC_WEIGHT_MAX,
+        detail: semanticDetail,
+      },
+      behavior: {
+        score: behavior.score,
+        maxScore: BEHAVIOR_WEIGHT_MAX,
+        detail: behavior.detail,
+      },
+    };
+    const confidence = deriveConfidence(missingFields, semanticScore, behavior.score);
 
     upsertRows.push({
       driver_id: driverId,
       job_id: jobRow.id,
-      overall_score: Math.min(result.overallScore, 100),
-      rules_score: result.rulesScore,
-      semantic_score: result.semanticScore,
-      score_breakdown: result.scoreBreakdown,
-      top_reasons: result.topReasons,
-      cautions: result.cautions,
-      degraded_mode: result.degradedMode,
+      overall_score: overall,
+      rules_score: normalizedRulesScore,
+      semantic_score: semanticScore,
+      behavior_score: behavior.score,
+      confidence,
+      missing_fields: missingFields,
+      actions: MATCH_ACTIONS,
+      score_breakdown: scoreBreakdown,
+      top_reasons: topReasons.slice(0, 4),
+      cautions: cautions.slice(0, 2),
+      degraded_mode: degradedMode,
       provider: embeddingProvider?.providerName ?? null,
       model: embeddingProvider?.modelName ?? null,
       computed_at: new Date().toISOString(),
-      version: 1,
+      version: 2,
     });
   }
 
@@ -231,6 +480,14 @@ async function processDriverProfile(
     await supabase
       .from("driver_job_match_scores")
       .upsert(upsertRows, { onConflict: "driver_id,job_id" });
+  }
+
+  if (behaviorContext.hiddenJobIds.size > 0) {
+    await supabase
+      .from("driver_job_match_scores")
+      .delete()
+      .eq("driver_id", driverId)
+      .in("job_id", Array.from(behaviorContext.hiddenJobIds));
   }
 }
 
@@ -277,7 +534,16 @@ async function processJob(
         .maybeSingle();
 
       const driverFeatures = extractDriverFeatures(profile, latestApp);
+      const missingFields = deriveMissingFields(driverFeatures);
+      const behaviorContext = await getDriverBehaviorContext(supabase, profile.id as string);
+      if (behaviorContext.hiddenJobIds.has(jobId)) continue;
+
       const result = computeDriverJobRulesScore(driverFeatures, jobFeatures);
+      const behavior = computeBehaviorScore(jobRow, behaviorContext);
+      if (behavior.hidden) continue;
+
+      let semanticScore: number | null = null;
+      let semanticDetail = "Semantic similarity unavailable (rules-only mode).";
 
       if (jobEmbedding) {
         const driverEmb = await getOrComputeEmbedding(
@@ -289,25 +555,73 @@ async function processJob(
         );
         if (driverEmb) {
           const sim = cosineSimilarity(driverEmb, jobEmbedding);
-          result.semanticScore = Math.round(Math.max(0, sim) * 10);
-          result.overallScore = result.rulesScore + result.semanticScore;
+          semanticScore = Math.round(clamp(Math.max(0, sim), 0, 1) * SEMANTIC_WEIGHT_MAX);
+          semanticDetail = `Embedding similarity contribution (${semanticScore}/${SEMANTIC_WEIGHT_MAX}).`;
         }
       }
+
+      const normalizedRulesScore = clamp(
+        Math.round((result.rulesScore / RULES_RAW_MAX) * RULES_WEIGHT_MAX),
+        0,
+        RULES_WEIGHT_MAX,
+      );
+      const overall = clamp(
+        normalizedRulesScore + (semanticScore ?? 0) + behavior.score,
+        0,
+        100,
+      );
+      const degradedMode = semanticScore === null;
+      const confidence = deriveConfidence(missingFields, semanticScore, behavior.score);
+
+      const topReasons = [...result.topReasons];
+      if (behavior.reason) topReasons.push({ text: behavior.reason, positive: true });
+      if (semanticScore !== null && semanticScore >= 12) {
+        topReasons.push({
+          text: "Strong semantic similarity between your profile and this job.",
+          positive: true,
+        });
+      }
+
+      const cautions = [...result.cautions];
+      if (behavior.caution) cautions.push({ text: behavior.caution, positive: false });
+
+      const scoreBreakdown = {
+        ...result.scoreBreakdown,
+        rulesNormalized: {
+          score: normalizedRulesScore,
+          maxScore: RULES_WEIGHT_MAX,
+          detail: `Normalized from raw rules score ${result.rulesScore}/${RULES_RAW_MAX}.`,
+        },
+        semantic: {
+          score: semanticScore ?? 0,
+          maxScore: SEMANTIC_WEIGHT_MAX,
+          detail: semanticDetail,
+        },
+        behavior: {
+          score: behavior.score,
+          maxScore: BEHAVIOR_WEIGHT_MAX,
+          detail: behavior.detail,
+        },
+      };
 
       driverRows.push({
         driver_id: profile.id,
         job_id: jobId,
-        overall_score: Math.min(result.overallScore, 100),
-        rules_score: result.rulesScore,
-        semantic_score: result.semanticScore,
-        score_breakdown: result.scoreBreakdown,
-        top_reasons: result.topReasons,
-        cautions: result.cautions,
-        degraded_mode: result.degradedMode,
+        overall_score: overall,
+        rules_score: normalizedRulesScore,
+        semantic_score: semanticScore,
+        behavior_score: behavior.score,
+        confidence,
+        missing_fields: missingFields,
+        actions: MATCH_ACTIONS,
+        score_breakdown: scoreBreakdown,
+        top_reasons: topReasons.slice(0, 4),
+        cautions: cautions.slice(0, 2),
+        degraded_mode: degradedMode,
         provider: embeddingProvider?.providerName ?? null,
         model: embeddingProvider?.modelName ?? null,
         computed_at: new Date().toISOString(),
-        version: 1,
+        version: 2,
       });
     }
 

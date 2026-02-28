@@ -378,6 +378,16 @@ const Navbar = () => {
                           <LayoutDashboard className="h-3.5 w-3.5 shrink-0" />
                           {user.role === "admin" ? "Admin Dashboard" : user.role === "company" ? "Dashboard" : "My Dashboard"}
                         </Link>
+                        {user.role === "driver" && (
+                          <Link
+                            to="/driver-dashboard?tab=ai-matches"
+                            onClick={() => setProfileOpen(false)}
+                            className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary"
+                          >
+                            <Truck className="h-3.5 w-3.5 shrink-0" />
+                            AI Matches
+                          </Link>
+                        )}
                         <Link
                           to={`${user.role === "admin" ? "/admin" : user.role === "company" ? "/dashboard" : "/driver-dashboard"}?tab=messages`}
                           onClick={() => setProfileOpen(false)}
@@ -514,6 +524,20 @@ const Navbar = () => {
                         </span>
                       )}
                     </Link>
+                    {user.role === "driver" && (
+                      <Link
+                        to="/driver-dashboard?tab=ai-matches"
+                        onClick={() => setIsOpen(false)}
+                        className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                          location.pathname === "/driver-dashboard"
+                            ? "bg-primary/10 text-primary"
+                            : "hover:bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        <Truck className="h-4 w-4 shrink-0" />
+                        AI Matches
+                      </Link>
+                    )}
                     <div className="flex gap-2 pt-2 items-center border-t border-border/50 mt-1">
                       <div className="flex items-center gap-2 px-3 py-1.5 text-sm flex-1 text-muted-foreground">
                         <User className="h-3.5 w-3.5 text-primary shrink-0" />

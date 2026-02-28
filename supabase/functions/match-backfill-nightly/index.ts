@@ -37,10 +37,18 @@ Deno.serve(async (req) => {
   const startTime = Date.now();
 
   try {
+    // Auth: only allow service-role key or cron secret
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing auth header" }), {
-        status: 401,
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const cronSecret = Deno.env.get("MATCH_CRON_SECRET");
+    const token = authHeader?.replace("Bearer ", "") ?? "";
+
+    const isServiceRole = token === serviceRoleKey;
+    const isCronSecret = cronSecret && token === cronSecret;
+
+    if (!isServiceRole && !isCronSecret) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
