@@ -143,7 +143,7 @@ const EMPTY_FORM = {
   location: "",
   pay: "",
   description: "",
-  status: "Active",
+  status: "Active" as "Active" | "Draft" | "Paused" | "Closed",
 };
 
 type Tab = "jobs" | "applications" | "pipeline" | "profile" | "analytics" | "messages" | "leads" | "hired" | "subscription" | "ai-matches";
@@ -653,12 +653,13 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
 
   // Load company profile on mount
   useEffect(() => {
-    supabase
-      .from("company_profiles")
-      .select("*")
-      .eq("id", user!.id)
-      .maybeSingle()
-      .then(({ data }) => {
+    Promise.resolve(
+      supabase
+        .from("company_profiles")
+        .select("*")
+        .eq("id", user!.id)
+        .maybeSingle()
+    ).then(({ data }) => {
         const loadedProfile: CompanyProfileForm = {
           name: data?.company_name ?? user!.name,
           email: data?.email ?? user!.email ?? "",
@@ -676,7 +677,8 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
         setProfileWebsite(loadedProfile.website);
         setProfileLogo(loadedProfile.logo);
         setLastSavedSnapshot(snapshotCompanyProfile(loadedProfile));
-      });
+      })
+      .catch(() => {});
   }, [user]);
 
   useEffect(() => {
@@ -1251,7 +1253,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                   <div className="flex items-center gap-5">
                     <div className="h-20 w-20 border border-border flex items-center justify-center bg-muted shrink-0 overflow-hidden">
                       {profileLogo ? (
-                        <img src={profileLogo} alt="Company logo" className="h-full w-full object-contain p-1" />
+                        <img src={profileLogo} alt="Company logo" loading="lazy" className="h-full w-full object-contain p-1" />
                       ) : (
                         <span className="font-display text-3xl font-bold text-primary">{user!.name.charAt(0)}</span>
                       )}
@@ -2211,9 +2213,9 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                             variant="outline"
                             size="sm"
                             className="mt-2 w-full text-xs"
-                            onClick={() => navigate("/pricing")}
+                            asChild
                           >
-                            Upgrade
+                            <Link to="/pricing">Upgrade</Link>
                           </Button>
                         )}
                       </div>

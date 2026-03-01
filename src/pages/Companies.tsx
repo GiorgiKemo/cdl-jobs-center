@@ -185,6 +185,9 @@ const Companies = () => {
                       <img
                         src={c.logo_url}
                         alt={c.company_name}
+                        loading="lazy"
+                        width={80}
+                        height={80}
                         className="h-20 w-20 object-contain border border-border bg-white"
                       />
                     ) : (

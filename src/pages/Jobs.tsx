@@ -321,7 +321,7 @@ const Jobs = () => {
                         </Button>
                         <div className="h-14 w-full border border-border flex items-center justify-center bg-muted/30 overflow-hidden">
                           {job.logoUrl ? (
-                            <img src={job.logoUrl} alt={job.company} className="h-full w-full object-contain p-1" />
+                            <img src={job.logoUrl} alt={job.company} loading="lazy" className="h-full w-full object-contain p-1" />
                           ) : (
                             <Truck className="h-6 w-6 text-muted-foreground" />
                           )}

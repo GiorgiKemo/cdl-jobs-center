@@ -117,6 +117,7 @@ export function getCtaForType(
     subscription_event: "View Subscription",
     profile_reminder: "Complete Profile",
     weekly_digest: "View Dashboard",
+    welcome: "Get Started",
   };
 
   return {

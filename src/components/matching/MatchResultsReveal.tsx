@@ -61,6 +61,7 @@ function MatchCard({
               <img
                 src={match.jobLogoUrl}
                 alt=""
+                loading="lazy"
                 className="w-10 h-10 rounded-md object-cover shrink-0 bg-muted"
               />
             ) : (

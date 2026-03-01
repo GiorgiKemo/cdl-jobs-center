@@ -110,7 +110,7 @@ const JobDetail = () => {
             {/* Logo */}
             <div className="shrink-0 h-20 w-20 bg-muted flex items-center justify-center font-display text-3xl font-bold text-primary border border-border overflow-hidden">
               {companyLogo ? (
-                <img src={companyLogo} alt={job.company} className="h-full w-full object-contain p-1" />
+                <img src={companyLogo} alt={job.company} loading="lazy" className="h-full w-full object-contain p-1" />
               ) : (
                 <span>{job.company.charAt(0)}</span>
               )}

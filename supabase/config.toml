@@ -172,14 +172,14 @@ enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
 enable_manual_linking = false
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
-minimum_password_length = 6
+minimum_password_length = 12
 # Passwords that do not meet the following requirements will be rejected as weak. Supported values
 # are: `letters_digits`, `lower_upper_letters_digits`, `lower_upper_letters_digits_symbols`
 password_requirements = ""
 
 [auth.rate_limit]
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
-email_sent = 2
+email_sent = 100
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
@@ -233,16 +233,22 @@ otp_expiry = 3600
 subject = "Confirm your CDL Jobs Center account"
 content_path = "./supabase/templates/confirmation.html"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+[auth.email.template.recovery]
+subject = "Reset your CDL Jobs Center password"
+content_path = "./supabase/templates/recovery.html"
 
-# Uncomment to customize notification email template
-# [auth.email.notification.password_changed]
-# enabled = true
-# subject = "Your password has been changed"
-# content_path = "./templates/password_changed_notification.html"
+[auth.email.template.magic_link]
+subject = "Sign in to CDL Jobs Center"
+content_path = "./supabase/templates/magic_link.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your email change - CDL Jobs Center"
+content_path = "./supabase/templates/email_change.html"
+
+[auth.email.notification.password_changed]
+enabled = true
+subject = "Your CDL Jobs Center password was changed"
+content_path = "./templates/password_changed.html"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
@@ -362,33 +368,38 @@ authorization_url_path = "/oauth/consent"
 allow_dynamic_registration = false
 
 [functions.sync-leads]
-verify_jwt = false
+verify_jwt = true
 
 [functions.create-checkout]
-verify_jwt = false
+verify_jwt = true
 
 [functions.stripe-webhook]
+# Stripe sends webhooks without a JWT — verified via Stripe signature instead
 verify_jwt = false
 
 [functions.create-portal-session]
-verify_jwt = false
+verify_jwt = true
 
 [functions.match-recompute]
+# Internal/cron — called by service role or scheduler
 verify_jwt = false
 
 [functions.match-backfill-nightly]
+# Internal/cron — called by service role or scheduler
 verify_jwt = false
 
 [functions.record-match-feedback]
-verify_jwt = false
+verify_jwt = true
 
 [functions.refresh-my-matches]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-notification]
+# Internal — called by other functions/triggers
 verify_jwt = false
 
 [functions.send-scheduled-notifications]
+# Internal/cron — called by scheduler
 verify_jwt = false
 
 [edge_runtime]

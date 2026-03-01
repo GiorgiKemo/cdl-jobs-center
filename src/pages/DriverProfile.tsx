@@ -62,7 +62,7 @@ const DriverProfile = () => {
     enabled: !!id && !!user && user.role === "company",
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("driver_profiles")
+        .from("driver_profiles_safe")
         .select("id, first_name, last_name, license_class, years_exp, license_state, about")
         .eq("id", id)
         .maybeSingle();

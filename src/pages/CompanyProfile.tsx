@@ -139,7 +139,7 @@ const CompanyProfile = () => {
             {/* Logo */}
             <div className="shrink-0 h-24 w-24 rounded-lg bg-muted flex items-center justify-center border border-border overflow-hidden">
               {company.logo_url ? (
-                <img src={company.logo_url} alt={company.company_name} className="h-full w-full object-contain p-1" />
+                <img src={company.logo_url} alt={company.company_name} loading="lazy" className="h-full w-full object-contain p-1" />
               ) : (
                 <Building2 className="h-10 w-10 text-primary" />
               )}

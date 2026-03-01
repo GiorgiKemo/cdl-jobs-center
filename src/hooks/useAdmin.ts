@@ -141,8 +141,8 @@ export function useAdminUsers() {
           .select("id, name, role, created_at")
           .order("created_at", { ascending: false }),
         supabase
-          .from("driver_profiles")
-          .select("id, phone, years_exp, license_state"),
+          .from("driver_profiles_safe")
+          .select("id, years_exp, license_state"),
         supabase
           .from("company_profiles")
           .select("id, company_name, email, phone"),
@@ -161,7 +161,7 @@ export function useAdminUsers() {
         const cp = companyMap.get(row.id);
         return rowToAdminUser(row, {
           email: cp?.email ?? null,
-          phone: dp?.phone ?? cp?.phone ?? null,
+          phone: cp?.phone ?? null,
           state: dp?.license_state ?? null,
           yearsExp: dp?.years_exp ?? null,
           companyName: cp?.company_name ?? null,

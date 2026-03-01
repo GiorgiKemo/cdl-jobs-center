@@ -86,6 +86,8 @@ const Pricing = () => {
       }
 
       const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
       const res = await fetch(fnUrl, {
         method: "POST",
         headers: {
@@ -93,7 +95,9 @@ const Pricing = () => {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ plan }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Unknown error" }));

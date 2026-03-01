@@ -1,4 +1,4 @@
-import { Component, type ReactNode } from "react";
+import React, { Component, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 
 interface Props {
@@ -18,6 +18,10 @@ export class ErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("[ErrorBoundary]", error, info.componentStack);
   }
 
   render() {

@@ -558,7 +558,7 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
                           <div className="flex items-start gap-3 flex-1 min-w-0">
                             <div className="shrink-0 h-10 w-10 bg-muted flex items-center justify-center border border-border overflow-hidden">
                               {match.jobLogoUrl ? (
-                                <img src={match.jobLogoUrl} alt={match.jobCompany} className="h-full w-full object-contain p-0.5" />
+                                <img src={match.jobLogoUrl} alt={match.jobCompany} loading="lazy" className="h-full w-full object-contain p-0.5" />
                               ) : (
                                 <Truck className="h-5 w-5 text-muted-foreground" />
                               )}

@@ -92,7 +92,7 @@ const Drivers = () => {
     enabled: !!user && user.role === "company",
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("driver_profiles")
+        .from("driver_profiles_safe")
         .select("id, first_name, last_name, license_class, years_exp, license_state, about, updated_at")
         .order("updated_at", { ascending: false });
 

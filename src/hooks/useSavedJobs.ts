@@ -1,6 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
+type ToggleSavedJobVars = {
+  jobId: string;
+  shouldSave: boolean;
+};
+
 export function useSavedJobs(driverId: string) {
   const qc = useQueryClient();
   const key = ["saved_jobs", driverId];
@@ -21,9 +26,12 @@ export function useSavedJobs(driverId: string) {
   const savedIds = data ?? [];
 
   const toggleMutation = useMutation({
-    mutationFn: async (jobId: string) => {
-      const alreadySaved = savedIds.includes(jobId);
-      if (alreadySaved) {
+    mutationFn: async ({ jobId, shouldSave }: ToggleSavedJobVars) => {
+      if (!driverId) {
+        throw new Error("Driver ID is required to toggle saved jobs.");
+      }
+
+      if (!shouldSave) {
         const { error } = await supabase
           .from("saved_jobs")
           .delete()
@@ -37,13 +45,38 @@ export function useSavedJobs(driverId: string) {
         if (error) throw error;
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: key }),
+    onMutate: async ({ jobId, shouldSave }) => {
+      await qc.cancelQueries({ queryKey: key });
+      const previousSavedIds = qc.getQueryData<string[]>(key) ?? [];
+
+      qc.setQueryData<string[]>(key, (prev) => {
+        const current = prev ?? [];
+        if (shouldSave) {
+          if (current.includes(jobId)) return current;
+          return [jobId, ...current];
+        }
+        return current.filter((id) => id !== jobId);
+      });
+
+      return { previousSavedIds };
+    },
+    onError: (_err, _vars, context) => {
+      if (!context) return;
+      qc.setQueryData(key, context.previousSavedIds);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: key });
+    },
   });
 
   return {
     savedIds,
     isLoading,
     isSaved: (id: string) => savedIds.includes(id),
-    toggle: (jobId: string) => toggleMutation.mutateAsync(jobId),
+    toggle: (jobId: string) => {
+      const currentSavedIds = qc.getQueryData<string[]>(key) ?? savedIds;
+      const shouldSave = !currentSavedIds.includes(jobId);
+      return toggleMutation.mutateAsync({ jobId, shouldSave });
+    },
   };
 }

@@ -128,7 +128,7 @@ const invokeAuthedFunction = async <TData = unknown>(
 ): Promise<TData> => {
   const callOnce = async (accessToken?: string) =>
     supabase.functions.invoke(fnName, {
-      body,
+      body: body as Record<string, unknown>,
       headers: accessToken
         ? { Authorization: `Bearer ${accessToken}` }
         : undefined,
@@ -212,24 +212,24 @@ function rowToCompanyDriverMatch(
   if (candidateData) {
     if (row.candidate_source === "application") {
       name = `${candidateData.first_name ?? ""} ${candidateData.last_name ?? ""}`.trim();
-      phone = candidateData.phone ?? null;
-      email = candidateData.email ?? null;
-      state = candidateData.license_state ?? null;
-      yearsExp = candidateData.years_exp ?? null;
-      driverType = candidateData.driver_type ?? null;
-      licenseClass = candidateData.license_class ?? null;
+      phone = (candidateData.phone as string) ?? null;
+      email = (candidateData.email as string) ?? null;
+      state = (candidateData.license_state as string) ?? null;
+      yearsExp = (candidateData.years_exp as string) ?? null;
+      driverType = (candidateData.driver_type as string) ?? null;
+      licenseClass = (candidateData.license_class as string) ?? null;
     } else if (row.candidate_source === "lead") {
-      name = candidateData.full_name ?? "";
-      phone = candidateData.phone ?? null;
-      email = candidateData.email ?? null;
-      state = candidateData.state ?? null;
-      yearsExp = candidateData.years_exp ?? null;
+      name = (candidateData.full_name as string) ?? "";
+      phone = (candidateData.phone as string) ?? null;
+      email = (candidateData.email as string) ?? null;
+      state = (candidateData.state as string) ?? null;
+      yearsExp = (candidateData.years_exp as string) ?? null;
       driverType = candidateData.is_owner_op ? "owner-operator" : null;
     }
   }
 
   return {
-    candidateId: row.candidate_id,
+    candidateId: row.candidate_id as string,
     candidateSource: row.candidate_source as CompanyDriverMatch["candidateSource"],
     candidateDriverId: (row.candidate_driver_id as string | null) ?? null,
     overallScore: row.overall_score as number,

@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/context/auth";
 
 const heroImage = "/hero-truck.jpg";
-const heroVideo = "/mainvideo.mp4";
+const heroVideo = "/hero-bg.mp4";
 
 const Hero = () => {
   const { user } = useAuth();

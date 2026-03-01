@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
 
     const { data: profile, error: profileErr } = await supabase
       .from("profiles")
-      .select("name, notification_preferences")
+      .select("name, role, notification_preferences")
       .eq("id", user_id)
       .single();
 
@@ -94,7 +94,8 @@ Deno.serve(async (req) => {
 
     // Build email
     const { ctaText, ctaUrl } = getCtaForType(type, metadata);
-    const preferencesUrl = `${SITE_URL}/dashboard?tab=profile`;
+    const dashPath = profile.role === "driver" ? "/driver-dashboard" : "/dashboard";
+    const preferencesUrl = `${SITE_URL}${dashPath}?tab=profile`;
 
     const html = buildNotificationEmail({
       title,
