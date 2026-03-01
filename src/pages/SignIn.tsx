@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,14 +8,102 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/auth";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { supabase } from "@/lib/supabase";
+import { friendlySignInError } from "@/lib/authErrorMessages";
+import { getPasswordStrength, type PasswordStrengthLevel } from "@/lib/passwordStrength";
+
+const strengthGradientByLevel: Record<PasswordStrengthLevel, string> = {
+  weak: "from-rose-600 to-red-500",
+  fair: "from-amber-500 to-orange-500",
+  good: "from-lime-500 to-emerald-500",
+  strong: "from-emerald-500 via-teal-500 to-cyan-500",
+};
+
+const strengthTextByLevel: Record<PasswordStrengthLevel, string> = {
+  weak: "text-destructive",
+  fair: "text-amber-700 dark:text-amber-400",
+  good: "text-lime-700 dark:text-lime-400",
+  strong: "text-emerald-700 dark:text-emerald-400",
+};
+
+const PasswordStrengthIndicator = ({ password }: { password: string }) => {
+  if (!password) return null;
+  const strength = getPasswordStrength(password);
+  const width = Math.max((strength.score / 5) * 100, 8);
+  const hints: Array<{ ok: boolean; label: string }> = [
+    { ok: password.length >= 12, label: "12+ chars" },
+    { ok: /[A-Z]/.test(password), label: "uppercase" },
+    { ok: /[a-z]/.test(password), label: "lowercase" },
+    { ok: /\d/.test(password), label: "number" },
+    { ok: /[^A-Za-z0-9]/.test(password), label: "symbol" },
+  ];
+  const missing = hints.filter((h) => !h.ok).map((h) => h.label);
+  const conciseHint =
+    missing.length === 0 ? "Looks strong." : `Add ${missing.slice(0, 2).join(" + ")}.`;
+
+  return (
+    <div className="space-y-1.5 pt-0.5" aria-live="polite">
+      <div className="flex items-center justify-between text-[11px] leading-none">
+        <span className="text-muted-foreground">{conciseHint}</span>
+        <span className={`font-semibold ${strengthTextByLevel[strength.label]}`}>
+          {strength.label.charAt(0).toUpperCase() + strength.label.slice(1)}
+        </span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/70">
+        <div
+          className={`h-full rounded-full bg-gradient-to-r transition-[width] duration-500 ease-out ${strengthGradientByLevel[strength.label]}`}
+          style={{ width: `${width}%` }}
+        />
+      </div>
+    </div>
+  );
+};
 
 const SignIn = () => {
   usePageTitle("Sign In");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [recovering, setRecovering] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const { signIn } = useAuth();
   const navigate = useNavigate();
+
+  // Detect PASSWORD_RECOVERY event when user clicks reset link from email
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setRecovering(true);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 12) {
+      toast.error("Password must be at least 12 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      toast.success("Password updated successfully!");
+      setRecovering(false);
+      setNewPassword("");
+      setConfirmPassword("");
+      navigate("/");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update password.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,8 +116,8 @@ const SignIn = () => {
       await signIn(email, password);
       toast.success("Welcome back!");
       navigate("/");
-    } catch {
-      toast.error("Sign in failed. Please try again.");
+    } catch (err) {
+      toast.error(friendlySignInError(err));
     } finally {
       setLoading(false);
     }
@@ -60,83 +148,129 @@ const SignIn = () => {
           <p className="text-sm text-muted-foreground mb-6">
             <Link to="/" className="text-primary hover:underline">Main</Link>
             <span className="mx-1">»</span>
-            Sign In
+            {recovering ? "Reset Password" : "Sign In"}
           </p>
 
           <div className="border border-border bg-card">
             {/* Header */}
             <div className="border-b border-border px-5 py-4">
               <div className="border-l-4 border-primary pl-3">
-                <p className="font-display font-bold text-lg">Sign In to Your Account</p>
+                <p className="font-display font-bold text-lg">
+                  {recovering ? "Set a New Password" : "Sign In to Your Account"}
+                </p>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  Access your driver profile and saved jobs
+                  {recovering
+                    ? "Choose a strong password for your account"
+                    : "Access your driver profile and saved jobs"}
                 </p>
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="px-5 py-6 space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <button
-                    type="button"
-                    className="text-xs text-primary hover:underline"
-                    onClick={async () => {
-                      if (!email) {
-                        toast.error("Enter your email first, then click Forgot password.");
-                        return;
-                      }
-                      try {
-                        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                          redirectTo: `${window.location.origin}/signin`,
-                        });
-                        if (error) throw error;
-                        toast.success("Password reset email sent! Check your inbox.");
-                      } catch (err) {
-                        toast.error(err instanceof Error ? err.message : "Failed to send reset email.");
-                      }
-                    }}
-                  >
-                    Forgot password?
-                  </button>
+            {recovering ? (
+              <form onSubmit={handleResetPassword} className="px-5 py-6 space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="new-password">New password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    placeholder="••••••••••••"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                  <PasswordStrengthIndicator password={newPassword} />
                 </div>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                />
-              </div>
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={loading}
-              >
-                {loading ? "Signing in..." : "Sign In"}
-              </Button>
+                <div className="space-y-1.5">
+                  <Label htmlFor="confirm-password">Confirm password</Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    placeholder="••••••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    autoComplete="new-password"
+                    aria-invalid={confirmPassword.length > 0 && newPassword !== confirmPassword}
+                    className={confirmPassword.length > 0 && newPassword !== confirmPassword ? "border-destructive focus-visible:ring-destructive" : ""}
+                  />
+                  {confirmPassword.length > 0 && newPassword !== confirmPassword && (
+                    <p className="text-xs text-destructive">Passwords do not match.</p>
+                  )}
+                </div>
 
-              <p className="text-center text-sm text-muted-foreground pt-2">
-                New driver?{" "}
-                <Link to="/apply" className="text-primary font-medium hover:underline">
-                  Apply Now →
-                </Link>
-              </p>
-            </form>
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={loading}
+                >
+                  {loading ? "Updating..." : "Update Password"}
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleSubmit} className="px-5 py-6 space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="email">Email address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="email"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    <button
+                      type="button"
+                      className="text-xs text-primary hover:underline"
+                      onClick={async () => {
+                        if (!email) {
+                          toast.error("Enter your email first, then click Forgot password.");
+                          return;
+                        }
+                        try {
+                          const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                            redirectTo: `${window.location.origin}/signin`,
+                          });
+                          if (error) throw error;
+                          toast.success("Password reset email sent! Check your inbox.");
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : "Failed to send reset email.");
+                        }
+                      }}
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={loading}
+                >
+                  {loading ? "Signing in..." : "Sign In"}
+                </Button>
+
+                <p className="text-center text-sm text-muted-foreground pt-2">
+                  New driver?{" "}
+                  <Link to="/apply" className="text-primary font-medium hover:underline">
+                    Apply Now →
+                  </Link>
+                </p>
+              </form>
+            )}
           </div>
         </div>
       </main>

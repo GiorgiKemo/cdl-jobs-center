@@ -92,9 +92,9 @@ const Footer = () => {
           </p>
           <p className="text-sm text-muted-foreground">
             All Rights Reserved —{" "}
-            <Link to="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
+            <Link to="/privacy" className="text-secondary-foreground hover:text-primary hover:underline">Privacy Policy</Link>
             {" "}&{" "}
-            <Link to="/terms" className="text-primary hover:underline">Terms of Service</Link>
+            <Link to="/terms" className="text-secondary-foreground hover:text-primary hover:underline">Terms of Service</Link>
           </p>
         </div>
       </div>

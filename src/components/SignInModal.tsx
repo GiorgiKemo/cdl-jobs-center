@@ -7,6 +7,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { toast } from "sonner";
 import { useAuth } from "@/context/auth";
 import { supabase } from "@/lib/supabase";
+import { friendlySignInError } from "@/lib/authErrorMessages";
+import { getPasswordStrength, type PasswordStrengthLevel } from "@/lib/passwordStrength";
 
 type View = "login" | "rules" | "register" | "forgot" | "confirm-email";
 
@@ -75,6 +77,57 @@ const ModalHeader = ({ title, onClose }: { title: string; onClose: () => void })
   </div>
 );
 
+const strengthGradientByLevel: Record<PasswordStrengthLevel, string> = {
+  weak: "from-rose-600 to-red-500",
+  fair: "from-amber-500 to-orange-500",
+  good: "from-lime-500 to-emerald-500",
+  strong: "from-emerald-500 via-teal-500 to-cyan-500",
+};
+
+const strengthTextByLevel: Record<PasswordStrengthLevel, string> = {
+  weak: "text-destructive",
+  fair: "text-amber-700 dark:text-amber-400",
+  good: "text-lime-700 dark:text-lime-400",
+  strong: "text-emerald-700 dark:text-emerald-400",
+};
+
+const formatStrengthLabel = (level: PasswordStrengthLevel) =>
+  level.charAt(0).toUpperCase() + level.slice(1);
+
+const PasswordStrengthIndicator = ({ password }: { password: string }) => {
+  if (!password) return null;
+
+  const strength = getPasswordStrength(password);
+  const width = Math.max((strength.score / 5) * 100, 8);
+  const hints: Array<{ ok: boolean; label: string }> = [
+    { ok: password.length >= 12, label: "12+ chars" },
+    { ok: /[A-Z]/.test(password), label: "uppercase" },
+    { ok: /[a-z]/.test(password), label: "lowercase" },
+    { ok: /\d/.test(password), label: "number" },
+    { ok: /[^A-Za-z0-9]/.test(password), label: "symbol" },
+  ];
+  const missing = hints.filter((h) => !h.ok).map((h) => h.label);
+  const conciseHint =
+    missing.length === 0 ? "Looks strong." : `Add ${missing.slice(0, 2).join(" + ")}.`;
+
+  return (
+    <div className="space-y-1.5 pt-0.5" aria-live="polite">
+      <div className="flex items-center justify-between text-[11px] leading-none">
+        <span className="text-muted-foreground">{conciseHint}</span>
+        <span className={`font-semibold ${strengthTextByLevel[strength.label]}`}>
+          {formatStrengthLabel(strength.label)}
+        </span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/70">
+        <div
+          className={`h-full rounded-full bg-gradient-to-r transition-[width] duration-500 ease-out ${strengthGradientByLevel[strength.label]}`}
+          style={{ width: `${width}%` }}
+        />
+      </div>
+    </div>
+  );
+};
+
 export function SignInModal({ onClose }: SignInModalProps) {
   const [view, setView] = useState<View>("login");
   const [submitting, setSubmitting] = useState(false);
@@ -90,6 +143,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regConfirm, setRegConfirm] = useState("");
+  const passwordsDoNotMatch = regConfirm.length > 0 && regPassword !== regConfirm;
 
   // Driver-specific
   const [regUsername, setRegUsername] = useState("");
@@ -129,14 +183,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
       onClose();
     } catch (err) {
       clearTimeout(timeout);
-      const msg = err instanceof Error ? err.message : "";
-      if (msg.toLowerCase().includes("not confirmed")) {
-        toast.error("Your email is not confirmed yet. Check your inbox or contact support.");
-      } else if (msg.toLowerCase().includes("invalid login")) {
-        toast.error("Incorrect email or password.");
-      } else {
-        toast.error(msg || "Sign in failed. Please try again.");
-      }
+      toast.error(friendlySignInError(err));
     } finally {
       setSubmitting(false);
     }
@@ -147,7 +194,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
     if (msg.toLowerCase().includes("already registered") || msg.toLowerCase().includes("already been registered"))
       return "This email is already registered. Please sign in instead.";
     if (msg.toLowerCase().includes("password") || msg.includes("422"))
-      return "Password must be at least 6 characters.";
+      return "Password must be at least 12 characters.";
     return msg || "Registration failed. Please try again.";
   };
 
@@ -161,8 +208,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
       toast.error("Please enter a valid email address.");
       return;
     }
-    if (regPassword.length < 6) {
-      toast.error("Password must be at least 6 characters.");
+    if (regPassword.length < 12) {
+      toast.error("Password must be at least 12 characters.");
       return;
     }
     if (regPassword !== regConfirm) {
@@ -207,8 +254,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
       toast.error("Please enter a valid email address.");
       return;
     }
-    if (regPassword.length < 6) {
-      toast.error("Password must be at least 6 characters.");
+    if (regPassword.length < 12) {
+      toast.error("Password must be at least 12 characters.");
       return;
     }
     if (regPassword !== regConfirm) {
@@ -426,6 +473,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   onChange={(e) => setRegPassword(e.target.value)}
                   autoComplete="new-password"
                 />
+                <PasswordStrengthIndicator password={regPassword} />
                 <Input
                   id="reg-confirmPassword"
                   type="password"
@@ -435,7 +483,12 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   value={regConfirm}
                   onChange={(e) => setRegConfirm(e.target.value)}
                   autoComplete="new-password"
+                  aria-invalid={passwordsDoNotMatch}
+                  className={passwordsDoNotMatch ? "border-destructive focus-visible:ring-destructive" : ""}
                 />
+                {passwordsDoNotMatch && (
+                  <p className="text-xs text-destructive">Passwords do not match.</p>
+                )}
                 <hr className="border-border" />
                 <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Driver Profile</p>
                 <Input
@@ -552,6 +605,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   onChange={(e) => setRegPassword(e.target.value)}
                   autoComplete="new-password"
                 />
+                <PasswordStrengthIndicator password={regPassword} />
                 <Input
                   id="co-confirmPassword"
                   type="password"
@@ -561,7 +615,12 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   value={regConfirm}
                   onChange={(e) => setRegConfirm(e.target.value)}
                   autoComplete="new-password"
+                  aria-invalid={passwordsDoNotMatch}
+                  className={passwordsDoNotMatch ? "border-destructive focus-visible:ring-destructive" : ""}
                 />
+                {passwordsDoNotMatch && (
+                  <p className="text-xs text-destructive">Passwords do not match.</p>
+                )}
                 <hr className="border-border" />
                 <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Company Profile</p>
                 <Input

@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/auth";
 
-const heroImage = "/hero-truck.jpg";
 const heroVideo = "/hero-bg.mp4";
 
 const Hero = () => {
@@ -15,12 +14,26 @@ const Hero = () => {
     <section className="relative overflow-hidden bg-secondary min-h-[90vh] flex items-center">
       {/* Background image */}
       <div className="absolute inset-0">
-        <img
-          src={heroImage}
-          alt="Professional CDL truck driver"
-          className="w-full h-full object-cover opacity-40"
-          {...({ fetchpriority: "high" } as Record<string, string>)}
-        />
+        <picture>
+          <source
+            type="image/avif"
+            srcSet="/hero-truck-640.avif 640w, /hero-truck-960.avif 960w, /hero-truck-1280.avif 1280w, /hero-truck-1920.avif 1920w"
+            sizes="100vw"
+          />
+          <source
+            type="image/webp"
+            srcSet="/hero-truck-640.webp 640w, /hero-truck-960.webp 960w, /hero-truck-1280.webp 1280w, /hero-truck-1920.webp 1920w"
+            sizes="100vw"
+          />
+          <img
+            src="/hero-truck-1280.jpg"
+            alt="Professional CDL truck driver"
+            width={1920}
+            height={1080}
+            className="w-full h-full object-cover opacity-40"
+            {...({ fetchpriority: "high" } as Record<string, string>)}
+          />
+        </picture>
         <div className="absolute inset-0 bg-gradient-to-r from-secondary via-secondary/90 to-secondary/50" />
       </div>
 
@@ -75,7 +88,7 @@ const Hero = () => {
             >
               <Button
                 size="lg"
-                className="text-lg px-8 glow-orange group"
+                className="text-lg px-8 glow-orange group dark:text-slate-950"
                 asChild
               >
                 <Link to={isCompany ? "/dashboard" : "/apply"}>
