@@ -7,10 +7,22 @@ import { cn } from "@/lib/utils";
 const SELECT_OPEN_UNLOCK_CLASS = "cdl-select-open";
 let openSelectCount = 0;
 
+// Capture-phase wheel listener that forces page scroll while a Select
+// is open.  react-remove-scroll calls preventDefault() on wheel events,
+// which blocks the native scroll, but programmatic scrollTop changes
+// bypass preventDefault() entirely.
+function forcePageScroll(e: WheelEvent) {
+  document.documentElement.scrollTop += e.deltaY;
+  document.documentElement.scrollLeft += e.deltaX;
+}
+
 const addSelectUnlockClass = () => {
   if (typeof document === "undefined") return;
   openSelectCount += 1;
   document.body.classList.add(SELECT_OPEN_UNLOCK_CLASS);
+  if (openSelectCount === 1) {
+    document.addEventListener("wheel", forcePageScroll, { capture: true, passive: true });
+  }
 };
 
 const removeSelectUnlockClass = () => {
@@ -18,6 +30,7 @@ const removeSelectUnlockClass = () => {
   openSelectCount = Math.max(0, openSelectCount - 1);
   if (openSelectCount === 0) {
     document.body.classList.remove(SELECT_OPEN_UNLOCK_CLASS);
+    document.removeEventListener("wheel", forcePageScroll, { capture: true } as EventListenerOptions);
   }
 };
 
@@ -138,10 +151,6 @@ const SelectContent = React.forwardRef<
             position === "popper" &&
               "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]",
           )}
-          onWheel={(e) => {
-            e.stopPropagation();
-            document.documentElement.scrollTop += e.deltaY;
-          }}
         >
           {children}
         </SelectPrimitive.Viewport>
