@@ -9,6 +9,13 @@ if (sentryDsn) {
   Sentry.init({
     dsn: sentryDsn,
     sendDefaultPii: true,
+    integrations: [
+      Sentry.browserTracingIntegration(),
+      Sentry.replayIntegration(),
+    ],
+    tracesSampleRate: 0.2,
+    replaysSessionSampleRate: 0,
+    replaysOnErrorSampleRate: 1.0,
   });
 }
 
