@@ -19,6 +19,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
+    target: "es2022",
     rollupOptions: {
       output: {
         manualChunks: {
@@ -27,7 +28,6 @@ export default defineConfig(({ mode }) => ({
           charts: ["recharts"],
           motion: ["framer-motion"],
           supabase: ["@supabase/supabase-js"],
-          sentry: ["@sentry/react"],
         },
       },
     },

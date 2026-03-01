@@ -8,6 +8,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Spinner } from "./components/ui/Spinner";
+import Index from "./pages/Index";
 
 // Auto-reload on stale chunk errors (happens after new deployments)
 function lazyWithRetry(factory: () => Promise<{ default: React.ComponentType }>) {
@@ -28,7 +29,6 @@ function lazyWithRetry(factory: () => Promise<{ default: React.ComponentType }>)
   );
 }
 
-const Index = lazyWithRetry(() => import("./pages/Index"));
 const ApplyNow = lazyWithRetry(() => import("./pages/ApplyNow"));
 const Jobs = lazyWithRetry(() => import("./pages/Jobs"));
 const JobDetail = lazyWithRetry(() => import("./pages/JobDetail"));
