@@ -1,6 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   Menu,
   X,
@@ -25,13 +24,18 @@ import {
 } from "@/components/ui/dialog";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/context/auth";
-import { SignInModal } from "@/components/SignInModal";
 import { toast } from "sonner";
 import { useUnreadCount } from "@/hooks/useMessages";
 import { useUnreadNotificationCount } from "@/hooks/useNotifications";
-import { NotificationCenter } from "@/components/NotificationCenter";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+
+const SignInModal = lazy(() =>
+  import("@/components/SignInModal").then((m) => ({ default: m.SignInModal }))
+);
+const NotificationCenter = lazy(() =>
+  import("@/components/NotificationCenter").then((m) => ({ default: m.NotificationCenter }))
+);
 
 const jobDropdownItems = [
   { name: "All Jobs", path: "/jobs" },
@@ -53,7 +57,6 @@ const navLinks = [
   { name: "Companies", path: "/companies" },
   { name: "Pricing", path: "/pricing" },
 ];
-const NAVBAR_ENTRANCE_ANIMATION_ENABLED = false;
 
 const getInitials = (name: string) =>
   name
@@ -283,15 +286,7 @@ const Navbar = () => {
       </div>
 
       {/* Main nav */}
-      <motion.nav
-        initial={
-          NAVBAR_ENTRANCE_ANIMATION_ENABLED ? { y: -20, opacity: 0 } : false
-        }
-        animate={
-          NAVBAR_ENTRANCE_ANIMATION_ENABLED ? { y: 0, opacity: 1 } : undefined
-        }
-        className="sticky top-0 z-50 glass border-b border-border/50"
-      >
+      <nav className="sticky top-0 z-50 glass border-b border-border/50">
         <div className="container mx-auto flex items-center justify-between py-4">
           <Link
             to="/"
@@ -349,41 +344,25 @@ const Navbar = () => {
                         className={`h-3.5 w-3.5 transition-transform duration-200 ${jobsDropdownOpen ? "rotate-180" : ""}`}
                       />
                       {location.pathname === link.path && (
-                        <motion.div
-                          layoutId="activeTab"
-                          className="absolute inset-0 rounded-lg bg-primary/10"
-                          transition={{
-                            type: "spring",
-                            bounce: 0.2,
-                            duration: 0.6,
-                          }}
-                        />
+                        <div className="absolute inset-0 rounded-lg bg-primary/10" />
                       )}
                     </button>
 
                     {/* Dropdown panel */}
-                    <AnimatePresence>
-                      {jobsDropdownOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -2 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -2 }}
-                          transition={{ duration: 0.12 }}
-                          className="absolute top-full left-0 w-44 bg-card border border-border shadow-md py-1"
-                        >
-                          {link.dropdown.map((item) => (
-                            <Link
-                              key={item.path}
-                              to={item.path}
-                              onClick={() => setJobsDropdownOpen(false)}
-                              className="block px-4 py-2 text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
-                            >
-                              {item.name}
-                            </Link>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                    {jobsDropdownOpen && (
+                      <div className="animate-dropdown absolute top-full left-0 w-44 bg-card border border-border shadow-md py-1">
+                        {link.dropdown.map((item) => (
+                          <Link
+                            key={item.path}
+                            to={item.path}
+                            onClick={() => setJobsDropdownOpen(false)}
+                            className="block px-4 py-2 text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+                          >
+                            {item.name}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <Link
@@ -398,15 +377,7 @@ const Navbar = () => {
                   >
                     {displayName}
                     {location.pathname === link.path && (
-                      <motion.div
-                        layoutId="activeTab"
-                        className="absolute inset-0 rounded-lg bg-primary/10"
-                        transition={{
-                          type: "spring",
-                          bounce: 0.2,
-                          duration: 0.6,
-                        }}
-                      />
+                      <div className="absolute inset-0 rounded-lg bg-primary/10" />
                     )}
                   </Link>
                 );
@@ -419,7 +390,9 @@ const Navbar = () => {
               <div className="h-9 w-32 animate-pulse rounded-md bg-muted" />
             ) : user ? (
               <>
-                <NotificationCenter userId={user.id} role={user.role as "driver" | "company"} />
+                <Suspense fallback={null}>
+                  <NotificationCenter userId={user.id} role={user.role as "driver" | "company"} />
+                </Suspense>
                 {/* Profile dropdown */}
                 <div className="relative" ref={profileRef}>
                   <button
@@ -459,72 +432,66 @@ const Navbar = () => {
                       className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`}
                     />
                   </button>
-                  <AnimatePresence>
-                    {profileOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -6 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute right-0 top-full z-50 mt-1.5 w-56 rounded-md border border-border bg-card py-1 shadow-md"
-                        role="menu"
-                        aria-label="Account menu"
-                      >
-                        <Link
-                          to={
-                            user.role === "admin"
-                              ? "/admin"
-                              : user.role === "company"
-                                ? "/dashboard"
-                                : "/driver-dashboard"
-                          }
-                          onClick={() => setProfileOpen(false)}
-                          className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary"
-                        >
-                          <LayoutDashboard className="h-3.5 w-3.5 shrink-0" />
-                          {user.role === "admin"
-                            ? "Admin Dashboard"
+                  {profileOpen && (
+                    <div
+                      className="animate-dropdown-profile absolute right-0 top-full z-50 mt-1.5 w-56 rounded-md border border-border bg-card py-1 shadow-md"
+                      role="menu"
+                      aria-label="Account menu"
+                    >
+                      <Link
+                        to={
+                          user.role === "admin"
+                            ? "/admin"
                             : user.role === "company"
-                              ? "Dashboard"
-                              : "My Dashboard"}
-                        </Link>
-                        {user.role === "driver" && (
-                          <Link
-                            to="/driver-dashboard?tab=ai-matches"
-                            onClick={() => setProfileOpen(false)}
-                            className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary"
-                          >
-                            <Truck className="h-3.5 w-3.5 shrink-0" />
-                            AI Matches
-                          </Link>
-                        )}
+                              ? "/dashboard"
+                              : "/driver-dashboard"
+                        }
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary"
+                      >
+                        <LayoutDashboard className="h-3.5 w-3.5 shrink-0" />
+                        {user.role === "admin"
+                          ? "Admin Dashboard"
+                          : user.role === "company"
+                            ? "Dashboard"
+                            : "My Dashboard"}
+                      </Link>
+                      {user.role === "driver" && (
                         <Link
-                          to={`${user.role === "admin" ? "/admin" : user.role === "company" ? "/dashboard" : "/driver-dashboard"}?tab=messages`}
+                          to="/driver-dashboard?tab=ai-matches"
                           onClick={() => setProfileOpen(false)}
                           className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary"
                         >
-                          <MessageSquare className="h-3.5 w-3.5 shrink-0" />
-                          Messages
-                          {unreadMsgCount > 0 && (
-                            <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                              {unreadMsgCount > 99 ? "99+" : unreadMsgCount}
-                            </span>
-                          )}
+                          <Truck className="h-3.5 w-3.5 shrink-0" />
+                          AI Matches
                         </Link>
-                        <hr className="border-border my-1" />
-                        <button
-                          onClick={() => {
-                            setSignOutOpen(true);
-                            setProfileOpen(false);
-                          }}
-                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary"
-                        >
-                          <LogOut className="h-3.5 w-3.5 shrink-0" />
-                          Sign Out
-                        </button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                      )}
+                      <Link
+                        to={`${user.role === "admin" ? "/admin" : user.role === "company" ? "/dashboard" : "/driver-dashboard"}?tab=messages`}
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary"
+                      >
+                        <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                        Messages
+                        {unreadMsgCount > 0 && (
+                          <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                            {unreadMsgCount > 99 ? "99+" : unreadMsgCount}
+                          </span>
+                        )}
+                      </Link>
+                      <hr className="border-border my-1" />
+                      <button
+                        onClick={() => {
+                          setSignOutOpen(true);
+                          setProfileOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary"
+                      >
+                        <LogOut className="h-3.5 w-3.5 shrink-0" />
+                        Sign Out
+                      </button>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
@@ -572,78 +539,28 @@ const Navbar = () => {
         </div>
 
         {/* Mobile menu */}
-        <AnimatePresence>
-          {isOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="lg:hidden overflow-hidden border-t border-border/50"
-            >
-              <div className="container mx-auto py-4 flex flex-col gap-2">
-                {navLinks
-                  .filter(
-                    (link) =>
-                      !(
-                        link.name === "Apply Now" && effectiveRole === "company"
-                      ) &&
-                      !(link.name === "Drivers" && effectiveRole === "driver") &&
-                      !(link.name === "Pricing" && effectiveRole === "driver"),
-                  )
-                  .map((link) => {
-                    const displayName =
-                      link.name === "Apply Now" && effectiveRole === "driver"
-                        ? "Find My Matches"
-                        : link.name;
-                    return link.dropdown ? (
-                      <div key={link.path}>
-                        <button
-                          onClick={() => setJobsMobileOpen(!jobsMobileOpen)}
-                          className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium transition-colors
-                          ${
-                            location.pathname === link.path
-                              ? "bg-primary/10 text-primary"
-                              : "hover:bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          {displayName}
-                          <ChevronDown
-                            className={`h-4 w-4 transition-transform duration-200 ${jobsMobileOpen ? "rotate-180" : ""}`}
-                          />
-                        </button>
-                        <AnimatePresence>
-                          {jobsMobileOpen && (
-                            <motion.div
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: "auto", opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              className="overflow-hidden"
-                            >
-                              <div className="pl-4 flex flex-col gap-1 pt-1">
-                                {link.dropdown.map((item) => (
-                                  <Link
-                                    key={item.path}
-                                    to={item.path}
-                                    onClick={() => {
-                                      setIsOpen(false);
-                                      setJobsMobileOpen(false);
-                                    }}
-                                    className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
-                                  >
-                                    {item.name}
-                                  </Link>
-                                ))}
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    ) : (
-                      <Link
-                        key={link.path}
-                        to={link.path}
-                        onClick={() => setIsOpen(false)}
-                        className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors
+        {isOpen && (
+          <div className="animate-mobile-menu lg:hidden overflow-hidden border-t border-border/50">
+            <div className="container mx-auto py-4 flex flex-col gap-2">
+              {navLinks
+                .filter(
+                  (link) =>
+                    !(
+                      link.name === "Apply Now" && effectiveRole === "company"
+                    ) &&
+                    !(link.name === "Drivers" && effectiveRole === "driver") &&
+                    !(link.name === "Pricing" && effectiveRole === "driver"),
+                )
+                .map((link) => {
+                  const displayName =
+                    link.name === "Apply Now" && effectiveRole === "driver"
+                      ? "Find My Matches"
+                      : link.name;
+                  return link.dropdown ? (
+                    <div key={link.path}>
+                      <button
+                        onClick={() => setJobsMobileOpen(!jobsMobileOpen)}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium transition-colors
                         ${
                           location.pathname === link.path
                             ? "bg-primary/10 text-primary"
@@ -651,116 +568,156 @@ const Navbar = () => {
                         }`}
                       >
                         {displayName}
-                      </Link>
-                    );
-                  })}
-                {authLoading ? (
-                  <div className="flex gap-2 pt-2">
-                    <div className="h-9 flex-1 animate-pulse rounded-md bg-muted" />
-                    <div className="h-9 flex-1 animate-pulse rounded-md bg-muted" />
-                  </div>
-                ) : user ? (
-                  <>
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform duration-200 ${jobsMobileOpen ? "rotate-180" : ""}`}
+                        />
+                      </button>
+                      {jobsMobileOpen && (
+                        <div className="overflow-hidden">
+                          <div className="pl-4 flex flex-col gap-1 pt-1">
+                            {link.dropdown.map((item) => (
+                              <Link
+                                key={item.path}
+                                to={item.path}
+                                onClick={() => {
+                                  setIsOpen(false);
+                                  setJobsMobileOpen(false);
+                                }}
+                                className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+                              >
+                                {item.name}
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
                     <Link
-                      to={
-                        user.role === "admin"
-                          ? "/admin"
-                          : user.role === "company"
-                            ? "/dashboard"
-                            : "/driver-dashboard"
-                      }
+                      key={link.path}
+                      to={link.path}
                       onClick={() => setIsOpen(false)}
-                      className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                        location.pathname === "/dashboard" ||
-                        location.pathname === "/driver-dashboard" ||
-                        location.pathname === "/admin"
+                      className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors
+                      ${
+                        location.pathname === link.path
                           ? "bg-primary/10 text-primary"
                           : "hover:bg-muted text-muted-foreground"
                       }`}
                     >
-                      <LayoutDashboard className="h-4 w-4 shrink-0" />
-                      {user.role === "admin"
-                        ? "Admin Dashboard"
-                        : user.role === "company"
-                          ? "Dashboard"
-                          : "My Dashboard"}
-                      {notifCount > 0 && (
-                        <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                          {notifCount > 9 ? "9+" : notifCount}
-                        </span>
-                      )}
+                      {displayName}
                     </Link>
-                    {user.role === "driver" && (
-                      <Link
-                        to="/driver-dashboard?tab=ai-matches"
-                        onClick={() => setIsOpen(false)}
-                        className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                          location.pathname === "/driver-dashboard"
-                            ? "bg-primary/10 text-primary"
-                            : "hover:bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        <Truck className="h-4 w-4 shrink-0" />
-                        AI Matches
-                      </Link>
+                  );
+                })}
+              {authLoading ? (
+                <div className="flex gap-2 pt-2">
+                  <div className="h-9 flex-1 animate-pulse rounded-md bg-muted" />
+                  <div className="h-9 flex-1 animate-pulse rounded-md bg-muted" />
+                </div>
+              ) : user ? (
+                <>
+                  <Link
+                    to={
+                      user.role === "admin"
+                        ? "/admin"
+                        : user.role === "company"
+                          ? "/dashboard"
+                          : "/driver-dashboard"
+                    }
+                    onClick={() => setIsOpen(false)}
+                    className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                      location.pathname === "/dashboard" ||
+                      location.pathname === "/driver-dashboard" ||
+                      location.pathname === "/admin"
+                        ? "bg-primary/10 text-primary"
+                        : "hover:bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    <LayoutDashboard className="h-4 w-4 shrink-0" />
+                    {user.role === "admin"
+                      ? "Admin Dashboard"
+                      : user.role === "company"
+                        ? "Dashboard"
+                        : "My Dashboard"}
+                    {notifCount > 0 && (
+                      <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                        {notifCount > 9 ? "9+" : notifCount}
+                      </span>
                     )}
-                    <div className="flex gap-2 pt-2 items-center border-t border-border/50 mt-1">
-                      <div className="flex items-center gap-2 px-3 py-1.5 text-sm flex-1 text-muted-foreground">
-                        <User className="h-3.5 w-3.5 text-primary shrink-0" />
-                        <span className="font-medium truncate">
-                          {user.name}
-                        </span>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSignOutOpen(true);
-                          setIsOpen(false);
-                        }}
-                        className="flex items-center gap-1.5"
-                      >
-                        <LogOut className="h-3.5 w-3.5" />
-                        Sign Out
-                      </Button>
+                  </Link>
+                  {user.role === "driver" && (
+                    <Link
+                      to="/driver-dashboard?tab=ai-matches"
+                      onClick={() => setIsOpen(false)}
+                      className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                        location.pathname === "/driver-dashboard"
+                          ? "bg-primary/10 text-primary"
+                          : "hover:bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      <Truck className="h-4 w-4 shrink-0" />
+                      AI Matches
+                    </Link>
+                  )}
+                  <div className="flex gap-2 pt-2 items-center border-t border-border/50 mt-1">
+                    <div className="flex items-center gap-2 px-3 py-1.5 text-sm flex-1 text-muted-foreground">
+                      <User className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <span className="font-medium truncate">
+                        {user.name}
+                      </span>
                     </div>
-                  </>
-                ) : (
-                  <div className="flex gap-2 pt-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1"
                       onClick={() => {
+                        setSignOutOpen(true);
                         setIsOpen(false);
-                        setSignInOpen(true);
                       }}
+                      className="flex items-center gap-1.5"
                     >
-                      Sign In
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="flex-1 dark:text-slate-950"
-                      onClick={() => {
-                        setIsOpen(false);
-                        if (location.pathname === "/apply") {
-                          toast.info("Sign in or create an account to apply");
-                        } else {
-                          navigate("/apply");
-                        }
-                      }}
-                    >
-                      Apply Now
+                      <LogOut className="h-3.5 w-3.5" />
+                      Sign Out
                     </Button>
                   </div>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.nav>
+                </>
+              ) : (
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      setIsOpen(false);
+                      setSignInOpen(true);
+                    }}
+                  >
+                    Sign In
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1 dark:text-slate-950"
+                    onClick={() => {
+                      setIsOpen(false);
+                      if (location.pathname === "/apply") {
+                        toast.info("Sign in or create an account to apply");
+                      } else {
+                        navigate("/apply");
+                      }
+                    }}
+                  >
+                    Apply Now
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </nav>
 
-      {signInOpen && <SignInModal onClose={() => setSignInOpen(false)} />}
+      {signInOpen && (
+        <Suspense fallback={null}>
+          <SignInModal onClose={() => setSignInOpen(false)} />
+        </Suspense>
+      )}
 
       <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
         <DialogContent>

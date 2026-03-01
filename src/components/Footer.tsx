@@ -50,7 +50,7 @@ const Footer = () => {
             <h3 className="font-display font-semibold text-secondary-foreground mb-3">Follow Us</h3>
             <div className="flex items-center gap-3">
               <a
-                href="https://www.facebook.com/people/CDL-Jobs-Center/100087223489567/"
+                href="https://www.facebook.com/profile.php?id=100087216585082"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Follow CDL Jobs Center on Facebook"

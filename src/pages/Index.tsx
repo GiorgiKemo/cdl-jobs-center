@@ -1,12 +1,14 @@
+import { lazy, Suspense } from "react";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
-import HowItWorks from "@/components/HowItWorks";
-import JobCategories from "@/components/JobCategories";
-import TopCompanies from "@/components/TopCompanies";
-import Stats from "@/components/Stats";
-import Reviews from "@/components/Reviews";
-import CTA from "@/components/CTA";
 import Footer from "@/components/Footer";
+
+const HowItWorks = lazy(() => import("@/components/HowItWorks"));
+const JobCategories = lazy(() => import("@/components/JobCategories"));
+const TopCompanies = lazy(() => import("@/components/TopCompanies"));
+const Stats = lazy(() => import("@/components/Stats"));
+const Reviews = lazy(() => import("@/components/Reviews"));
+const CTA = lazy(() => import("@/components/CTA"));
 
 const Index = () => {
   return (
@@ -14,12 +16,14 @@ const Index = () => {
       <Navbar />
       <main>
         <Hero />
-        <HowItWorks />
-        <JobCategories />
-        <TopCompanies />
-        <Stats />
-        <Reviews />
-        <CTA />
+        <Suspense fallback={null}>
+          <HowItWorks />
+          <JobCategories />
+          <TopCompanies />
+          <Stats />
+          <Reviews />
+          <CTA />
+        </Suspense>
       </main>
       <Footer />
     </div>
