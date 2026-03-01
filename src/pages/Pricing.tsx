@@ -107,7 +107,10 @@ const Pricing = () => {
       const { url } = await res.json();
       window.location.href = url;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to start checkout");
+      const msg = err instanceof DOMException && err.name === "AbortError"
+        ? "Request timed out. Please try again."
+        : err instanceof Error ? err.message : "Failed to start checkout";
+      toast.error(msg);
     } finally {
       setLoading(null);
     }
@@ -180,13 +183,21 @@ const Pricing = () => {
                 </ul>
 
                 {/* CTA */}
-                {isCurrent ? (
+                {isCurrent && subscription?.status !== "canceled" ? (
                   <Button
                     variant="outline"
                     className="w-full"
                     onClick={() => navigate("/dashboard?tab=subscription")}
                   >
                     Manage Subscription
+                  </Button>
+                ) : !isCurrent && subscription?.stripeSubscriptionId && subscription?.status !== "canceled" ? (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate("/dashboard?tab=subscription")}
+                  >
+                    Change Plan
                   </Button>
                 ) : (
                   <Button
@@ -195,7 +206,11 @@ const Pricing = () => {
                     onClick={() => handleSubscribe(plan)}
                     disabled={loading !== null}
                   >
-                    {loading === plan ? "Redirecting..." : `Get ${info.label}`}
+                    {loading === plan
+                      ? "Redirecting..."
+                      : isCurrent
+                        ? "Resubscribe"
+                        : `Get ${info.label}`}
                   </Button>
                 )}
               </div>
@@ -218,13 +233,24 @@ const Pricing = () => {
 
         {/* Current plan banner for logged-in companies */}
         {isCompany && subscription && subscription.plan !== "free" && (
-          <div className="mt-8 max-w-xl mx-auto border border-primary/20 bg-primary/5 p-4 text-center text-sm">
-            <p>
-              You're on the <strong className="text-primary">{PLANS[subscription.plan].label}</strong> plan.{" "}
-              {subscription.leadLimit === 9999
-                ? "Unlimited leads."
-                : `${subscription.leadLimit - subscription.leadsUsed} leads remaining this period.`}
-            </p>
+          <div className={`mt-8 max-w-xl mx-auto border p-4 text-center text-sm ${
+            subscription.status === "canceled"
+              ? "border-red-500/20 bg-red-500/5"
+              : "border-primary/20 bg-primary/5"
+          }`}>
+            {subscription.status === "canceled" ? (
+              <p>
+                Your <strong className="text-red-500">{PLANS[subscription.plan].label}</strong> plan was canceled.
+                {subscription.currentPeriodEnd && ` Access continues until ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}.`}
+              </p>
+            ) : (
+              <p>
+                You're on the <strong className="text-primary">{PLANS[subscription.plan].label}</strong> plan.{" "}
+                {subscription.leadLimit === 9999
+                  ? "Unlimited leads."
+                  : `${subscription.leadLimit - subscription.leadsUsed} leads remaining this period.`}
+              </p>
+            )}
           </div>
         )}
       </main>

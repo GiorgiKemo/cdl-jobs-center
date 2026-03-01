@@ -85,13 +85,28 @@ export function useCancelSubscription() {
       if (!session) throw new Error("Not authenticated");
 
       const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-portal-session`;
-      const res = await fetch(fnUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+
+      let res: Response;
+      try {
+        res = await fetch(fnUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          signal: controller.signal,
+        });
+      } catch (err) {
+        clearTimeout(timeout);
+        if (err instanceof DOMException && err.name === "AbortError") {
+          throw new Error("Request timed out. Please try again.");
+        }
+        throw new Error("Could not reach billing portal. Please try again later.");
+      }
+      clearTimeout(timeout);
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Unknown error" }));
@@ -99,6 +114,7 @@ export function useCancelSubscription() {
       }
 
       const { url } = await res.json();
+      if (!url) throw new Error("No portal URL returned. Please try again.");
       window.location.href = url;
     },
     onSuccess: (_data, companyId) => {

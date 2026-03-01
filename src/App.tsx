@@ -44,6 +44,7 @@ const PrivacyPolicy = lazyWithRetry(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazyWithRetry(() => import("./pages/TermsOfService"));
 const Pricing = lazyWithRetry(() => import("./pages/Pricing"));
 const AdminDashboard = lazyWithRetry(() => import("./pages/AdminDashboard"));
+const Verification = lazyWithRetry(() => import("./pages/Verification"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -82,6 +83,7 @@ const App = () => (
             <Route path="/companies" element={<Companies />} />
             <Route path="/companies/:id" element={<CompanyProfile />} />
             <Route path="/dashboard" element={<ProtectedRoute requiredRole="company"><Dashboard /></ProtectedRoute>} />
+            <Route path="/verification" element={<ProtectedRoute requiredRole="company"><Verification /></ProtectedRoute>} />
             <Route path="/driver-dashboard" element={<ProtectedRoute requiredRole="driver"><DriverDashboard /></ProtectedRoute>} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />

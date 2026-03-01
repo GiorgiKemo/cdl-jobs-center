@@ -21,6 +21,7 @@ const COMPANY_PREFS: PrefItem[] = [
   { key: "new_message", label: "New Messages", description: "When you receive a new message" },
   { key: "new_match", label: "AI Matches", description: "When a new candidate match is found" },
   { key: "new_lead", label: "New Leads", description: "When a new lead is captured" },
+  { key: "verification_update", label: "Verification Updates", description: "When your verification request is approved or rejected" },
   { key: "subscription_event", label: "Subscription Updates", description: "Plan changes and billing events" },
   { key: "weekly_digest", label: "Weekly Digest", description: "Weekly summary of activity" },
 ];

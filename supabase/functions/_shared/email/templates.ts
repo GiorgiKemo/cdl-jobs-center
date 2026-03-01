@@ -119,6 +119,9 @@ export function getCtaForType(
     profile_reminder: "Complete Profile",
     weekly_digest: "View Dashboard",
     welcome: "Get Started",
+    verification_update: (metadata.decision as string) === "approved"
+      ? "View Your Dashboard"
+      : "Resubmit Verification",
   };
 
   return {
@@ -249,6 +252,37 @@ export function buildRichBody(
           <li>${bold("Review incoming applications")} — manage your hiring pipeline with our built-in tools</li>
         </ol>`,
         p("Thousands of qualified CDL drivers are searching for their next opportunity. Your first applicants could arrive within hours of posting!"),
+      ].join("");
+    }
+
+    case "verification_update": {
+      const decision = (m.decision as string) || "";
+      const reason = escapeHtml((m.rejection_reason as string) || "");
+
+      if (decision === "approved") {
+        return [
+          p(`Great news! ${bold("Your company has been verified.")} &#9989;`),
+          divider,
+          p("Here's what this means for your company:"),
+          `<ul style="margin: 0 0 12px 0; padding-left: 20px; font-size: 14px; line-height: 1.8; color: ${TEXT_COLOR};">
+            <li>A ${bold("verified badge")} is now visible on your profile and job listings</li>
+            <li>Drivers will see increased ${bold("trust signals")} when viewing your company</li>
+            <li>Your company ${bold("stands out")} in search results</li>
+          </ul>`,
+          p("Keep posting quality jobs and engaging with applicants to make the most of your verified status!"),
+        ].join("");
+      }
+
+      return [
+        p("Your verification request was ${bold('not approved')} at this time."),
+        reason
+          ? `<div style="background-color: #fef2f2; border-left: 3px solid #dc2626; padding: 12px 16px; margin: 0 0 12px 0; border-radius: 0 6px 6px 0;">
+              <p style="margin: 0; font-size: 13px; color: ${TEXT_COLOR};"><strong>Reason:</strong> ${reason}</p>
+            </div>`
+          : "",
+        divider,
+        p("You can submit a new verification request with updated information. Common reasons for rejection include incomplete documentation or mismatched business details."),
+        p("If you believe this was a mistake, please update your information and try again."),
       ].join("");
     }
 

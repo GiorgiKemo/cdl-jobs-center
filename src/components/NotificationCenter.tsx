@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, CheckCheck, FileText, MessageSquare, Users, Zap, CreditCard, UserCircle, BarChart, PartyPopper, Settings } from "lucide-react";
+import { Bell, CheckCheck, FileText, MessageSquare, Users, Zap, CreditCard, UserCircle, BarChart, PartyPopper, Settings, ShieldCheck } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ const typeIcons: Record<string, typeof Bell> = {
   profile_reminder: UserCircle,
   weekly_digest: BarChart,
   welcome: PartyPopper,
+  verification_update: ShieldCheck,
 };
 
 function getNotificationLink(notif: Notification): string | undefined {

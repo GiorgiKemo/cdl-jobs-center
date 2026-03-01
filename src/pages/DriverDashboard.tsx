@@ -212,9 +212,14 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
 
   // Consume deep-link app param from URL so notification links work.
   // Keep ?tab= in the URL so refresh stays on the same tab.
+  // When navigating to /driver-dashboard with no ?tab=, reset to default.
   useEffect(() => {
     const tabFromUrl = searchParams.get("tab");
-    if (!tabFromUrl || !isDriverTab(tabFromUrl)) return;
+    if (!tabFromUrl) {
+      setActiveTab("applications");
+      return;
+    }
+    if (!isDriverTab(tabFromUrl)) return;
     const appFromUrl = searchParams.get("app");
 
     setActiveTab(tabFromUrl);

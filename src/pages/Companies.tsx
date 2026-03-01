@@ -11,11 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Phone, MapPin, CheckCircle, Building2, ExternalLink } from "lucide-react";
+import { Phone, MapPin, CheckCircle, Building2, ExternalLink, Search, Filter, ShieldCheck, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Input } from "@/components/ui/input";
 
 interface CompanyRow {
   id: string;
@@ -43,6 +44,8 @@ const COMPANY_STATES = [
 const Companies = () => {
   usePageTitle("Company Directory");
   const [stateFilter, setStateFilter] = useState("All");
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const {
     data: companies = [],
@@ -63,13 +66,24 @@ const Companies = () => {
     },
   });
 
+  const hasActiveFilters = stateFilter !== "All" || verifiedOnly || searchQuery.trim() !== "";
+
   const handleClear = () => {
     setStateFilter("All");
+    setVerifiedOnly(false);
+    setSearchQuery("");
   };
 
-  // Simple address-based state filter
+  // Filter companies by state, verified, and search query
   const filtered = companies.filter((c) => {
     if (stateFilter !== "All" && !c.address?.includes(stateFilter)) return false;
+    if (verifiedOnly && !c.is_verified) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchesName = c.company_name?.toLowerCase().includes(q);
+      const matchesAddress = c.address?.toLowerCase().includes(q);
+      if (!matchesName && !matchesAddress) return false;
+    }
     return true;
   });
 
@@ -86,41 +100,69 @@ const Companies = () => {
           Companies
         </p>
 
-        {/* Filter box */}
-        <div className="bg-foreground text-background dark:bg-muted dark:text-foreground border border-border mb-6">
-          <div className="px-5 py-3 border-b border-white/10 dark:border-border">
-            <h1 className="font-display font-bold text-base">
-              Filter Companies
-            </h1>
+        {/* Filter bar */}
+        <div className="border border-border bg-card mb-6">
+          <div className="px-5 py-3 border-b border-border flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <h1 className="font-display font-bold text-base">Filter Companies</h1>
           </div>
           <div className="px-5 py-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-              <div>
-                <label htmlFor="companies-state" className="text-xs font-medium uppercase tracking-wide opacity-70 block mb-1.5">
-                  Company State:
-                </label>
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+              {/* Search */}
+              <div className="w-full sm:w-64 space-y-1">
+                <label htmlFor="companies-search" className="text-xs font-medium text-muted-foreground">Search</label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    id="companies-search"
+                    placeholder="Company name or location..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              {/* State */}
+              <div className="w-full sm:w-48 space-y-1">
+                <label htmlFor="companies-state" className="text-xs font-medium text-muted-foreground">State</label>
                 <Select value={stateFilter} onValueChange={setStateFilter} name="stateFilter">
-                  <SelectTrigger id="companies-state" className="bg-background/10 border-white/20 dark:bg-background dark:border-border text-inherit">
-                    <SelectValue placeholder="Choose an option..." />
+                  <SelectTrigger id="companies-state">
+                    <SelectValue placeholder="All states" />
                   </SelectTrigger>
                   <SelectContent>
                     {COMPANY_STATES.map((o) => (
                       <SelectItem key={o} value={o}>
-                        {o === "All" ? "Choose an option..." : o}
+                        {o === "All" ? "All states" : o}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={handleClear}
-                className="border-cdl-amber text-cdl-amber hover:bg-cdl-amber/10 dark:border-cdl-amber dark:text-cdl-amber"
-              >
-                Clear filter
-              </Button>
+
+              {/* Verified toggle */}
+              <div className="space-y-1">
+                <span className="text-xs font-medium text-muted-foreground block">Verified</span>
+                <Button
+                  variant={verifiedOnly ? "default" : "outline"}
+                  onClick={() => setVerifiedOnly((v) => !v)}
+                  className={verifiedOnly
+                    ? "gap-1.5 h-10 bg-green-600 hover:bg-green-700 text-white"
+                    : "gap-1.5 h-10"
+                  }
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  Verified only
+                </Button>
+              </div>
+
+              {/* Clear */}
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={handleClear} className="gap-1 text-muted-foreground hover:text-foreground sm:self-end">
+                  <X className="h-3.5 w-3.5" />
+                  Clear
+                </Button>
+              )}
             </div>
           </div>
         </div>

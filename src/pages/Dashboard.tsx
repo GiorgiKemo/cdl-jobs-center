@@ -12,7 +12,7 @@ import { useJobs } from "@/hooks/useJobs";
 import { Job } from "@/data/jobs";
 import { COMPANY_GOALS } from "@/data/constants";
 import { toast } from "sonner";
-import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload, Bell, MessageSquare, Users, Phone as PhoneIcon, Mail as MailIcon, MapPin, Truck as TruckIcon, Lock, RefreshCw, CreditCard, Send, Briefcase, Check, Sparkles, CheckCircle, ShieldCheck, Clock, XCircle, FileText } from "lucide-react";
+import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload, Bell, MessageSquare, Users, Phone as PhoneIcon, Mail as MailIcon, MapPin, Truck as TruckIcon, Lock, RefreshCw, CreditCard, Send, Briefcase, Check, Sparkles, CheckCircle, ShieldCheck, FileText } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -26,16 +26,22 @@ import { ChatPanel } from "@/components/ChatPanel";
 import { NotificationPreferences } from "@/components/NotificationPreferences";
 import { useUnreadCount } from "@/hooks/useMessages";
 import { useLeads, useUpdateLeadStatus, useSyncLeads } from "@/hooks/useLeads";
-import { useSubscription, useCancelSubscription, PLANS } from "@/hooks/useSubscription";
+import { useSubscription, useCancelSubscription, PLANS, type Plan } from "@/hooks/useSubscription";
 import { useCompanyDriverMatches, useMatchingRollout } from "@/hooks/useMatchScores";
 import {
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { formatDate } from "@/lib/dateUtils";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ImageCropDialog } from "@/components/ImageCropDialog";
-import { useVerificationRequest, useSubmitVerification } from "@/hooks/useVerification";
+import { useVerificationRequest } from "@/hooks/useVerification";
 
 const FREIGHT_TYPES = [
   "Box", "Car Hauler", "Drop and Hook", "Dry Bulk", "Dry Van", "Flatbed",
@@ -554,6 +560,50 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
   const cancelSubscription = useCancelSubscription();
   const rollout = useMatchingRollout();
   const [portalLoading, setPortalLoading] = useState(false);
+  const [resubscribeOpen, setResubscribeOpen] = useState(false);
+  const [selectedResub, setSelectedResub] = useState<Plan | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState<Plan | null>(null);
+
+  const handleCheckout = async (plan: Plan) => {
+    const planInfo = PLANS[plan];
+    if (!planInfo.priceId) {
+      toast.error("This plan is not available for purchase.");
+      return;
+    }
+    try {
+      setCheckoutLoading(plan);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { navigate("/signin"); return; }
+
+      const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      const res = await fetch(fnUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ plan }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(err.error ?? `Checkout failed (${res.status})`);
+      }
+      const { url } = await res.json();
+      window.location.href = url;
+    } catch (err) {
+      const msg = err instanceof DOMException && err.name === "AbortError"
+        ? "Request timed out. Please try again."
+        : err instanceof Error ? err.message : "Failed to start checkout";
+      toast.error(msg);
+    } finally {
+      setCheckoutLoading(null);
+    }
+  };
 
   const leadLimit = subscription ? PLANS[subscription.plan].leads : 3;
 
@@ -594,9 +644,14 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
 
   // Consume deep-link app/driver params from URL so navbar notification links work.
   // Keep ?tab= in the URL so refresh stays on the same tab.
+  // When navigating to /dashboard with no ?tab=, reset to "jobs".
   useEffect(() => {
     const tabFromUrl = searchParams.get("tab");
-    if (!tabFromUrl || !isCompanyTab(tabFromUrl)) return;
+    if (!tabFromUrl) {
+      setActiveTab("jobs");
+      return;
+    }
+    if (!isCompanyTab(tabFromUrl)) return;
     const appFromUrl = searchParams.get("app");
     const driverFromUrl = searchParams.get("driver");
 
@@ -650,17 +705,8 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
   const hasUnsavedChanges = lastSavedSnapshot !== null && currentProfileSnapshot !== lastSavedSnapshot;
   const isProfileSaved = profileSaveStatus === "saved" && !hasUnsavedChanges;
 
-  // Verification request state
+  // Verification request state (status only — form is on /verification page)
   const { data: verificationRequest, isLoading: verificationLoading } = useVerificationRequest(user!.id);
-  const submitVerification = useSubmitVerification();
-  const [showVerifyForm, setShowVerifyForm] = useState(false);
-  const [verifyDot, setVerifyDot] = useState("");
-  const [verifyEin, setVerifyEin] = useState("");
-  const [verifyYears, setVerifyYears] = useState("");
-  const [verifyFleet, setVerifyFleet] = useState("");
-  const [verifyNotes, setVerifyNotes] = useState("");
-  const [verifyDocs, setVerifyDocs] = useState<string[]>([]);
-  const [verifyUploading, setVerifyUploading] = useState(false);
 
   // Fetch applications for this company
   const appsKey = ["company-applications", user!.id];
@@ -962,6 +1008,45 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
             </div>
           )}
         </div>
+
+        {/* Verification status banner */}
+        {!verificationLoading && verificationRequest?.status === "approved" && (
+          <div className="flex items-center gap-4 px-5 py-3.5 mb-6 bg-green-500/10 border border-green-500/30">
+            <CheckCircle className="h-6 w-6 text-green-500 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm text-green-700 dark:text-green-400">Your company is verified</p>
+              <p className="text-xs text-muted-foreground">Drivers can see the verified badge on your profile and job listings.</p>
+            </div>
+          </div>
+        )}
+        {!verificationLoading && verificationRequest?.status === "pending" && (
+          <div className="flex items-center gap-4 px-5 py-3.5 mb-6 bg-amber-500/10 border border-amber-500/30">
+            <ShieldCheck className="h-6 w-6 text-amber-500 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm text-amber-700 dark:text-amber-400">Verification under review</p>
+              <p className="text-xs text-muted-foreground">Your request is being reviewed. We'll notify you once a decision is made.</p>
+            </div>
+            <Button size="sm" variant="outline" asChild>
+              <Link to="/verification">View Details</Link>
+            </Button>
+          </div>
+        )}
+        {!verificationLoading && verificationRequest?.status !== "approved" && verificationRequest?.status !== "pending" && (
+          <div className="flex items-center gap-4 px-5 py-3.5 mb-6 bg-amber-500/10 border border-amber-500/30">
+            <ShieldCheck className="h-6 w-6 text-amber-500 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm">Get your company verified</p>
+              <p className="text-xs text-muted-foreground">
+                {verificationRequest?.status === "rejected"
+                  ? "Your previous request was not approved. You can submit a new one with updated information."
+                  : "A verified badge builds trust with drivers and helps you stand out."}
+              </p>
+            </div>
+            <Button size="sm" asChild>
+              <Link to="/verification">{verificationRequest?.status === "rejected" ? "Resubmit" : "Request Verification"}</Link>
+            </Button>
+          </div>
+        )}
 
         {/* New applications banner */}
         {(() => {
@@ -1408,7 +1493,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
               </div>
               <Button
                 onClick={handleSaveProfile}
-                disabled={profileSaveStatus === "saving"}
+                disabled={profileSaveStatus === "saving" || !hasUnsavedChanges}
                 className={isProfileSaved ? "px-8 bg-green-600 text-white hover:bg-green-600 focus-visible:ring-green-600" : "px-8"}
               >
                 {profileSaveStatus === "saving" ? (
@@ -1426,173 +1511,6 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                 )}
               </Button>
             </div>
-            {/* ── Verification Status ──────────────────────────────────────── */}
-            <div className="border border-border bg-card p-5 space-y-4">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-primary" />
-                <h3 className="font-display font-semibold text-base">Company Verification</h3>
-              </div>
-
-              {verificationLoading ? (
-                <div className="flex justify-center py-4"><Spinner size="sm" /></div>
-              ) : verificationRequest?.status === "approved" ? (
-                <div className="flex items-center gap-3 p-4 bg-green-500/10 border border-green-500/30 rounded-md">
-                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
-                  <div>
-                    <p className="font-medium text-green-700 dark:text-green-400 text-sm">Your company is verified</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Drivers can see the verified badge on your profile and job listings.</p>
-                  </div>
-                </div>
-              ) : verificationRequest?.status === "pending" ? (
-                <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-md">
-                  <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
-                  <div>
-                    <p className="font-medium text-amber-700 dark:text-amber-400 text-sm">Verification request under review</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Submitted on {verificationRequest.createdAt ? formatDate(verificationRequest.createdAt) : "—"}. We'll review your request shortly.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {verificationRequest?.status === "rejected" && (
-                    <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-md">
-                      <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-red-700 dark:text-red-400 text-sm">Verification request was not approved</p>
-                        {verificationRequest.rejectionReason && (
-                          <p className="text-xs text-muted-foreground mt-0.5">Reason: {verificationRequest.rejectionReason}</p>
-                        )}
-                        <p className="text-xs text-muted-foreground mt-1">You can submit a new request with updated information.</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {!showVerifyForm ? (
-                    <div className="text-center py-2">
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Get your company verified to build trust with drivers and stand out in search results.
-                      </p>
-                      <Button onClick={() => setShowVerifyForm(true)}>
-                        <ShieldCheck className="h-4 w-4 mr-2" />
-                        Request Verification
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-3 border-t border-border pt-4">
-                      <div className="grid sm:grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <Label htmlFor="verify-dot" className="text-xs text-muted-foreground">DOT / MC Number</Label>
-                          <Input id="verify-dot" placeholder="e.g. 1234567" value={verifyDot} onChange={(e) => setVerifyDot(e.target.value)} />
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="verify-ein" className="text-xs text-muted-foreground">Business EIN (optional)</Label>
-                          <Input id="verify-ein" placeholder="e.g. 12-3456789" value={verifyEin} onChange={(e) => setVerifyEin(e.target.value)} />
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="verify-years" className="text-xs text-muted-foreground">Years in Business</Label>
-                          <Select value={verifyYears} onValueChange={setVerifyYears} name="verifyYears">
-                            <SelectTrigger id="verify-years"><SelectValue placeholder="Select..." /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="0-1">Less than 1 year</SelectItem>
-                              <SelectItem value="1-3">1–3 years</SelectItem>
-                              <SelectItem value="3-5">3–5 years</SelectItem>
-                              <SelectItem value="5-10">5–10 years</SelectItem>
-                              <SelectItem value="10+">10+ years</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="verify-fleet" className="text-xs text-muted-foreground">Fleet Size</Label>
-                          <Select value={verifyFleet} onValueChange={setVerifyFleet} name="verifyFleet">
-                            <SelectTrigger id="verify-fleet"><SelectValue placeholder="Select..." /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="1-10">1–10 trucks</SelectItem>
-                              <SelectItem value="11-50">11–50 trucks</SelectItem>
-                              <SelectItem value="51-200">51–200 trucks</SelectItem>
-                              <SelectItem value="200+">200+ trucks</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="verify-notes" className="text-xs text-muted-foreground">Additional Notes (optional)</Label>
-                        <Textarea id="verify-notes" placeholder="Any additional information to support your verification..." value={verifyNotes} onChange={(e) => setVerifyNotes(e.target.value)} rows={3} className="resize-none" />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Supporting Documents (optional)</Label>
-                        <p className="text-xs text-muted-foreground mb-1.5">Upload business license, DOT certificate, or similar documentation.</p>
-                        <input
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          multiple
-                          onChange={async (e) => {
-                            const files = Array.from(e.target.files ?? []);
-                            if (files.length === 0) return;
-                            setVerifyUploading(true);
-                            const urls: string[] = [];
-                            for (const file of files) {
-                              const path = `${user!.id}/${Date.now()}-${file.name}`;
-                              const { error } = await supabase.storage.from("verification-documents").upload(path, file, { upsert: true });
-                              if (error) {
-                                toast.error(`Failed to upload ${file.name}`);
-                                continue;
-                              }
-                              const { data: { publicUrl } } = supabase.storage.from("verification-documents").getPublicUrl(path);
-                              urls.push(publicUrl);
-                            }
-                            setVerifyDocs((prev) => [...prev, ...urls]);
-                            setVerifyUploading(false);
-                            e.target.value = "";
-                          }}
-                          className="block text-sm text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 file:cursor-pointer"
-                        />
-                        {verifyDocs.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {verifyDocs.map((url, i) => (
-                              <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded text-xs">
-                                <FileText className="h-3 w-3" />
-                                Document {i + 1}
-                                <button type="button" onClick={() => setVerifyDocs((d) => d.filter((_, j) => j !== i))} className="ml-1 text-destructive hover:text-destructive/80">
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex gap-3 pt-1">
-                        <Button
-                          disabled={submitVerification.isPending || verifyUploading || !verifyDot}
-                          onClick={() => {
-                            submitVerification.mutate({
-                              companyId: user!.id,
-                              dotNumber: verifyDot,
-                              businessEin: verifyEin,
-                              yearsInBusiness: verifyYears,
-                              fleetSize: verifyFleet,
-                              notes: verifyNotes,
-                              documentUrls: verifyDocs,
-                            }, {
-                              onSuccess: () => {
-                                toast.success("Verification request submitted!");
-                                setShowVerifyForm(false);
-                                setVerifyDot(""); setVerifyEin(""); setVerifyYears(""); setVerifyFleet(""); setVerifyNotes(""); setVerifyDocs([]);
-                              },
-                              onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to submit request."),
-                            });
-                          }}
-                        >
-                          {submitVerification.isPending ? "Submitting..." : verifyUploading ? "Uploading..." : "Submit Verification Request"}
-                        </Button>
-                        <Button variant="outline" onClick={() => setShowVerifyForm(false)}>Cancel</Button>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
             <NotificationPreferences userId={user!.id} role="company" />
           </div>
         )}
@@ -2398,7 +2316,11 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                     )}
                   </div>
                   <span className={`text-xs px-2 py-1 font-semibold rounded-full ${
-                    plan === "unlimited"
+                    subscription?.status === "canceled"
+                      ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                      : subscription?.status === "past_due"
+                      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                      : plan === "unlimited"
                       ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
                       : plan === "growth"
                       ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
@@ -2406,7 +2328,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                       ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                       : "bg-muted text-muted-foreground"
                   }`}>
-                    {subscription?.status ?? "active"}
+                    {subscription?.status === "canceled" ? "canceled" : subscription?.status === "past_due" ? "past due" : "active"}
                   </span>
                 </div>
 
@@ -2431,30 +2353,52 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                 {/* Renewal date */}
                 {subscription?.currentPeriodEnd && (
                   <p className="text-xs text-muted-foreground mt-3">
-                    Renews on {formatDate(subscription.currentPeriodEnd)}
+                    {subscription.status === "canceled" ? "Expires on" : "Renews on"} {formatDate(subscription.currentPeriodEnd)}
                   </p>
                 )}
 
-                {/* Cancel subscription — redirects to Stripe billing portal */}
-                {!isFreePlan && (
-                  <div className="mt-5 pt-5 border-t border-border flex justify-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs border-destructive/40 text-destructive bg-destructive/5 hover:bg-destructive/10 hover:text-destructive"
-                      disabled={cancelSubscription.isPending}
-                      onClick={() => {
-                        cancelSubscription.mutate(user!.id, {
-                          onError: (err) => {
-                            toast.error(err instanceof Error ? err.message : "Failed to open billing portal");
-                          },
-                        });
-                      }}
-                    >
-                      {cancelSubscription.isPending ? "Opening Portal..." : "Cancel Subscription"}
-                    </Button>
-                  </div>
-                )}
+                {/* Subscription actions */}
+                {!isFreePlan && (() => {
+                  const isCanceled = subscription?.status === "canceled";
+                  const hasStripe = !!subscription?.stripeCustomerId && !!subscription?.stripeSubscriptionId;
+
+                  if (isCanceled) {
+                    return (
+                      <div className="mt-5 pt-5 border-t border-border flex items-center justify-between gap-4">
+                        <p className="text-xs text-muted-foreground">
+                          Subscription canceled.{subscription.currentPeriodEnd ? ` Access continues until ${formatDate(subscription.currentPeriodEnd)}.` : ""}
+                        </p>
+                        <Button size="sm" onClick={() => setResubscribeOpen(true)}>
+                          Resubscribe
+                        </Button>
+                      </div>
+                    );
+                  }
+
+                  if (hasStripe) {
+                    return (
+                      <div className="mt-5 pt-5 border-t border-border flex justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs border-red-500/50 text-red-500 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                          disabled={cancelSubscription.isPending}
+                          onClick={() => {
+                            cancelSubscription.mutate(user!.id, {
+                              onError: (err) => {
+                                toast.error(err instanceof Error ? err.message : "Failed to open billing portal");
+                              },
+                            });
+                          }}
+                        >
+                          {cancelSubscription.isPending ? "Opening Portal..." : "Cancel Subscription"}
+                        </Button>
+                      </div>
+                    );
+                  }
+
+                  return null;
+                })()}
               </div>
 
               {/* Plan comparison */}
@@ -2481,17 +2425,27 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                         <p className="text-xs text-muted-foreground mt-1">
                           {info.leads === 9999 ? "Unlimited" : info.leads} leads/month
                         </p>
-                        {isCurrent && (
+                        {isCurrent && subscription?.status !== "canceled" && (
                           <p className="text-xs text-primary font-medium mt-2">Current plan</p>
                         )}
-                        {!isCurrent && p !== "free" && (
+                        {isCurrent && subscription?.status === "canceled" && (
+                          <Button
+                            size="sm"
+                            className="mt-2 w-full text-xs"
+                            onClick={() => setResubscribeOpen(true)}
+                          >
+                            Resubscribe
+                          </Button>
+                        )}
+                        {!isCurrent && p !== "free" && (subscription?.status === "canceled" || plan === "free") && (
                           <Button
                             variant="outline"
                             size="sm"
                             className="mt-2 w-full text-xs"
-                            asChild
+                            onClick={() => handleCheckout(p)}
+                            disabled={checkoutLoading !== null}
                           >
-                            <Link to="/pricing">Upgrade</Link>
+                            {checkoutLoading === p ? "Redirecting..." : "Subscribe"}
                           </Button>
                         )}
                       </div>
@@ -2507,17 +2461,19 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                     Manage Billing
                   </p>
                   <p className="text-xs text-muted-foreground mt-1 mb-4">
-                    View invoices, update payment method, or cancel your subscription via the Stripe billing portal.
+                    Upgrade, downgrade, update payment method, view invoices, or cancel your subscription via the Stripe billing portal.
                   </p>
                   <Button
                     variant="outline"
                     size="sm"
                     disabled={portalLoading}
                     onClick={async () => {
+                      const controller = new AbortController();
+                      const timeout = setTimeout(() => controller.abort(), 15000);
                       try {
                         setPortalLoading(true);
                         const { data: { session } } = await supabase.auth.getSession();
-                        if (!session) return;
+                        if (!session) throw new Error("Not authenticated");
 
                         const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-portal-session`;
                         const res = await fetch(fnUrl, {
@@ -2526,13 +2482,23 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                             "Content-Type": "application/json",
                             Authorization: `Bearer ${session.access_token}`,
                           },
+                          signal: controller.signal,
                         });
-                        if (!res.ok) throw new Error("Failed to open billing portal");
+                        clearTimeout(timeout);
+                        if (!res.ok) {
+                          const body = await res.json().catch(() => ({ error: "Unknown error" }));
+                          throw new Error(body.error ?? "Failed to open billing portal");
+                        }
 
                         const { url } = await res.json();
+                        if (!url) throw new Error("No portal URL returned");
                         window.location.href = url;
                       } catch (err) {
-                        toast.error(err instanceof Error ? err.message : "Failed to open billing portal");
+                        clearTimeout(timeout);
+                        const msg = err instanceof DOMException && err.name === "AbortError"
+                          ? "Request timed out. Please try again."
+                          : err instanceof Error ? err.message : "Failed to open billing portal";
+                        toast.error(msg);
                       } finally {
                         setPortalLoading(false);
                       }
@@ -2556,6 +2522,114 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
           onClose={() => { URL.revokeObjectURL(cropImageSrc); setCropImageSrc(null); }}
         />
       )}
+
+      {/* Resubscribe dialog */}
+      <Dialog open={resubscribeOpen} onOpenChange={(open) => { setResubscribeOpen(open); if (!open) setSelectedResub(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Resubscribe to a Plan</DialogTitle>
+            <DialogDescription>
+              Your subscription was canceled. Select a plan to continue.
+            </DialogDescription>
+          </DialogHeader>
+
+          {(() => {
+            const RESUB_FEATURES: Record<string, string[]> = {
+              starter: [
+                "25 driver leads per month",
+                "Filter by state & driver type",
+                "Contact info (phone + email)",
+                "Lead status tracking",
+              ],
+              growth: [
+                "100 driver leads per month",
+                "Everything in Starter",
+                "Owner operator truck details",
+                "Priority lead delivery",
+              ],
+              unlimited: [
+                "Unlimited driver leads",
+                "Everything in Growth",
+                "Real-time lead notifications",
+                "Dedicated account manager",
+              ],
+            };
+
+            return (
+              <div className="space-y-2 py-1">
+                {(Object.keys(PLANS) as Plan[]).filter((p) => p !== "free").map((p) => {
+                  const info = PLANS[p];
+                  const isSamePlan = p === subscription?.plan;
+                  const isSelected = selectedResub === p;
+                  return (
+                    <div key={p}>
+                      <button
+                        className={`w-full text-left border rounded-lg p-4 transition-all ${
+                          isSelected
+                            ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                            : isSamePlan
+                              ? "border-primary/40 bg-primary/[0.02]"
+                              : "border-border hover:border-primary/40 hover:bg-muted/50"
+                        }`}
+                        onClick={() => setSelectedResub(p)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold text-sm flex items-center gap-2">
+                              {info.label}
+                              {isSamePlan && (
+                                <span className="text-[10px] font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                  Previous plan
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {info.leads === 9999 ? "Unlimited" : info.leads} leads/month
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-lg">${info.price}</p>
+                            <p className="text-[10px] text-muted-foreground">/month</p>
+                          </div>
+                        </div>
+                      </button>
+
+                      {/* Expanded details when selected */}
+                      {isSelected && (
+                        <div className="border border-t-0 border-primary/20 rounded-b-lg px-4 pb-4 pt-3 -mt-1 bg-primary/[0.02]">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">What's included:</p>
+                          <ul className="space-y-1.5 mb-4">
+                            {(RESUB_FEATURES[p] ?? []).map((f) => (
+                              <li key={f} className="flex items-start gap-2 text-xs">
+                                <Check className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                                <span>{f}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <Button
+                            className="w-full"
+                            size="sm"
+                            disabled={checkoutLoading !== null}
+                            onClick={() => handleCheckout(p)}
+                          >
+                            {checkoutLoading === p ? "Redirecting to checkout..." : `Confirm — $${info.price}/month`}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          <DialogFooter className="sm:justify-center">
+            <Button variant="ghost" size="sm" onClick={() => setResubscribeOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -22,6 +22,7 @@ const EMAIL_ENABLED_TYPES = new Set([
   "stage_change",
   "new_message",
   "welcome",
+  "verification_update",
 ]);
 
 /** Descriptive email subjects per type (overrides the short in-app title) */
@@ -47,6 +48,12 @@ function getEmailSubject(
     }
     case "welcome":
       return "Welcome to CDL Jobs Center - Let's Get Started!";
+    case "verification_update": {
+      const decision = (m.decision as string) || "";
+      return decision === "approved"
+        ? "Your Company Has Been Verified - CDL Jobs Center"
+        : "Verification Update - CDL Jobs Center";
+    }
     default:
       return "CDL Jobs Center Notification";
   }
