@@ -21,6 +21,7 @@ interface CompanyData {
   about: string | null;
   website: string | null;
   logo_url: string | null;
+  is_verified: boolean;
 }
 
 interface JobRow {
@@ -41,7 +42,7 @@ const CompanyProfile = () => {
   const [signInOpen, setSignInOpen] = useState(false);
 
   // Fetch company profile from Supabase
-  const { data: company, isLoading } = useQuery({
+  const { data: company, isLoading, isError } = useQuery({
     queryKey: ["company-profile", id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -88,18 +89,33 @@ const CompanyProfile = () => {
   });
 
   useEffect(() => {
-    if (!isLoading && !company) {
+    if (!isLoading && !isError && !company) {
       toast.error("Company not found.");
       navigate("/companies", { replace: true });
     }
-  }, [isLoading, company, navigate]);
+  }, [isLoading, isError, company, navigate]);
 
-  if (isLoading) {
+  if (isLoading && !isError) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
         <main className="container mx-auto py-8 max-w-4xl">
           <div className="flex justify-center py-20"><Spinner /></div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="container mx-auto py-8 max-w-4xl text-center">
+          <p className="text-sm text-destructive mb-3">Failed to load company profile.</p>
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/companies">Back to Companies</Link>
+          </Button>
         </main>
         <Footer />
       </div>
@@ -139,7 +155,7 @@ const CompanyProfile = () => {
             {/* Logo */}
             <div className="shrink-0 h-24 w-24 rounded-lg bg-muted flex items-center justify-center border border-border overflow-hidden">
               {company.logo_url ? (
-                <img src={company.logo_url} alt={company.company_name} loading="lazy" className="h-full w-full object-contain p-1" />
+                <img src={company.logo_url} alt={company.company_name} loading="lazy" className="h-full w-full object-cover" />
               ) : (
                 <Building2 className="h-10 w-10 text-primary" />
               )}
@@ -185,9 +201,11 @@ const CompanyProfile = () => {
 
             {/* Actions */}
             <div className="shrink-0 flex flex-col items-end gap-3">
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/30 text-xs font-medium rounded-full">
-                <CheckCircle className="h-3.5 w-3.5" /> VERIFIED COMPANY
-              </span>
+              {company.is_verified && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/30 text-xs font-medium rounded-full">
+                  <CheckCircle className="h-3.5 w-3.5" /> VERIFIED COMPANY
+                </span>
+              )}
               {isOwnProfile ? (
                 <Button asChild>
                   <Link to="/dashboard">Edit Profile</Link>

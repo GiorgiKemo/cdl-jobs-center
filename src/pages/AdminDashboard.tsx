@@ -41,6 +41,7 @@ import {
   useAdminLeads,
   useAdminUpdateJobStatus,
   useChangeSubscriptionPlan,
+  useToggleCompanyVerified,
 } from "@/hooks/useAdmin";
 import { PLANS, type Plan } from "@/hooks/useSubscription";
 import { formatDate } from "@/lib/dateUtils";
@@ -83,6 +84,7 @@ function AdminDashboardInner() {
   const { data: leads = [] } = useAdminLeads();
   const updateJobStatus = useAdminUpdateJobStatus();
   const changePlan = useChangeSubscriptionPlan();
+  const toggleVerified = useToggleCompanyVerified();
 
   /* matching diagnostics data */
   const { data: rollout } = useMatchingRollout();
@@ -498,25 +500,48 @@ function AdminDashboardInner() {
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           {u.role === "company" && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-xs h-7"
-                              onClick={() => {
-                                const sub = subscriptions.find(
-                                  (s) => s.companyId === u.id
-                                );
-                                setPlanDialogTarget({
-                                  companyId: u.id,
-                                  companyName: u.name,
-                                  currentPlan: sub?.plan ?? "free",
-                                });
-                                setSelectedPlan(sub?.plan ?? "free");
-                                setPlanDialogOpen(true);
-                              }}
-                            >
-                              Manage Plan
-                            </Button>
+                            <>
+                              <Button
+                                variant={u.isVerified ? "outline" : "default"}
+                                size="sm"
+                                className={`text-xs h-7 ${u.isVerified ? "border-green-500/50 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20" : ""}`}
+                                disabled={toggleVerified.isPending}
+                                onClick={() => {
+                                  toggleVerified.mutate(
+                                    { companyId: u.id, verified: !u.isVerified },
+                                    {
+                                      onSuccess: () =>
+                                        toast.success(
+                                          u.isVerified
+                                            ? `${u.companyName || u.name} unverified`
+                                            : `${u.companyName || u.name} verified`
+                                        ),
+                                    }
+                                  );
+                                }}
+                              >
+                                {u.isVerified ? "Verified" : "Verify"}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs h-7"
+                                onClick={() => {
+                                  const sub = subscriptions.find(
+                                    (s) => s.companyId === u.id
+                                  );
+                                  setPlanDialogTarget({
+                                    companyId: u.id,
+                                    companyName: u.name,
+                                    currentPlan: sub?.plan ?? "free",
+                                  });
+                                  setSelectedPlan(sub?.plan ?? "free");
+                                  setPlanDialogOpen(true);
+                                }}
+                              >
+                                Manage Plan
+                              </Button>
+                            </>
                           )}
                           <p className="text-[10px] text-muted-foreground font-mono">
                             {u.id.slice(0, 8)}...

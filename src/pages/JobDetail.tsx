@@ -12,12 +12,13 @@ import { SignInModal } from "@/components/SignInModal";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { Spinner } from "@/components/ui/Spinner";
 
 const JobDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { job, isLoading } = useJobById(id);
+  const { job, isLoading, isError } = useJobById(id);
   const [applyOpen, setApplyOpen] = useState(false);
   const [signInOpen, setSignInOpen] = useState(false);
   const { data: matchScore } = useDriverJobMatchScore(user?.role === "driver" ? user.id : undefined, id);
@@ -54,13 +55,39 @@ const JobDetail = () => {
   });
 
   useEffect(() => {
-    if (!isLoading && !job) {
+    if (!isLoading && !isError && !job) {
       toast.error("Job not found.");
       navigate("/jobs");
     }
-  }, [job, isLoading, navigate]);
+  }, [job, isLoading, isError, navigate]);
 
-  if (isLoading) return null;
+  if (isLoading && !isError) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="container mx-auto py-8 max-w-4xl">
+          <div className="flex justify-center py-20"><Spinner /></div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="container mx-auto py-8 max-w-4xl text-center">
+          <p className="text-sm text-destructive mb-3">Failed to load job details.</p>
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/jobs">Back to Jobs</Link>
+          </Button>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   if (!job) return null;
 
   const companyLogo = job.logoUrl ?? companyProfile?.logo_url;
@@ -110,7 +137,7 @@ const JobDetail = () => {
             {/* Logo */}
             <div className="shrink-0 h-20 w-20 bg-muted flex items-center justify-center font-display text-3xl font-bold text-primary border border-border overflow-hidden">
               {companyLogo ? (
-                <img src={companyLogo} alt={job.company} loading="lazy" className="h-full w-full object-contain p-1" />
+                <img src={companyLogo} alt={job.company} loading="lazy" className="h-full w-full object-cover" />
               ) : (
                 <span>{job.company.charAt(0)}</span>
               )}

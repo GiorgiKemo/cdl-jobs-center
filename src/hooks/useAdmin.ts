@@ -13,6 +13,7 @@ export interface AdminUser {
   state: string | null;
   yearsExp: string | null;
   companyName: string | null;
+  isVerified: boolean;
   createdAt: string;
 }
 
@@ -56,7 +57,7 @@ export interface AdminLead {
 /* ── Row mappers ────────────────────────────────────────────────────── */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function rowToAdminUser(row: Record<string, any>, extra?: { email?: string | null; phone?: string | null; state?: string | null; yearsExp?: string | null; companyName?: string | null }): AdminUser {
+function rowToAdminUser(row: Record<string, any>, extra?: { email?: string | null; phone?: string | null; state?: string | null; yearsExp?: string | null; companyName?: string | null; isVerified?: boolean }): AdminUser {
   return {
     id: row.id,
     name: row.name ?? "",
@@ -66,6 +67,7 @@ function rowToAdminUser(row: Record<string, any>, extra?: { email?: string | nul
     state: extra?.state ?? null,
     yearsExp: extra?.yearsExp ?? null,
     companyName: extra?.companyName ?? null,
+    isVerified: extra?.isVerified ?? false,
     createdAt: row.created_at,
   };
 }
@@ -145,7 +147,7 @@ export function useAdminUsers() {
           .select("id, years_exp, license_state"),
         supabase
           .from("company_profiles")
-          .select("id, company_name, email, phone"),
+          .select("id, company_name, email, phone, is_verified"),
       ]);
       if (profilesRes.error) throw profilesRes.error;
 
@@ -165,6 +167,7 @@ export function useAdminUsers() {
           state: dp?.license_state ?? null,
           yearsExp: dp?.years_exp ?? null,
           companyName: cp?.company_name ?? null,
+          isVerified: cp?.is_verified ?? false,
         });
       });
     },
@@ -305,6 +308,24 @@ export function useChangeSubscriptionPlan() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-subscriptions"] });
+    },
+  });
+}
+
+/** Admin toggles company verified status */
+export function useToggleCompanyVerified() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { companyId: string; verified: boolean }) => {
+      const { error } = await supabase
+        .from("company_profiles")
+        .update({ is_verified: params.verified })
+        .eq("id", params.companyId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      qc.invalidateQueries({ queryKey: ["companies-directory-v2"] });
     },
   });
 }

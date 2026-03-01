@@ -28,11 +28,12 @@ const SavedJobs = () => {
 };
 
 const SavedJobsInner = ({ driverId }: { driverId: string }) => {
-  const { jobs: allJobs, isLoading: jobsLoading } = useActiveJobs();
+  const { jobs: allJobs, isLoading: jobsLoading, error: jobsError } = useActiveJobs();
   const { savedIds, isLoading: savedLoading, toggle } = useSavedJobs(driverId);
 
   const jobs = allJobs.filter((j) => savedIds.includes(j.id));
-  const isLoading = jobsLoading || savedLoading;
+  const hasError = !!jobsError;
+  const isLoading = (jobsLoading || savedLoading) && !hasError;
 
   const handleRemove = async (id: string, company: string) => {
     await toggle(id);
@@ -58,6 +59,11 @@ const SavedJobsInner = ({ driverId }: { driverId: string }) => {
 
         {isLoading ? (
           <div className="flex justify-center py-12"><Spinner size="md" /></div>
+        ) : hasError ? (
+          <div className="border border-border bg-card p-12 text-center">
+            <p className="text-sm text-destructive mb-1">Failed to load saved jobs.</p>
+            <p className="text-xs text-muted-foreground">Please refresh the page to try again.</p>
+          </div>
         ) : jobs.length === 0 ? (
           <div className="border border-border bg-card p-12 text-center">
             <Bookmark className="h-10 w-10 text-muted-foreground mx-auto mb-3" />

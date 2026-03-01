@@ -45,7 +45,7 @@ function resolveMessageStatus(msg: Message): MessageDeliveryStatus {
 }
 
 export function ChatPanel({ userId, userRole, userName, initialApplicationId, initialDriverId }: ChatPanelProps) {
-  const { data: conversations = [], isLoading } = useConversations(userId, userRole);
+  const { data: conversations = [], isLoading, isError } = useConversations(userId, userRole);
   const [selectedAppId, setSelectedAppId] = useState<string | null>(initialApplicationId ?? null);
   const [draft, setDraft] = useState("");
   const sendMessage = useSendMessage();
@@ -118,8 +118,12 @@ export function ChatPanel({ userId, userRole, userName, initialApplicationId, in
             <p className="font-semibold text-sm">Messages</p>
           </div>
           <ScrollArea className="flex-1">
-            {isLoading ? (
+            {isLoading && !isError ? (
               <div className="flex items-center justify-center py-12"><Spinner size="sm" /></div>
+            ) : isError ? (
+              <div className="px-4 py-12 text-center text-sm text-destructive">
+                <p>Failed to load conversations.</p>
+              </div>
             ) : conversations.length === 0 ? (
               <div className="px-4 py-12 text-center text-sm text-muted-foreground">
                 <MessageSquare className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
@@ -280,7 +284,7 @@ function ChatWindow({
   onBack: () => void;
   sending: boolean;
 }) {
-  const { data: messages = [], isLoading } = useMessages(conv.applicationId);
+  const { data: messages = [], isLoading, isError: messagesError } = useMessages(conv.applicationId);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom of the messages container (not the page)
@@ -312,8 +316,12 @@ function ChatWindow({
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
-        {isLoading ? (
+        {isLoading && !messagesError ? (
           <div className="flex justify-center py-8"><Spinner size="sm" /></div>
+        ) : messagesError ? (
+          <div className="text-center text-sm text-destructive py-8">
+            <p>Failed to load messages.</p>
+          </div>
         ) : messages.length === 0 ? (
           <div className="text-center text-sm text-muted-foreground py-8">
             <p>No messages yet.</p>

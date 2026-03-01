@@ -210,7 +210,8 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
     } catch { return new Set(); }
   });
 
-  // Consume deep-link tab/app from URL so notification links always switch tabs.
+  // Consume deep-link app param from URL so notification links work.
+  // Keep ?tab= in the URL so refresh stays on the same tab.
   useEffect(() => {
     const tabFromUrl = searchParams.get("tab");
     if (!tabFromUrl || !isDriverTab(tabFromUrl)) return;
@@ -225,12 +226,12 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
       lastAutoScrollAppIdRef.current = null;
     }
 
-    const next = new URLSearchParams(searchParams);
-    next.delete("tab");
-    if (tabFromUrl !== "messages") {
+    // Only strip the one-time deep-link param (app), keep ?tab=
+    if (appFromUrl) {
+      const next = new URLSearchParams(searchParams);
       next.delete("app");
+      setSearchParams(next, { replace: true });
     }
-    setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
   // Fetch driver's applications
@@ -445,6 +446,8 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
 
   const switchTab = (tab: Tab) => {
     setActiveTab(tab);
+    // Persist tab in URL so a refresh stays on the same tab
+    setSearchParams(tab === "overview" ? {} : { tab }, { replace: true });
     if (tab === "applications") {
       localStorage.setItem(`cdl-apps-seen-${user!.id}`, new Date().toISOString());
       qc.invalidateQueries({ queryKey: ["driver-update-count", user!.id] });

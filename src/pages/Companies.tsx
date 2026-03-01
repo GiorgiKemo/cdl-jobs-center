@@ -26,6 +26,7 @@ interface CompanyRow {
   website: string | null;
   about: string | null;
   logo_url: string | null;
+  is_verified: boolean;
 }
 
 const COMPANY_STATES = [
@@ -51,35 +52,14 @@ const Companies = () => {
     refetch,
   } = useQuery({
     queryKey: ["companies-directory-v2"],
-    networkMode: "always",
-    retry: 2,
-    refetchOnMount: "always",
+    retry: 1,
     queryFn: async () => {
-      const controller = new AbortController();
-      const timeoutMs = 12000;
-      let timeoutId: ReturnType<typeof setTimeout> | undefined;
-      try {
-        const result = await Promise.race([
-          supabase
-            .from("company_profiles")
-            .select("id, company_name, phone, address, email, website, about, logo_url")
-            .abortSignal(controller.signal)
-            .order("company_name"),
-          new Promise<never>((_, reject) => {
-            timeoutId = setTimeout(() => {
-              controller.abort();
-              reject(new Error("Loading companies timed out. Please try again."));
-            }, timeoutMs);
-          }),
-        ]);
-
-        const { data, error } = result;
-
-        if (error) throw error;
-        return (data ?? []) as CompanyRow[];
-      } finally {
-        if (timeoutId) clearTimeout(timeoutId);
-      }
+      const { data, error } = await supabase
+        .from("company_profiles")
+        .select("id, company_name, phone, address, email, website, about, logo_url, is_verified")
+        .order("company_name");
+      if (error) throw error;
+      return (data ?? []) as CompanyRow[];
     },
   });
 
@@ -151,9 +131,11 @@ const Companies = () => {
             <div className="w-1 h-5 bg-primary shrink-0" />
             <h2 className="font-display font-bold text-base">
               Companies{" "}
-              <span className="text-muted-foreground font-normal text-sm ml-1">
-                ({filtered.length} found)
-              </span>
+              {!isLoading && (
+                <span className="text-muted-foreground font-normal text-sm ml-1">
+                  ({filtered.length} found)
+                </span>
+              )}
             </h2>
           </div>
 
@@ -188,7 +170,7 @@ const Companies = () => {
                         loading="lazy"
                         width={80}
                         height={80}
-                        className="h-20 w-20 object-contain border border-border bg-white"
+                        className="h-20 w-20 object-cover border border-border"
                       />
                     ) : (
                       <div className="h-20 w-20 bg-muted flex items-center justify-center font-display text-3xl font-bold text-primary border border-border">
@@ -229,10 +211,12 @@ const Companies = () => {
                         {c.website.replace(/^https?:\/\//, "")}
                       </a>
                     )}
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/30 text-xs font-medium">
-                      <CheckCircle className="h-3 w-3" aria-hidden="true" />{" "}
-                      VERIFIED COMPANY
-                    </span>
+                    {c.is_verified && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/30 text-xs font-medium">
+                        <CheckCircle className="h-3 w-3" aria-hidden="true" />{" "}
+                        VERIFIED COMPANY
+                      </span>
+                    )}
                   </div>
 
                   {/* Action */}

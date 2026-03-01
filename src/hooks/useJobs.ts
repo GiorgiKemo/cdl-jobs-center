@@ -43,7 +43,7 @@ export function useActiveJobs() {
 
 // ── Single job by ID ──────────────────────────────────────────────────────────
 export function useJobById(jobId: string | undefined) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["job", jobId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -56,7 +56,7 @@ export function useJobById(jobId: string | undefined) {
     },
     enabled: !!jobId,
   });
-  return { job: data ?? null, isLoading };
+  return { job: data ?? null, isLoading, isError };
 }
 
 // ── Company's own jobs — with CRUD mutations ──────────────────────────────────

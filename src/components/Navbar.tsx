@@ -29,6 +29,8 @@ import { toast } from "sonner";
 import { useUnreadCount } from "@/hooks/useMessages";
 import { useUnreadNotificationCount } from "@/hooks/useNotifications";
 import { NotificationCenter } from "@/components/NotificationCenter";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 
 const jobDropdownItems = [
   { name: "All Jobs", path: "/jobs" },
@@ -217,6 +219,21 @@ const Navbar = () => {
   // Notification counts
   const { data: unreadMsgCount = 0 } = useUnreadCount(user?.id, user?.role as "driver" | "company" | undefined);
   const { data: notifCount = 0 } = useUnreadNotificationCount(user?.id);
+
+  // Company logo for navbar avatar
+  const { data: companyLogoUrl } = useQuery({
+    queryKey: ["company-logo", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("company_profiles")
+        .select("logo_url")
+        .eq("id", user!.id)
+        .maybeSingle();
+      return (data?.logo_url as string) || null;
+    },
+    enabled: !!user && user.role === "company",
+    staleTime: 5 * 60_000,
+  });
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -409,9 +426,17 @@ const Navbar = () => {
                     aria-label="Open account menu"
                     className="group flex max-w-[300px] items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-left shadow-sm transition-all hover:border-primary/50"
                   >
-                    <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/12 text-xs font-semibold text-primary">
-                      {getInitials(user.name)}
-                    </span>
+                    {companyLogoUrl ? (
+                      <img
+                        src={companyLogoUrl}
+                        alt=""
+                        className="h-8 w-8 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/12 text-xs font-semibold text-primary">
+                        {getInitials(user.name)}
+                      </span>
+                    )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-foreground">
                         {user.name}

@@ -34,6 +34,7 @@ import { formatDate } from "@/lib/dateUtils";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ImageCropDialog } from "@/components/ImageCropDialog";
 
 const FREIGHT_TYPES = [
   "Box", "Car Hauler", "Drop and Hook", "Dry Bulk", "Dry Van", "Flatbed",
@@ -363,6 +364,7 @@ const AiMatchesContent = ({
   const {
     data: matches = [],
     isLoading: matchesLoading,
+    isError: matchesError,
   } = useCompanyDriverMatches(userId, {
     jobId: aiJobFilter !== "all" ? aiJobFilter : undefined,
     source: aiSourceFilter !== "all" ? (aiSourceFilter as "application" | "lead") : undefined,
@@ -409,9 +411,14 @@ const AiMatchesContent = ({
       </div>
 
       {/* Results */}
-      {matchesLoading ? (
+      {matchesLoading && !matchesError ? (
         <div className="flex justify-center py-12">
           <Spinner />
+        </div>
+      ) : matchesError ? (
+        <div className="border border-border bg-card p-8 text-center">
+          <p className="text-sm text-destructive mb-1">Failed to load matches.</p>
+          <p className="text-xs text-muted-foreground">Please refresh the page to try again.</p>
         </div>
       ) : matches.length === 0 ? (
         <EmptyState
@@ -574,7 +581,8 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
   const [aiJobFilter, setAiJobFilter] = useState<string>("all");
   const [aiSourceFilter, setAiSourceFilter] = useState<string>("all");
 
-  // Consume deep-link tab/app from URL so navbar notification links always switch tabs.
+  // Consume deep-link app/driver params from URL so navbar notification links work.
+  // Keep ?tab= in the URL so refresh stays on the same tab.
   useEffect(() => {
     const tabFromUrl = searchParams.get("tab");
     if (!tabFromUrl || !isCompanyTab(tabFromUrl)) return;
@@ -593,13 +601,13 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
       }
     }
 
-    const next = new URLSearchParams(searchParams);
-    next.delete("tab");
-    if (tabFromUrl !== "messages") {
+    // Only strip the one-time deep-link params (app, driver), keep ?tab=
+    if (appFromUrl || driverFromUrl) {
+      const next = new URLSearchParams(searchParams);
       next.delete("app");
       next.delete("driver");
+      setSearchParams(next, { replace: true });
     }
-    setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
   // Company profile state
@@ -610,6 +618,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
   const [profileAbout, setProfileAbout] = useState("");
   const [profileWebsite, setProfileWebsite] = useState("");
   const [profileLogo, setProfileLogo] = useState("");
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [contactName, setContactName] = useState("");
   const [contactTitle, setContactTitle] = useState("");
   const [companyGoal, setCompanyGoal] = useState("");
@@ -804,19 +813,38 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
     }
   };
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
     if (!allowedTypes.includes(file.type)) { toast.error("Only image files are allowed (JPEG, PNG, WebP, GIF)."); return; }
-    if (file.size > 2 * 1024 * 1024) { toast.error("Logo must be under 2MB."); return; }
-    const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
-    const path = `${user!.id}/logo.${ext}`;
-    const { error } = await supabase.storage.from("company-logos").upload(path, file, { upsert: true });
+    if (file.size > 5 * 1024 * 1024) { toast.error("Image must be under 5MB."); return; }
+    const objectUrl = URL.createObjectURL(file);
+    setCropImageSrc(objectUrl);
+    e.target.value = "";
+  };
+
+  const handleCroppedUpload = async (blob: Blob) => {
+    setCropImageSrc(null);
+    const path = `${user!.id}/logo.webp`;
+    const { error } = await supabase.storage.from("company-logos").upload(path, blob, {
+      upsert: true,
+      contentType: "image/webp",
+    });
     if (error) { toast.error("Upload failed: " + error.message); return; }
     const { data: { publicUrl } } = supabase.storage.from("company-logos").getPublicUrl(path);
-    setProfileLogo(publicUrl);
-    e.target.value = "";
+    const newUrl = publicUrl + "?t=" + Date.now();
+    setProfileLogo(newUrl);
+    // Persist to DB immediately so navbar + public profile update without clicking Save
+    await supabase.from("company_profiles").upsert({ id: user!.id, logo_url: newUrl, updated_at: new Date().toISOString() });
+    qc.invalidateQueries({ queryKey: ["company-logo", user!.id] });
+    toast.success("Logo updated.");
+  };
+
+  const handleRemoveLogo = async () => {
+    setProfileLogo("");
+    await supabase.from("company_profiles").upsert({ id: user!.id, logo_url: "", updated_at: new Date().toISOString() });
+    qc.invalidateQueries({ queryKey: ["company-logo", user!.id] });
   };
 
   const handleSaveProfile = async () => {
@@ -853,6 +881,8 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
 
   const switchTab = (tab: Tab) => {
     setActiveTab(tab);
+    // Persist tab in URL so a refresh stays on the same tab
+    setSearchParams(tab === "jobs" ? {} : { tab }, { replace: true });
     if (tab !== "messages") {
       setInitialChatDriverId(null);
     }
@@ -1284,9 +1314,9 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                 <div className="sm:col-span-2 space-y-2">
                   <Label className="text-xs text-muted-foreground">Company Logo</Label>
                   <div className="flex items-center gap-5">
-                    <div className="h-20 w-20 border border-border flex items-center justify-center bg-muted shrink-0 overflow-hidden">
+                    <div className="h-20 w-20 border border-border rounded-lg flex items-center justify-center bg-muted shrink-0 overflow-hidden">
                       {profileLogo ? (
-                        <img src={profileLogo} alt="Company logo" loading="lazy" className="h-full w-full object-contain p-1" />
+                        <img src={profileLogo} alt="Company logo" loading="lazy" className="h-full w-full object-cover" />
                       ) : (
                         <span className="font-display text-3xl font-bold text-primary">{user!.name.charAt(0)}</span>
                       )}
@@ -1297,10 +1327,10 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                           <Upload className="h-3.5 w-3.5" />
                           {profileLogo ? "Change Logo" : "Upload Logo"}
                         </span>
-                        <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                        <input type="file" accept="image/*" className="hidden" onChange={handleLogoSelect} />
                       </label>
                       {profileLogo && (
-                        <button type="button" onClick={() => setProfileLogo("")} className="block text-xs text-red-500 hover:underline">
+                        <button type="button" onClick={handleRemoveLogo} className="block text-xs text-red-500 hover:underline">
                           Remove logo
                         </button>
                       )}
@@ -2328,6 +2358,14 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
         })()}
       </main>
       <Footer />
+
+      {cropImageSrc && (
+        <ImageCropDialog
+          imageSrc={cropImageSrc}
+          onCropComplete={handleCroppedUpload}
+          onClose={() => { URL.revokeObjectURL(cropImageSrc); setCropImageSrc(null); }}
+        />
+      )}
     </div>
   );
 };

@@ -30,7 +30,7 @@ const PAGE_SIZE = 20;
 const ApplicationHistory = () => {
   const { user } = useAuth();
   const [page, setPage] = useState(0);
-  const { data: applications = [], isLoading } = useQuery({
+  const { data: applications = [], isLoading, isError } = useQuery({
     queryKey: ["driver-applications-history", user?.id, page],
     queryFn: async () => {
       const from = page * PAGE_SIZE;
@@ -92,9 +92,14 @@ const ApplicationHistory = () => {
           <span className="text-sm text-muted-foreground">({applications.length})</span>
         </div>
 
-        {isLoading ? (
+        {isLoading && !isError ? (
           <div className="border border-border bg-card p-12 flex justify-center">
             <Spinner />
+          </div>
+        ) : isError ? (
+          <div className="border border-border bg-card p-12 text-center">
+            <p className="text-sm text-destructive mb-1">Failed to load applications.</p>
+            <p className="text-xs text-muted-foreground">Please refresh the page to try again.</p>
           </div>
         ) : applications.length === 0 ? (
           <div className="border border-border bg-card p-12 text-center">
