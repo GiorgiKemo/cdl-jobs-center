@@ -122,7 +122,7 @@ const Drivers = () => {
         new Set(
           drivers
             .map((driver) => driver.state.trim())
-            .filter((state) => state.length > 0 && state !== "Not specified"),
+            .filter((s): s is string => !!s && s !== "Not specified"),
         ),
       ).sort(),
     ],
@@ -259,7 +259,7 @@ const Drivers = () => {
                     <SelectValue placeholder="Choose an option..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {licenseStates.map((option) => (
+                    {licenseStates.filter(Boolean).map((option) => (
                       <SelectItem key={option} value={option}>
                         {option === "All" ? "All" : option}
                       </SelectItem>
