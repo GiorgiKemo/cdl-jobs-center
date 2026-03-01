@@ -25,6 +25,7 @@ import {
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/context/auth";
 import { SignInModal } from "@/components/SignInModal";
+import { toast } from "sonner";
 import { useUnreadCount } from "@/hooks/useMessages";
 import { useUnreadNotificationCount } from "@/hooks/useNotifications";
 import { NotificationCenter } from "@/components/NotificationCenter";
@@ -496,8 +497,18 @@ const Navbar = () => {
                 >
                   Sign In
                 </Button>
-                <Button size="sm" className="glow-orange" asChild>
-                  <Link to="/apply">Apply Now</Link>
+                <Button
+                  size="sm"
+                  className="glow-orange"
+                  onClick={() => {
+                    if (location.pathname === "/apply") {
+                      toast.info("Sign in or create an account to apply");
+                    } else {
+                      navigate("/apply");
+                    }
+                  }}
+                >
+                  Apply Now
                 </Button>
               </>
             )}
@@ -683,10 +694,19 @@ const Navbar = () => {
                     >
                       Sign In
                     </Button>
-                    <Button size="sm" className="flex-1" asChild>
-                      <Link to="/apply" onClick={() => setIsOpen(false)}>
-                        Apply Now
-                      </Link>
+                    <Button
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => {
+                        setIsOpen(false);
+                        if (location.pathname === "/apply") {
+                          toast.info("Sign in or create an account to apply");
+                        } else {
+                          navigate("/apply");
+                        }
+                      }}
+                    >
+                      Apply Now
                     </Button>
                   </div>
                 )}

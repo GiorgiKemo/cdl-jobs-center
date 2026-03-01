@@ -368,17 +368,20 @@ authorization_url_path = "/oauth/consent"
 allow_dynamic_registration = false
 
 [functions.sync-leads]
-verify_jwt = true
+# Auth verified internally via getUser() — gateway JWT off to avoid double-check conflicts
+verify_jwt = false
 
 [functions.create-checkout]
-verify_jwt = true
+# Auth verified internally via getUser()
+verify_jwt = false
 
 [functions.stripe-webhook]
 # Stripe sends webhooks without a JWT — verified via Stripe signature instead
 verify_jwt = false
 
 [functions.create-portal-session]
-verify_jwt = true
+# Auth verified internally via getUser()
+verify_jwt = false
 
 [functions.match-recompute]
 # Internal/cron — called by service role or scheduler
@@ -389,10 +392,12 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.record-match-feedback]
-verify_jwt = true
+# Auth verified internally via getUser()
+verify_jwt = false
 
 [functions.refresh-my-matches]
-verify_jwt = true
+# Auth verified internally via getUser()
+verify_jwt = false
 
 [functions.send-notification]
 # Internal — called by other functions/triggers
