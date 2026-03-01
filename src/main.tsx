@@ -12,4 +12,9 @@ if (sentryDsn) {
   });
 }
 
+// Intentional crash for validating Sentry alert -> GitHub issue automation.
+if (new URLSearchParams(window.location.search).get("sentry_github_test") === "1") {
+  throw new Error("Sentry GitHub integration test error");
+}
+
 createRoot(document.getElementById("root")!).render(<App />);
