@@ -151,11 +151,11 @@ const DriverProfile = () => {
       <Navbar />
       <main className="container mx-auto py-6 max-w-3xl">
         <p className="text-sm text-muted-foreground mb-4">
-          <Link to="/" className="text-primary hover:underline">
+          <Link to="/" className="text-primary underline hover:opacity-80">
             Main
           </Link>
           <span className="mx-1">»</span>
-          <Link to="/drivers" className="text-primary hover:underline">
+          <Link to="/drivers" className="text-primary underline hover:opacity-80">
             Drivers
           </Link>
           <span className="mx-1">»</span>

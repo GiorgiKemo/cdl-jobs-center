@@ -976,7 +976,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
       <main className="container mx-auto py-8 max-w-[1400px]">
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary hover:underline">Main</Link>
+          <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
           <span className="mx-1">»</span>
           Dashboard
         </p>
@@ -2038,14 +2038,14 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                           <td className="px-4 py-3 font-medium">{lead.fullName}</td>
                           <td className="px-4 py-3">
                             {lead.phone ? (
-                              <a href={`tel:${lead.phone}`} className="text-primary hover:underline flex items-center gap-1">
+                              <a href={`tel:${lead.phone}`} className="text-primary underline hover:opacity-80 flex items-center gap-1">
                                 <PhoneIcon className="h-3 w-3" />{lead.phone}
                               </a>
                             ) : <span className="text-muted-foreground">—</span>}
                           </td>
                           <td className="px-4 py-3">
                             {lead.email ? (
-                              <a href={`mailto:${lead.email}`} className="text-primary hover:underline flex items-center gap-1">
+                              <a href={`mailto:${lead.email}`} className="text-primary underline hover:opacity-80 flex items-center gap-1">
                                 <MailIcon className="h-3 w-3" />{lead.email}
                               </a>
                             ) : <span className="text-muted-foreground">—</span>}

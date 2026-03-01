@@ -289,7 +289,7 @@ function AdminDashboardInner() {
       <main className="container mx-auto py-8 max-w-[1400px]">
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary hover:underline">
+          <Link to="/" className="text-primary underline hover:opacity-80">
             Main
           </Link>
           <span className="mx-1">»</span>
@@ -984,7 +984,7 @@ function AdminDashboardInner() {
                                 <p className="text-xs text-muted-foreground mb-1.5">Supporting Documents:</p>
                                 <div className="flex flex-wrap gap-2">
                                   {req.documentUrls.map((url, i) => (
-                                    <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded text-xs text-primary hover:underline">
+                                    <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded text-xs text-primary underline hover:opacity-80">
                                       <ExternalLink className="h-3 w-3" />
                                       Document {i + 1}
                                     </a>

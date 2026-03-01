@@ -475,7 +475,7 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
       <main className="container mx-auto py-8 max-w-[1400px]">
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary hover:underline">Main</Link>
+          <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
           <span className="mx-1">»</span>
           My Dashboard
         </p>
@@ -632,7 +632,7 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
                       );
                     })}
                     <div className="text-center pt-2">
-                      <Link to="/jobs" className="text-sm text-primary hover:underline">
+                      <Link to="/jobs" className="text-sm text-primary underline hover:opacity-80">
                         Browse All Jobs
                       </Link>
                     </div>
@@ -646,7 +646,7 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-display font-semibold text-base border-l-4 border-primary pl-3">Recent Applications</h2>
                 {totalApps > 3 && (
-                  <button onClick={() => setActiveTab("applications")} className="text-sm text-primary hover:underline">
+                  <button onClick={() => setActiveTab("applications")} className="text-sm text-primary underline hover:opacity-80">
                     View all
                   </button>
                 )}

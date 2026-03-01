@@ -111,9 +111,9 @@ const JobDetail = () => {
         {/* Breadcrumb + Back */}
         <div className="flex items-center justify-between mb-6">
           <p className="text-sm text-muted-foreground">
-            <Link to="/" className="text-primary hover:underline">Main</Link>
+            <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
             <span className="mx-1">»</span>
-            <Link to="/jobs" className="text-primary hover:underline">jobs</Link>
+            <Link to="/jobs" className="text-primary underline hover:opacity-80">jobs</Link>
             <span className="mx-1">»</span>
             {job.title}
           </p>
@@ -167,7 +167,7 @@ const JobDetail = () => {
                   href={companyProfile.website}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+                  className="flex items-center gap-1.5 text-sm text-primary underline hover:opacity-80"
                 >
                   <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   Visit Company Website

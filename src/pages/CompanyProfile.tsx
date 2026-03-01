@@ -145,9 +145,9 @@ const CompanyProfile = () => {
       <main className="container mx-auto py-8 max-w-4xl">
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary hover:underline">Main</Link>
+          <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
           <span className="mx-1">»</span>
-          <Link to="/companies" className="text-primary hover:underline">Companies</Link>
+          <Link to="/companies" className="text-primary underline hover:opacity-80">Companies</Link>
           <span className="mx-1">»</span>
           {company.company_name}
         </p>
@@ -193,7 +193,7 @@ const CompanyProfile = () => {
                     href={company.website.startsWith("http") ? company.website : `https://${company.website}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-sm text-primary hover:underline"
+                    className="flex items-center gap-2 text-sm text-primary underline hover:opacity-80"
                   >
                     <ExternalLink className="h-4 w-4 shrink-0" />
                     Visit Website

@@ -149,7 +149,7 @@ const Drivers = () => {
         <Navbar />
         <main className="container mx-auto py-8 max-w-3xl">
           <p className="text-sm text-muted-foreground mb-6">
-            <Link to="/" className="text-primary hover:underline">
+            <Link to="/" className="text-primary underline hover:opacity-80">
               Main
             </Link>
             <span className="mx-1">»</span>
@@ -200,7 +200,7 @@ const Drivers = () => {
       <Navbar />
       <main className="container mx-auto py-8">
         <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary hover:underline">
+          <Link to="/" className="text-primary underline hover:opacity-80">
             Main
           </Link>
           <span className="mx-1">»</span>
@@ -296,7 +296,7 @@ const Drivers = () => {
                 <div key={driver.id} className="px-5 py-5 hover:bg-muted/30 transition-colors">
                   <div className="flex items-start justify-between mb-3">
                     <button
-                      className="font-display font-semibold text-primary hover:underline text-left truncate max-w-xs"
+                      className="font-display font-semibold text-primary underline hover:opacity-80 text-left truncate max-w-xs"
                       onClick={() => navigate(`/drivers/${driver.id}`)}
                     >
                       {driver.name}

@@ -23,7 +23,7 @@ const TermsOfService = () => {
       <main className="container mx-auto py-8 max-w-3xl">
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary hover:underline">Main</Link>
+          <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
           <span className="mx-1">»</span>
           Terms of Service
         </p>
@@ -67,7 +67,7 @@ const TermsOfService = () => {
               <ul className="list-disc pl-5 space-y-1 mt-2">
                 <li>Provide truthful and accurate information, including your CDL credentials and driving history</li>
                 <li>Keep your login credentials confidential and not share them with any third party</li>
-                <li>Notify us immediately of any unauthorized use of your account at <a href="mailto:info@cdljobscenter.com" className="text-primary hover:underline">info@cdljobscenter.com</a></li>
+                <li>Notify us immediately of any unauthorized use of your account at <a href="mailto:info@cdljobscenter.com" className="text-primary underline hover:opacity-80">info@cdljobscenter.com</a></li>
                 <li>Be solely responsible for all activity that occurs under your account</li>
               </ul>
               <p className="mt-2">We reserve the right to suspend or terminate accounts that violate these Terms, provide false information, or engage in prohibited conduct.</p>
@@ -141,8 +141,8 @@ const TermsOfService = () => {
               <div className="mt-3 p-4 border border-border bg-muted/30 space-y-1">
                 <p><strong className="text-foreground">CDL Jobs Center</strong></p>
                 <p>1975 E Sunrise Blvd, Fort Lauderdale, FL 33304</p>
-                <p>Email: <a href="mailto:info@cdljobscenter.com" className="text-primary hover:underline">info@cdljobscenter.com</a></p>
-                <p>Phone: <a href="tel:+16189360241" className="text-primary hover:underline">+1 618-936-0241</a></p>
+                <p>Email: <a href="mailto:info@cdljobscenter.com" className="text-primary underline hover:opacity-80">info@cdljobscenter.com</a></p>
+                <p>Phone: <a href="tel:+16189360241" className="text-primary underline hover:opacity-80">+1 618-936-0241</a></p>
               </div>
             </Section>
 

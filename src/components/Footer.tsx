@@ -9,7 +9,7 @@ const Footer = () => {
 
           {/* For Drivers */}
           <div>
-            <h3 className="font-display font-semibold text-secondary-foreground mb-4">For Drivers</h3>
+            <h2 className="font-display font-semibold text-secondary-foreground mb-4 text-base">For Drivers</h2>
             <div className="flex flex-col gap-2">
               {[
                 { label: "Trucking Job", path: "/jobs" },
@@ -27,7 +27,7 @@ const Footer = () => {
 
           {/* For Companies */}
           <div>
-            <h3 className="font-display font-semibold text-secondary-foreground mb-4">For Companies</h3>
+            <h2 className="font-display font-semibold text-secondary-foreground mb-4 text-base">For Companies</h2>
             <div className="flex flex-col gap-2">
               {[
                 { label: "Company Login", path: "/signin" },
@@ -45,9 +45,9 @@ const Footer = () => {
 
           {/* About + Follow Us */}
           <div>
-            <h3 className="font-display font-semibold text-secondary-foreground mb-4">About</h3>
+            <h2 className="font-display font-semibold text-secondary-foreground mb-4 text-base">About</h2>
             <p className="text-sm text-muted-foreground mb-6">CDL Job Center © {new Date().getFullYear()}</p>
-            <h3 className="font-display font-semibold text-secondary-foreground mb-3">Follow Us</h3>
+            <h2 className="font-display font-semibold text-secondary-foreground mb-3 text-base">Follow Us</h2>
             <div className="flex items-center gap-3">
               <a
                 href="https://www.facebook.com/profile.php?id=100087216585082"
@@ -72,7 +72,7 @@ const Footer = () => {
 
           {/* Contact Us */}
           <div>
-            <h3 className="font-display font-semibold text-secondary-foreground mb-4">Contact Us</h3>
+            <h2 className="font-display font-semibold text-secondary-foreground mb-4 text-base">Contact Us</h2>
             <div className="flex flex-col gap-3">
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
                 <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
@@ -92,9 +92,9 @@ const Footer = () => {
           </p>
           <p className="text-sm text-muted-foreground">
             All Rights Reserved —{" "}
-            <Link to="/privacy" className="text-secondary-foreground hover:text-primary hover:underline">Privacy Policy</Link>
+            <Link to="/privacy" className="text-secondary-foreground underline hover:text-primary">Privacy Policy</Link>
             {" "}&{" "}
-            <Link to="/terms" className="text-secondary-foreground hover:text-primary hover:underline">Terms of Service</Link>
+            <Link to="/terms" className="text-secondary-foreground underline hover:text-primary">Terms of Service</Link>
           </p>
         </div>
       </div>

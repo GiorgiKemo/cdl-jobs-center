@@ -20,6 +20,7 @@ export interface VerificationRequest {
   companyEmail?: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToRequest(row: Record<string, any>): VerificationRequest {
   return {
     id: row.id,

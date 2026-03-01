@@ -113,9 +113,9 @@ const Verification = () => {
       <main className="container mx-auto py-8 max-w-2xl">
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary hover:underline">Main</Link>
+          <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
           <span className="mx-1">&raquo;</span>
-          <Link to="/dashboard" className="text-primary hover:underline">Dashboard</Link>
+          <Link to="/dashboard" className="text-primary underline hover:opacity-80">Dashboard</Link>
           <span className="mx-1">&raquo;</span>
           Verification
         </p>

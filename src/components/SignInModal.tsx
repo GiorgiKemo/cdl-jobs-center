@@ -412,7 +412,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
               <button
                 type="button"
                 onClick={() => setView("login")}
-                className="w-full text-center text-sm text-primary hover:underline"
+                className="w-full text-center text-sm text-primary underline hover:opacity-80"
               >
                 ← Back to login
               </button>
@@ -596,7 +596,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   </Select>
                 </div>
                 <Button type="submit" disabled={submitting} className="w-full">{submitting ? "Submitting…" : "Submit"}</Button>
-                <button type="button" onClick={() => setView("login")} className="w-full text-center text-sm text-primary hover:underline">
+                <button type="button" onClick={() => setView("login")} className="w-full text-center text-sm text-primary underline hover:opacity-80">
                   ← Back to login
                 </button>
               </form>
@@ -705,7 +705,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   </Select>
                 </div>
                 <Button type="submit" disabled={submitting} className="w-full">{submitting ? "Submitting…" : "Submit"}</Button>
-                <button type="button" onClick={() => setView("login")} className="w-full text-center text-sm text-primary hover:underline">
+                <button type="button" onClick={() => setView("login")} className="w-full text-center text-sm text-primary underline hover:opacity-80">
                   ← Back to login
                 </button>
               </form>

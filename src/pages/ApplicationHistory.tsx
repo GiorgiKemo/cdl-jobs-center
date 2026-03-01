@@ -81,7 +81,7 @@ const ApplicationHistory = () => {
       <main className="container mx-auto py-6 max-w-4xl">
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-4">
-          <Link to="/" className="text-primary hover:underline">Main</Link>
+          <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
           <span className="mx-1">»</span>
           My Applications
         </p>
@@ -113,83 +113,85 @@ const ApplicationHistory = () => {
             </Button>
           </div>
         ) : (
-          <div className="border border-border bg-card divide-y divide-border">
-            {applications.map((app) => {
-              const isOpen = expanded === app.id;
-              return (
-                <div key={app.id} className="p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-foreground">{app.companyName}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Submitted {formatDate(app.submittedAt)}
-                      </p>
-                      <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground mt-1.5">
-                        {app.driverType && <span>{driverTypeLabel[app.driverType] ?? app.driverType}</span>}
-                        {app.licenseClass && <span>{licenseLabel[app.licenseClass] ?? app.licenseClass}</span>}
-                        {app.yearsExp && <span>{expLabel[app.yearsExp] ?? app.yearsExp} exp</span>}
-                        {app.licenseState && <span>{app.licenseState}</span>}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setExpanded(isOpen ? null : app.id)}
-                      className="flex items-center gap-1 text-xs text-primary hover:opacity-80 shrink-0"
-                    >
-                      {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      {isOpen ? "Hide" : "Details"}
-                    </button>
-                  </div>
-
-                  {isOpen && (
-                    <div className="mt-4 pt-4 border-t border-border grid sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+          <>
+            <div className="border border-border bg-card divide-y divide-border">
+              {applications.map((app) => {
+                const isOpen = expanded === app.id;
+                return (
+                  <div key={app.id} className="p-5">
+                    <div className="flex items-start justify-between gap-4">
                       <div>
-                        <span className="text-muted-foreground">Name: </span>
-                        <span className="font-medium">{app.firstName} {app.lastName}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Email: </span>
-                        <span className="font-medium">{app.email}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Phone: </span>
-                        <span className="font-medium">{app.phone}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">License State: </span>
-                        <span className="font-medium">{app.licenseState}</span>
-                      </div>
-                      {app.notes && (
-                        <div className="sm:col-span-2">
-                          <span className="text-muted-foreground">Notes: </span>
-                          <span className="font-medium">{app.notes}</span>
+                        <p className="font-semibold text-foreground">{app.companyName}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Submitted {formatDate(app.submittedAt)}
+                        </p>
+                        <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground mt-1.5">
+                          {app.driverType && <span>{driverTypeLabel[app.driverType] ?? app.driverType}</span>}
+                          {app.licenseClass && <span>{licenseLabel[app.licenseClass] ?? app.licenseClass}</span>}
+                          {app.yearsExp && <span>{expLabel[app.yearsExp] ?? app.yearsExp} exp</span>}
+                          {app.licenseState && <span>{app.licenseState}</span>}
                         </div>
-                      )}
+                      </div>
+                      <button
+                        onClick={() => setExpanded(isOpen ? null : app.id)}
+                        className="flex items-center gap-1 text-xs text-primary hover:opacity-80 shrink-0"
+                      >
+                        {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        {isOpen ? "Hide" : "Details"}
+                      </button>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          {/* Pagination */}
-          <div className="flex items-center justify-between px-5 py-3 border border-t-0 border-border bg-card">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page === 0}
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" /> Previous
-            </Button>
-            <span className="text-xs text-muted-foreground">Page {page + 1}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={applications.length < PAGE_SIZE}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
+
+                    {isOpen && (
+                      <div className="mt-4 pt-4 border-t border-border grid sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Name: </span>
+                          <span className="font-medium">{app.firstName} {app.lastName}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Email: </span>
+                          <span className="font-medium">{app.email}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Phone: </span>
+                          <span className="font-medium">{app.phone}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">License State: </span>
+                          <span className="font-medium">{app.licenseState}</span>
+                        </div>
+                        {app.notes && (
+                          <div className="sm:col-span-2">
+                            <span className="text-muted-foreground">Notes: </span>
+                            <span className="font-medium">{app.notes}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {/* Pagination */}
+            <div className="flex items-center justify-between px-5 py-3 border border-t-0 border-border bg-card">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page === 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+              </Button>
+              <span className="text-xs text-muted-foreground">Page {page + 1}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={applications.length < PAGE_SIZE}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </>
         )}
       </main>
       <Footer />

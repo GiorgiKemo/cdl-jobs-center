@@ -146,7 +146,7 @@ const SignIn = () => {
         <div className="w-full max-w-md">
           {/* Breadcrumb */}
           <p className="text-sm text-muted-foreground mb-6">
-            <Link to="/" className="text-primary hover:underline">Main</Link>
+            <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
             <span className="mx-1">»</span>
             {recovering ? "Reset Password" : "Sign In"}
           </p>
@@ -225,7 +225,7 @@ const SignIn = () => {
                     <Label htmlFor="password">Password</Label>
                     <button
                       type="button"
-                      className="text-xs text-primary hover:underline"
+                      className="text-xs text-primary underline hover:opacity-80"
                       onClick={async () => {
                         if (!email) {
                           toast.error("Enter your email first, then click Forgot password.");

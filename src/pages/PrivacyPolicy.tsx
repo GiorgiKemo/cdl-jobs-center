@@ -23,7 +23,7 @@ const PrivacyPolicy = () => {
       <main className="container mx-auto py-8 max-w-3xl">
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary hover:underline">Main</Link>
+          <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
           <span className="mx-1">»</span>
           Privacy Policy
         </p>
@@ -93,7 +93,7 @@ const PrivacyPolicy = () => {
                 <li><strong className="text-foreground">Opt-out:</strong> Unsubscribe from marketing emails at any time using the unsubscribe link in any email.</li>
                 <li><strong className="text-foreground">Portability:</strong> Request a portable copy of your data in a common format.</li>
               </ul>
-              <p className="mt-2">To exercise any of these rights, contact us at <a href="mailto:info@cdljobscenter.com" className="text-primary hover:underline">info@cdljobscenter.com</a>.</p>
+              <p className="mt-2">To exercise any of these rights, contact us at <a href="mailto:info@cdljobscenter.com" className="text-primary underline hover:opacity-80">info@cdljobscenter.com</a>.</p>
             </Section>
 
             <Section title="7. Cookies and Tracking">
@@ -113,8 +113,8 @@ const PrivacyPolicy = () => {
               <div className="mt-3 p-4 border border-border bg-muted/30 space-y-1">
                 <p><strong className="text-foreground">CDL Jobs Center</strong></p>
                 <p>1975 E Sunrise Blvd, Fort Lauderdale, FL 33304</p>
-                <p>Email: <a href="mailto:info@cdljobscenter.com" className="text-primary hover:underline">info@cdljobscenter.com</a></p>
-                <p>Phone: <a href="tel:+16189360241" className="text-primary hover:underline">+1 618-936-0241</a></p>
+                <p>Email: <a href="mailto:info@cdljobscenter.com" className="text-primary underline hover:opacity-80">info@cdljobscenter.com</a></p>
+                <p>Phone: <a href="tel:+16189360241" className="text-primary underline hover:opacity-80">+1 618-936-0241</a></p>
               </div>
             </Section>
 

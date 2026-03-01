@@ -81,7 +81,7 @@ const Jobs = () => {
       setFreightType(nextFreight);
       setPage(0);
     }
-  }, [searchParams]);
+  }, [searchParams, freightType]);
 
   // Sync a filter change to URL
   const updateParam = (key: string, value: string) => {
@@ -159,9 +159,9 @@ const Jobs = () => {
       <main className="container mx-auto py-6">
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-4">
-          <Link to="/" className="text-primary hover:underline">Main</Link>
+          <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
           <span className="mx-1">»</span>
-          <Link to="/jobs" className="text-primary hover:underline">jobs</Link>
+          <Link to="/jobs" className="text-primary underline hover:opacity-80">jobs</Link>
           {freightType !== "all" && (
             <>
               <span className="mx-1">»</span>
@@ -179,7 +179,7 @@ const Jobs = () => {
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:block">Sort:</span>
             <Select value={sortBy} onValueChange={(v) => { setSortBy(v); setPage(0); }} name="sortBy">
-              <SelectTrigger id="jobs-sortBy" className="w-44 h-8 text-xs">
+              <SelectTrigger id="jobs-sortBy" aria-label="Sort jobs" className="w-44 h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

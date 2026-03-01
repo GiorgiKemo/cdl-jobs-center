@@ -93,7 +93,7 @@ const Companies = () => {
       <main className="container mx-auto py-8">
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary hover:underline">
+          <Link to="/" className="text-primary underline hover:opacity-80">
             Main
           </Link>
           <span className="mx-1">»</span>
@@ -225,7 +225,7 @@ const Companies = () => {
                   <div className="flex-1 min-w-0">
                     <Link
                       to={`/companies/${c.id}`}
-                      className="font-display font-semibold text-primary hover:underline text-left mb-1.5 block truncate"
+                      className="font-display font-semibold text-primary underline hover:opacity-80 text-left mb-1.5 block truncate"
                     >
                       {c.company_name}
                     </Link>
@@ -246,7 +246,7 @@ const Companies = () => {
                         href={c.website.startsWith("http") ? c.website : `https://${c.website}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 text-sm text-primary hover:underline mb-2"
+                        className="flex items-center gap-1.5 text-sm text-primary underline hover:opacity-80 mb-2"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
