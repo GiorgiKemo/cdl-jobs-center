@@ -7,7 +7,7 @@ const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
 if (sentryDsn) {
   Sentry.init({
     dsn: sentryDsn,
-    sendDefaultPii: true,
+    sendDefaultPii: false,
   });
 }
 

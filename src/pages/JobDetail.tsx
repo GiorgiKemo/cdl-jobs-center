@@ -162,7 +162,7 @@ const JobDetail = () => {
                   {companyProfile.address}
                 </p>
               )}
-              {companyProfile?.website && (
+              {companyProfile?.website && companyProfile.website.startsWith("http") && (
                 <a
                   href={companyProfile.website}
                   target="_blank"
