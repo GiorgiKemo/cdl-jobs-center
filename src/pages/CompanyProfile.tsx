@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -71,6 +72,8 @@ const CompanyProfile = () => {
     },
     enabled: !!isDriver && !!id,
   });
+
+  usePageTitle(company?.company_name ?? "Company Profile");
 
   // Fetch company's active jobs
   const { data: jobs = [] } = useQuery({

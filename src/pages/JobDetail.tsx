@@ -7,6 +7,7 @@ import { useJobById } from "@/hooks/useJobs";
 import { useAuth } from "@/context/auth";
 import { useDriverJobMatchScore, useMatchingRollout } from "@/hooks/useMatchScores";
 import { useState, useEffect } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { ApplyModal } from "@/components/ApplyModal";
 import { SignInModal } from "@/components/SignInModal";
 import { toast } from "sonner";
@@ -23,6 +24,7 @@ const JobDetail = () => {
   const [signInOpen, setSignInOpen] = useState(false);
   const { data: matchScore } = useDriverJobMatchScore(user?.role === "driver" ? user.id : undefined, id);
   const { data: rollout } = useMatchingRollout();
+  usePageTitle(job ? `${job.title} at ${job.company}` : "Job Details");
 
   // Fetch company profile (phone, address, website, logo)
   const { data: companyProfile } = useQuery({

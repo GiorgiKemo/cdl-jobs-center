@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import Footer from "@/components/Footer";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 const HowItWorks = lazy(() => import("@/components/HowItWorks"));
 const JobCategories = lazy(() => import("@/components/JobCategories"));
@@ -11,6 +12,7 @@ const Reviews = lazy(() => import("@/components/Reviews"));
 const CTA = lazy(() => import("@/components/CTA"));
 
 const Index = () => {
+  usePageTitle("CDL Trucking Jobs — AI-Powered Matching");
   return (
     <div className="min-h-screen bg-background">
       <Navbar />

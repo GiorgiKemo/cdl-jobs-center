@@ -1,5 +1,6 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { User, MapPin, Award, Truck, MessageSquare } from "lucide-react";
@@ -82,6 +83,8 @@ const DriverProfile = () => {
       };
     },
   });
+
+  usePageTitle(driver?.name ?? "Driver Profile");
 
   if (!user || user.role !== "company") {
     return (
