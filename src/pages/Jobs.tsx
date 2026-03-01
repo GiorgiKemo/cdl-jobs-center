@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link, useSearchParams } from "react-router-dom";
 import { Truck, Bookmark, BookmarkCheck, Search } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useActiveJobs } from "@/hooks/useJobs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { useAuth } from "@/context/auth";
@@ -71,6 +71,17 @@ const Jobs = () => {
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "");
   const [sortBy, setSortBy] = useState("newest");
   const [page, setPage] = useState(0);
+
+  // Sync URL params → filter state (e.g. when Navbar job-type links change the URL)
+  useEffect(() => {
+    const type = searchParams.get("type");
+    const freight = searchParams.get("freight");
+    const nextFreight = (type && urlTypeMap[type]) ? urlTypeMap[type] : (freight ?? "all");
+    if (nextFreight !== freightType) {
+      setFreightType(nextFreight);
+      setPage(0);
+    }
+  }, [searchParams]);
 
   // Sync a filter change to URL
   const updateParam = (key: string, value: string) => {

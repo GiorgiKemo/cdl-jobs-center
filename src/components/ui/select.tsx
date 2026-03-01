@@ -139,12 +139,8 @@ const SelectContent = React.forwardRef<
               "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]",
           )}
           onWheel={(e) => {
-            const vp = e.currentTarget;
-            const atTop = vp.scrollTop <= 0;
-            const atBottom = vp.scrollHeight - vp.scrollTop - vp.clientHeight < 1;
-            if ((e.deltaY > 0 && atBottom) || (e.deltaY < 0 && atTop)) {
-              document.documentElement.scrollTop += e.deltaY;
-            }
+            e.stopPropagation();
+            document.documentElement.scrollTop += e.deltaY;
           }}
         >
           {children}
