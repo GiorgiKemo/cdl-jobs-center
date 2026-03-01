@@ -27,6 +27,7 @@ export default defineConfig(({ mode }) => ({
           charts: ["recharts"],
           motion: ["framer-motion"],
           supabase: ["@supabase/supabase-js"],
+          sentry: ["@sentry/react"],
         },
       },
     },
