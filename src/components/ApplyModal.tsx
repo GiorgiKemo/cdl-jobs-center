@@ -256,30 +256,39 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
           {/* Basic info */}
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <Input id="modal-firstName" name="firstName" autoComplete="given-name" placeholder="First name *" value={firstName} onChange={(e) => setFirstName(e.target.value)} className={errors.firstName ? "border-destructive" : ""} />
+              <Label htmlFor="modal-firstName" className="text-xs text-muted-foreground">First Name *</Label>
+              <Input id="modal-firstName" name="firstName" autoComplete="given-name" placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} className={errors.firstName ? "border-destructive" : ""} />
               {errors.firstName && <p className="text-xs text-destructive">{errors.firstName}</p>}
             </div>
             <div className="space-y-1">
-              <Input id="modal-lastName" name="lastName" autoComplete="family-name" placeholder="Last name *" value={lastName} onChange={(e) => setLastName(e.target.value)} className={errors.lastName ? "border-destructive" : ""} />
+              <Label htmlFor="modal-lastName" className="text-xs text-muted-foreground">Last Name *</Label>
+              <Input id="modal-lastName" name="lastName" autoComplete="family-name" placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} className={errors.lastName ? "border-destructive" : ""} />
               {errors.lastName && <p className="text-xs text-destructive">{errors.lastName}</p>}
             </div>
             <div className="space-y-1">
-              <Input id="modal-email" name="email" autoComplete="email" placeholder="Email *" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={errors.email ? "border-destructive" : ""} />
+              <Label htmlFor="modal-email" className="text-xs text-muted-foreground">Email *</Label>
+              <Input id="modal-email" name="email" autoComplete="email" placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={errors.email ? "border-destructive" : ""} />
               {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
             </div>
             <div className="space-y-1">
-              <Input id="modal-phone" name="phone" autoComplete="tel" placeholder="Phone *" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={errors.phone ? "border-destructive" : ""} />
+              <Label htmlFor="modal-phone" className="text-xs text-muted-foreground">Phone *</Label>
+              <Input id="modal-phone" name="phone" autoComplete="tel" placeholder="Phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={errors.phone ? "border-destructive" : ""} />
               {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
             </div>
             <div className="space-y-1">
-              <Input id="modal-cdlNumber" name="cdlNumber" autoComplete="off" placeholder="CDL # *" value={cdlNumber} onChange={(e) => setCdlNumber(e.target.value)} className={errors.cdlNumber ? "border-destructive" : ""} />
+              <Label htmlFor="modal-cdlNumber" className="text-xs text-muted-foreground">CDL # *</Label>
+              <Input id="modal-cdlNumber" name="cdlNumber" autoComplete="off" placeholder="CDL number" value={cdlNumber} onChange={(e) => setCdlNumber(e.target.value)} className={errors.cdlNumber ? "border-destructive" : ""} />
               {errors.cdlNumber && <p className="text-xs text-destructive">{errors.cdlNumber}</p>}
             </div>
             <div className="space-y-1">
-              <Input id="modal-zipCode" name="zipCode" autoComplete="postal-code" placeholder="Zip Code *" value={zipCode} onChange={(e) => setZipCode(e.target.value)} className={errors.zipCode ? "border-destructive" : ""} />
+              <Label htmlFor="modal-zipCode" className="text-xs text-muted-foreground">Zip Code *</Label>
+              <Input id="modal-zipCode" name="zipCode" autoComplete="postal-code" placeholder="Zip code" value={zipCode} onChange={(e) => setZipCode(e.target.value)} className={errors.zipCode ? "border-destructive" : ""} />
               {errors.zipCode && <p className="text-xs text-destructive">{errors.zipCode}</p>}
             </div>
-            <Input id="modal-date" name="availableDate" autoComplete="off" placeholder="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <div className="space-y-1">
+              <Label htmlFor="modal-date" className="text-xs text-muted-foreground">Available Date</Label>
+              <Input id="modal-date" name="availableDate" autoComplete="off" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
           </div>
 
           {/* Driving experience */}

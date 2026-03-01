@@ -102,12 +102,13 @@ const Drivers = () => {
 
       return (((data as DriverRow[] | null) ?? []).map((row) => {
         const fullName = `${row.first_name ?? ""} ${row.last_name ?? ""}`.trim();
+        const normalizedState = (row.license_state ?? "").trim();
         return {
           id: row.id,
           name: fullName || "Unnamed Driver",
           licenseClass: LICENSE_CLASS_LABELS[row.license_class ?? ""] ?? "Not specified",
           experience: YEARS_EXP_LABELS[row.years_exp ?? ""] ?? "Not specified",
-          state: row.license_state ?? "Not specified",
+          state: normalizedState || "Not specified",
           about: row.about ?? "",
         };
       })) as Driver[];
@@ -118,7 +119,11 @@ const Drivers = () => {
     () => [
       "All",
       ...Array.from(
-        new Set(drivers.map((driver) => driver.state).filter((state) => state !== "Not specified")),
+        new Set(
+          drivers
+            .map((driver) => driver.state.trim())
+            .filter((state) => state.length > 0 && state !== "Not specified"),
+        ),
       ).sort(),
     ],
     [drivers],
@@ -199,7 +204,7 @@ const Drivers = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="container mx-auto py-8">
-        <p className="text-sm text-muted-foreground mb-6">
+        <p className="text-sm text-muted-foreground mb-4">
           <Link to="/" className="text-primary underline hover:opacity-80">
             Main
           </Link>
@@ -207,9 +212,13 @@ const Drivers = () => {
           Drivers
         </p>
 
+        <div className="flex items-center gap-3 border-l-4 border-primary pl-3 mb-6">
+          <h1 className="font-display text-2xl font-bold">Driver Directory</h1>
+        </div>
+
         <div className="bg-foreground text-background dark:bg-muted dark:text-foreground border border-border mb-6">
           <div className="px-5 py-3 border-b border-white/10 dark:border-border">
-            <h1 className="font-display font-bold text-base">Filter drivers</h1>
+            <h2 className="font-display font-bold text-base">Filter drivers</h2>
           </div>
           <div className="px-5 py-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
@@ -222,7 +231,7 @@ const Drivers = () => {
                   <SelectContent>
                     {LICENSE_CLASSES.map((option) => (
                       <SelectItem key={option} value={option}>
-                        {option === "All" ? "Choose an option..." : option}
+                        {option === "All" ? "All" : option}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -237,7 +246,7 @@ const Drivers = () => {
                   <SelectContent>
                     {EXPERIENCE_OPTIONS.map((option) => (
                       <SelectItem key={option} value={option}>
-                        {option === "All" ? "Choose an option..." : option}
+                        {option === "All" ? "All" : option}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -252,7 +261,7 @@ const Drivers = () => {
                   <SelectContent>
                     {licenseStates.map((option) => (
                       <SelectItem key={option} value={option}>
-                        {option === "All" ? "Choose an option..." : option}
+                        {option === "All" ? "All" : option}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -263,7 +272,7 @@ const Drivers = () => {
               <Button
                 variant="outline"
                 onClick={handleClear}
-                className="border-cdl-amber text-cdl-amber hover:bg-cdl-amber/10 dark:border-cdl-amber dark:text-cdl-amber"
+                className="border-border"
               >
                 Clear filter
               </Button>

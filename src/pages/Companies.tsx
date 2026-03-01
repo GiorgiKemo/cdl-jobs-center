@@ -92,7 +92,7 @@ const Companies = () => {
       <Navbar />
       <main className="container mx-auto py-8">
         {/* Breadcrumb */}
-        <p className="text-sm text-muted-foreground mb-6">
+        <p className="text-sm text-muted-foreground mb-4">
           <Link to="/" className="text-primary underline hover:opacity-80">
             Main
           </Link>
@@ -100,11 +100,16 @@ const Companies = () => {
           Companies
         </p>
 
+        {/* Page heading */}
+        <div className="flex items-center gap-3 border-l-4 border-primary pl-3 mb-6">
+          <h1 className="font-display text-2xl font-bold">Company Directory</h1>
+        </div>
+
         {/* Filter bar */}
         <div className="border border-border bg-card mb-6">
           <div className="px-5 py-3 border-b border-border flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
-            <h1 className="font-display font-bold text-base">Filter Companies</h1>
+            <h2 className="font-display font-bold text-base">Filter Companies</h2>
           </div>
           <div className="px-5 py-4">
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">

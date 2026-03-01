@@ -119,7 +119,7 @@ const JobDetail = () => {
           </p>
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={() => { window.history.length > 1 ? navigate(-1) : navigate("/jobs"); }}
             className="inline-flex items-center gap-1.5 text-primary hover:text-primary/70 transition-colors shrink-0 text-sm font-medium"
             aria-label="Go back"
           >
@@ -279,7 +279,7 @@ const JobDetail = () => {
         <div className="border border-border bg-card p-5 mb-4">
           <h3 className="font-display font-semibold text-base mb-3">Job Description</h3>
           <hr className="border-primary/20 mb-4" />
-          <p className="text-sm text-muted-foreground leading-relaxed">{job.description}</p>
+          <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{job.description}</p>
         </div>
 
         {/* Info panel for guests / company users */}

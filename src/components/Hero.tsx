@@ -79,7 +79,7 @@ const Hero = () => {
             >
               <Button
                 size="lg"
-                className="text-lg px-8 glow-orange group dark:text-slate-950"
+                className="text-lg px-8 glow-orange group"
                 asChild
               >
                 <Link to={isCompany ? "/dashboard" : "/apply"}>
@@ -101,7 +101,7 @@ const Hero = () => {
 
             {/* Trust badges */}
             <div
-              className="animate-hero-fade-in mt-12 flex items-center gap-8 border-t border-border/20 pt-8"
+              className="animate-hero-fade-in mt-12 flex items-center gap-x-8 gap-y-3 flex-wrap border-t border-border/20 pt-8"
               style={{ animationDelay: "0.5s" }}
             >
               <div className="flex items-center gap-2 text-muted-foreground">

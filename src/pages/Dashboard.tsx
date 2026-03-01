@@ -657,8 +657,11 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
 
     setActiveTab(tabFromUrl);
     if (tabFromUrl === "messages") {
-      setInitialChatAppId(appFromUrl);
-      setInitialChatDriverId(driverFromUrl);
+      // Preserve one-time deep-link IDs after we strip query params from URL.
+      // If we overwrite with null on the follow-up render, ChatPanel can't
+      // preselect the target conversation.
+      if (appFromUrl) setInitialChatAppId(appFromUrl);
+      if (driverFromUrl) setInitialChatDriverId(driverFromUrl);
     } else if (tabFromUrl === "applications") {
       setFocusedApplicationId(appFromUrl);
       if (appFromUrl) {
@@ -1068,7 +1071,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
         })()}
 
         {/* Tab bar */}
-        <div className="border-b border-border mb-6 flex overflow-x-auto" role="tablist">
+        <div className="border-b border-border mb-6 flex overflow-x-auto scrollbar-hide relative" role="tablist" style={{ scrollbarWidth: "none" }}>
           <button className={tabClass("jobs")} onClick={() => switchTab("jobs")} role="tab" aria-selected={activeTab === "jobs"}>
             My Jobs ({jobs.length})
           </button>
@@ -1338,6 +1341,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                 {applications.length > 0 && (
                   <button
                     onClick={async () => {
+                      if (!window.confirm("Are you sure you want to clear ALL applications? This cannot be undone.")) return;
                       const { error } = await supabase
                         .from("applications")
                         .delete()
@@ -2019,8 +2023,8 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                   </p>
                 </div>
               ) : (
-                <div className="border border-border bg-card overflow-hidden">
-                  <table className="w-full text-sm">
+                <div className="border border-border bg-card overflow-x-auto">
+                  <table className="w-full text-sm min-w-[700px]">
                     <thead>
                       <tr className="border-b border-border bg-muted/50">
                         <th className="text-left px-4 py-3 font-medium text-xs text-muted-foreground uppercase tracking-wide">Name</th>

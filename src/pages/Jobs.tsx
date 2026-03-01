@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link, useSearchParams } from "react-router-dom";
-import { Truck, Bookmark, BookmarkCheck, Search } from "lucide-react";
+import { Truck, Bookmark, BookmarkCheck, Search, MapPin, DollarSign } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { useActiveJobs } from "@/hooks/useJobs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
@@ -140,6 +140,11 @@ const Jobs = () => {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
+  const goToPage = (p: number) => {
+    setPage(p);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleToggleSave = async (id: string, company: string) => {
     if (!user || user.role !== "driver") {
       toast.error("Sign in as a driver to save jobs.");
@@ -205,7 +210,7 @@ const Jobs = () => {
 
               {/* Keyword search */}
               <div>
-                <label htmlFor="jobs-search" className="text-sm text-primary font-medium block mb-1">Search:</label>
+                <label htmlFor="jobs-search" className="text-sm text-foreground font-medium block mb-1">Search</label>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                   <Input
@@ -221,13 +226,13 @@ const Jobs = () => {
 
               {/* Driver Type */}
               <div>
-                <label htmlFor="jobs-driverType" className="text-sm text-primary font-medium block mb-1">Driver Type:</label>
+                <label htmlFor="jobs-driverType" className="text-sm text-foreground font-medium block mb-1">Driver Type</label>
                 <Select value={driverType} onValueChange={setDriver} name="driverType">
                   <SelectTrigger id="jobs-driverType" className="w-full">
                     <SelectValue placeholder="Choose an option..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Choose an option...</SelectItem>
+                    <SelectItem value="all">All</SelectItem>
                     <SelectItem value="Owner Operator">Owner Operator</SelectItem>
                     <SelectItem value="Company Driver">Company Driver</SelectItem>
                     <SelectItem value="Student">Student</SelectItem>
@@ -237,13 +242,13 @@ const Jobs = () => {
 
               {/* Freight Type */}
               <div>
-                <label htmlFor="jobs-freightType" className="text-sm text-primary font-medium block mb-1">Freight Type:</label>
+                <label htmlFor="jobs-freightType" className="text-sm text-foreground font-medium block mb-1">Freight Type</label>
                 <Select value={freightType} onValueChange={setFreight} name="freightType">
                   <SelectTrigger id="jobs-freightType" className="w-full">
                     <SelectValue placeholder="Choose an option..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Choose an option...</SelectItem>
+                    <SelectItem value="all">All</SelectItem>
                     <SelectItem value="Box">Box</SelectItem>
                     <SelectItem value="Car Hauler">Car Hauler</SelectItem>
                     <SelectItem value="Drop and Hook">Drop and Hook</SelectItem>
@@ -263,13 +268,13 @@ const Jobs = () => {
 
               {/* Route Type */}
               <div>
-                <label htmlFor="jobs-routeType" className="text-sm text-primary font-medium block mb-1">Route Type:</label>
+                <label htmlFor="jobs-routeType" className="text-sm text-foreground font-medium block mb-1">Route Type</label>
                 <Select value={routeType} onValueChange={setRoute} name="routeType">
                   <SelectTrigger id="jobs-routeType" className="w-full">
                     <SelectValue placeholder="Choose an option..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Choose an option...</SelectItem>
+                    <SelectItem value="all">All</SelectItem>
                     <SelectItem value="Dedicated">Dedicated</SelectItem>
                     <SelectItem value="Local">Local</SelectItem>
                     <SelectItem value="LTL">LTL</SelectItem>
@@ -281,13 +286,13 @@ const Jobs = () => {
 
               {/* Team Driving */}
               <div>
-                <label htmlFor="jobs-teamDriving" className="text-sm text-primary font-medium block mb-1">Team Driving:</label>
+                <label htmlFor="jobs-teamDriving" className="text-sm text-foreground font-medium block mb-1">Team Driving</label>
                 <Select value={teamDriving} onValueChange={setTeam} name="teamDriving">
                   <SelectTrigger id="jobs-teamDriving" className="w-full">
                     <SelectValue placeholder="Choose an option..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Choose an option...</SelectItem>
+                    <SelectItem value="all">All</SelectItem>
                     <SelectItem value="Solo">Solo</SelectItem>
                     <SelectItem value="Team">Team</SelectItem>
                     <SelectItem value="Both">Both</SelectItem>
@@ -300,7 +305,7 @@ const Jobs = () => {
                 <Button
                   onClick={resetFilters}
                   variant="outline"
-                  className="w-full bg-amber-400 hover:bg-amber-500 text-black border-amber-400 hover:border-amber-500"
+                  className="w-full"
                 >
                   Reset Filters
                 </Button>
@@ -315,29 +320,32 @@ const Jobs = () => {
                 {paginated.map((job) => {
                   const saved = savedIds.includes(job.id);
                   return (
-                    <div key={job.id} className="border border-border bg-card p-5 flex flex-col sm:flex-row gap-4">
+                    <div key={job.id} className="border border-border bg-card p-5 flex flex-col sm:flex-row gap-4 transition-shadow hover:shadow-md hover:border-primary/30">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 mb-0.5">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h2 className="font-display font-semibold text-lg text-primary">{job.company}</h2>
-                            {user?.role === "driver" && rollout?.driverUiEnabled && matchScoreMap?.has(job.id) ? (() => {
-                              const score = Math.round(matchScoreMap.get(job.id)!);
-                              const badgeColor =
-                                score >= 70
-                                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                  : score >= 40
-                                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                                  : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400";
-                              return (
-                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badgeColor}`}>
-                                  {score}% Match
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <div className="min-w-0">
+                            <h2 className="font-display font-semibold text-lg text-foreground truncate">{job.title}</h2>
+                            <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                              <span className="text-sm text-primary font-medium">{job.company}</span>
+                              {user?.role === "driver" && rollout?.driverUiEnabled && matchScoreMap?.has(job.id) ? (() => {
+                                const score = Math.round(matchScoreMap.get(job.id)!);
+                                const badgeColor =
+                                  score >= 70
+                                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                    : score >= 40
+                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                    : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400";
+                                return (
+                                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badgeColor}`}>
+                                    {score}% Match
+                                  </span>
+                                );
+                              })() : user?.role === "driver" && isPreferenceMatch(job, driverProfile) && (
+                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
+                                  Matches your preferences
                                 </span>
-                              );
-                            })() : user?.role === "driver" && isPreferenceMatch(job, driverProfile) && (
-                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
-                                Matches your preferences
-                              </span>
-                            )}
+                              )}
+                            </div>
                           </div>
                           <button
                             onClick={() => handleToggleSave(job.id, job.company)}
@@ -347,12 +355,27 @@ const Jobs = () => {
                             {saved ? <BookmarkCheck className="h-5 w-5" /> : <Bookmark className="h-5 w-5" />}
                           </button>
                         </div>
-                        <p className="text-sm font-medium text-foreground mb-1">{job.title}</p>
-                        <hr className="border-border mb-3" />
+                        {(job.location || job.pay) && (
+                          <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2 flex-wrap">
+                            {job.location && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                {job.location}
+                              </span>
+                            )}
+                            {job.pay && (
+                              <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
+                                <DollarSign className="h-3.5 w-3.5 shrink-0" />
+                                {job.pay}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <hr className="border-border mb-2" />
                         <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">{job.description}</p>
                       </div>
                       <div className="flex flex-col items-stretch gap-3 shrink-0 w-36">
-                        <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90 w-full">
+                        <Button asChild className="w-full">
                           <Link to={`/jobs/${job.id}`}>View Job</Link>
                         </Button>
                         <div className="h-14 w-full border border-border flex items-center justify-center bg-muted/30 overflow-hidden">
@@ -368,44 +391,60 @@ const Jobs = () => {
                 })}
 
                 {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between pt-2">
-                    <span className="text-sm text-muted-foreground">
-                      Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
-                    </span>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPage((p) => p - 1)}
-                        disabled={page === 0}
-                      >
-                        Previous
-                      </Button>
-                      {Array.from({ length: totalPages }, (_, i) => (
+                {totalPages > 1 && (() => {
+                  const pages: (number | "...")[] = [];
+                  if (totalPages <= 7) {
+                    for (let i = 0; i < totalPages; i++) pages.push(i);
+                  } else {
+                    pages.push(0);
+                    if (page > 2) pages.push("...");
+                    for (let i = Math.max(1, page - 1); i <= Math.min(totalPages - 2, page + 1); i++) pages.push(i);
+                    if (page < totalPages - 3) pages.push("...");
+                    pages.push(totalPages - 1);
+                  }
+                  return (
+                    <div className="flex items-center justify-between pt-4 border-t border-border mt-2">
+                      <span className="text-sm text-muted-foreground">
+                        Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
+                      </span>
+                      <div className="flex gap-1.5">
                         <Button
-                          key={i}
-                          variant={i === page ? "default" : "outline"}
+                          variant="outline"
                           size="sm"
-                          onClick={() => setPage(i)}
-                          className="w-9"
-                          aria-label={`Page ${i + 1}`}
-                          aria-current={i === page ? "page" : undefined}
+                          onClick={() => goToPage(page - 1)}
+                          disabled={page === 0}
                         >
-                          {i + 1}
+                          Previous
                         </Button>
-                      ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPage((p) => p + 1)}
-                        disabled={page >= totalPages - 1}
-                      >
-                        Next
-                      </Button>
+                        {pages.map((p, idx) =>
+                          p === "..." ? (
+                            <span key={`ellipsis-${idx}`} className="w-9 flex items-center justify-center text-sm text-muted-foreground">...</span>
+                          ) : (
+                            <Button
+                              key={p}
+                              variant={p === page ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => goToPage(p)}
+                              className="w-9"
+                              aria-label={`Page ${p + 1}`}
+                              aria-current={p === page ? "page" : undefined}
+                            >
+                              {p + 1}
+                            </Button>
+                          )
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => goToPage(page + 1)}
+                          disabled={page >= totalPages - 1}
+                        >
+                          Next
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </>
             ) : jobsError ? (
               <div className="border border-destructive/30 bg-destructive/5 p-12 text-center rounded-lg">

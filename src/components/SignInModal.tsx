@@ -320,7 +320,10 @@ export function SignInModal({ onClose }: SignInModalProps) {
         {view === "login" && (
           <>
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-              <h2 className="font-display font-bold text-lg">Login</h2>
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-5 bg-primary shrink-0" />
+                <h2 className="font-display font-bold text-base">Login</h2>
+              </div>
               <button onClick={onClose} className="p-1 hover:text-primary transition-colors" aria-label="Close">
                 <X className="h-5 w-5" />
               </button>
@@ -355,7 +358,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   className="flex-1"
                   onClick={() => { setResetEmail(loginEmail); setView("forgot"); }}
                 >
-                  Forgot it?
+                  Forgot Password?
                 </Button>
                 <Button
                   type="button"

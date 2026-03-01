@@ -49,7 +49,7 @@
     --cdl-charcoal: 220 60% 18%;      /* Deep navy */
     --cdl-orange: 352 68% 42%;        /* Old Glory Red #B22234 */
     --cdl-orange-glow: 352 80% 55%;   /* Bright red glow */
-    --cdl-amber: 352 68% 50%;         /* Medium red */
+    --cdl-amber: 352 68% 50%;         /* Old Glory Red for stars/gradients */
     --cdl-slate: 220 20% 50%;         /* Blue-gray */
     --cdl-light: 220 50% 97%;         /* Patriotic blue-white */
     --chart-1: 352 68% 42%;
@@ -74,7 +74,18 @@
   }
 
   .dark {
-    /* Dark mode — Deep navy background, red primary highlights */
+    /*
+     * DARK MODE PRIMARY COLOR TOGGLE
+     * ──────────────────────────────
+     * Option A: Blue primary — feels patriotic, blue links/buttons
+     *   --primary: 216 80% 55%;
+     *
+     * Option B (current): Red primary — bold, high-energy feel
+     *   --primary: 350 80% 58%;
+     *
+     * To switch: replace the --primary value below and update --ring,
+     * --sidebar-primary, --sidebar-ring to match.
+     */
     --background: 220 50% 8%;
     --foreground: 0 0% 100%;
 
@@ -84,7 +95,7 @@
     --popover: 220 50% 10%;
     --popover-foreground: 0 0% 100%;
 
-    --primary: 352 80% 60%;           /* Bright red in dark mode */
+    --primary: 350 80% 58%;            /* Bright Old Glory Red for dark bg */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 220 40% 15%;
@@ -93,38 +104,39 @@
     --muted: 220 40% 15%;
     --muted-foreground: 220 20% 65%;
 
-    --accent: 352 80% 60%;
+    --accent: 350 80% 58%;             /* Bright Old Glory Red for dark bg */
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 352 68% 40%;
+    --destructive: 350 80% 50%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 220 50% 30%;
     --input: 220 50% 30%;
-    --ring: 352 80% 60%;
+    --ring: 350 80% 58%;
 
     --sidebar-background: 220 50% 6%;
     --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 352 80% 60%;
+    --sidebar-primary: 350 80% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 220 40% 15%;
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 220 50% 25%;
-    --sidebar-ring: 352 80% 60%;
-    --chart-1: 352 80% 60%;
-    --chart-2: 220 70% 60%;
+    --sidebar-ring: 350 80% 58%;
+    --chart-1: 350 80% 58%;
+    --chart-2: 216 80% 55%;
     --chart-3: 220 50% 45%;
-    --chart-4: 352 50% 75%;
+    --chart-4: 350 50% 75%;
     --chart-5: 220 80% 75%;
     --sidebar: 220 50% 6%;
-    --shadow-2xs: 1px 1px 0px 0px #B22234;
-    --shadow-xs: 2px 2px 0px 0px #B22234;
-    --shadow-sm: 3px 3px 0px 0px #B22234;
-    --shadow: 5px 5px 0px 0px #B22234;
-    --shadow-md: 8px 8px 0px 0px #B22234;
-    --shadow-lg: 12px 12px 0px 0px #B22234;
-    --shadow-xl: 16px 16px 0px 0px #B22234;
-    --shadow-2xl: 24px 24px 0px 0px #B22234;
+    --cdl-amber: 350 80% 58%;           /* Old Glory Red for dark mode gradient (blue→red = patriotic) */
+    --shadow-2xs: 1px 1px 0px 0px #EA3E5B;
+    --shadow-xs: 2px 2px 0px 0px #EA3E5B;
+    --shadow-sm: 3px 3px 0px 0px #EA3E5B;
+    --shadow: 5px 5px 0px 0px #EA3E5B;
+    --shadow-md: 8px 8px 0px 0px #EA3E5B;
+    --shadow-lg: 12px 12px 0px 0px #EA3E5B;
+    --shadow-xl: 16px 16px 0px 0px #EA3E5B;
+    --shadow-2xl: 24px 24px 0px 0px #EA3E5B;
     --radius: 0rem;
   }
 }

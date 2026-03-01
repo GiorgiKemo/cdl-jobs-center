@@ -133,6 +133,7 @@ const ApplyNow = () => {
   // AI matching state
   const [matchesStartedAt, setMatchesStartedAt] = useState<number | null>(null);
   const [animationComplete, setAnimationComplete] = useState(false);
+  const [matchRefreshDone, setMatchRefreshDone] = useState(false); // true when edge function resolved or errored
   const handleAnimationComplete = useCallback(() => setAnimationComplete(true), []);
 
   // Persist step to sessionStorage
@@ -223,20 +224,30 @@ const ApplyNow = () => {
       return;
     }
 
-    // No matches at all — wait up to 15s for results, then show empty state
+    // Edge function finished (success or error) with no matches — show empty state immediately
+    if (matchRefreshDone) {
+      // One final refetch to catch any last-second results, then transition
+      queryClient.invalidateQueries({ queryKey: ["driver-matches", user?.id] });
+      const timer = setTimeout(() => {
+        setStep(5);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+
+    // Edge function still running — poll every 2s, hard cap at 20s
     const elapsed = Date.now() - matchesStartedAt;
-    if (elapsed > 15000) {
+    if (elapsed > 20000) {
       setStep(5);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
-    // Check again in 1s
     const timer = setTimeout(() => {
       queryClient.invalidateQueries({ queryKey: ["driver-matches", user?.id] });
-    }, 1000);
+    }, 2000);
     return () => clearTimeout(timer);
-  }, [step, animationComplete, matchesStartedAt, matches, queryClient, user?.id]);
+  }, [step, animationComplete, matchesStartedAt, matchRefreshDone, matches, queryClient, user?.id]);
 
   // Pre-fill empty fields from driver profile (Supabase)
   useEffect(() => {
@@ -339,11 +350,18 @@ const ApplyNow = () => {
 
   const nextStep = () => {
     let errs: Record<string, string> = {};
-    if (step === 1) errs = validateStep1();
+    if (step === 1) {
+      errs = validateStep1();
+      // If validation fails while summary card is shown, switch to edit mode so errors are visible
+      if (Object.keys(errs).length > 0 && !editingProfile) {
+        setEditingProfile(true);
+      }
+    }
     if (step === 2) errs = validateStep2();
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
-      toast.error("Please fix the errors before continuing.");
+      const errorFields = Object.values(errs);
+      toast.error(errorFields.length === 1 ? errorFields[0] : `Please fix ${errorFields.length} errors: ${errorFields.join(", ")}`);
       return;
     }
     setErrors({});
@@ -372,15 +390,19 @@ const ApplyNow = () => {
       saveDraft();
 
       // Fire match refresh in background — don't block form submission
-      refreshMyMatches.mutateAsync().catch(() => {});
+      setMatchRefreshDone(false);
+      refreshMyMatches.mutateAsync()
+        .then(() => setMatchRefreshDone(true))
+        .catch(() => setMatchRefreshDone(true));
 
-      // Run profile save + application insert in parallel
+      // Run profile save + application insert in parallel (both non-fatal)
       await Promise.all([
         // 1. Upsert driver profile
         saveProfile({
           firstName, lastName, phone, cdlNumber, driverType, licenseClass,
           yearsExp, licenseState, zipCode, dateOfBirth: date, about: notes,
-        }),
+          homeAddress: "", interestedIn: "", nextJobWant: "", hasAccidents: "", wantsContact: "",
+        }).catch((err) => { console.error("Profile save failed:", err); }),
         // 2. Insert enrichment application (non-fatal)
         supabase.from("applications").insert({
           driver_id: user.id, company_id: null, job_id: null,
@@ -390,7 +412,7 @@ const ApplyNow = () => {
           driver_type: driverType, license_class: licenseClass,
           years_exp: yearsExp, license_state: licenseState, solo_team: soloTeam,
           notes, prefs, endorse, hauler, route, extra, pipeline_stage: "New",
-        }).then(({ error }) => { if (error) toast.error("Failed to save application record."); }),
+        }).then(({ error }) => { if (error) console.error("Application insert failed:", error); }),
       ]);
 
       // 4. Transition to AI generation screen
@@ -475,32 +497,32 @@ const ApplyNow = () => {
                       <div className="grid sm:grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <Label htmlFor="apply-firstName" className="text-xs text-muted-foreground">First Name *</Label>
-                          <Input id="apply-firstName" name="firstName" autoComplete="given-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" className={errors.firstName ? "border-destructive" : ""} />
+                          <Input id="apply-firstName" name="firstName" autoComplete="given-name" value={firstName} onChange={(e) => { setFirstName(e.target.value); setErrors(p => ({ ...p, firstName: "" })); }} placeholder="First name" className={errors.firstName ? "border-destructive" : ""} />
                           {errors.firstName && <p className="text-xs text-destructive">{errors.firstName}</p>}
                         </div>
                         <div className="space-y-1">
                           <Label htmlFor="apply-lastName" className="text-xs text-muted-foreground">Last Name *</Label>
-                          <Input id="apply-lastName" name="lastName" autoComplete="family-name" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" className={errors.lastName ? "border-destructive" : ""} />
+                          <Input id="apply-lastName" name="lastName" autoComplete="family-name" value={lastName} onChange={(e) => { setLastName(e.target.value); setErrors(p => ({ ...p, lastName: "" })); }} placeholder="Last name" className={errors.lastName ? "border-destructive" : ""} />
                           {errors.lastName && <p className="text-xs text-destructive">{errors.lastName}</p>}
                         </div>
                         <div className="space-y-1">
                           <Label htmlFor="apply-email" className="text-xs text-muted-foreground">Email *</Label>
-                          <Input id="apply-email" name="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" className={errors.email ? "border-destructive" : ""} />
+                          <Input id="apply-email" name="email" type="email" autoComplete="email" value={email} onChange={(e) => { setEmail(e.target.value); setErrors(p => ({ ...p, email: "" })); }} placeholder="email@example.com" className={errors.email ? "border-destructive" : ""} />
                           {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                         </div>
                         <div className="space-y-1">
                           <Label htmlFor="apply-phone" className="text-xs text-muted-foreground">Phone *</Label>
-                          <Input id="apply-phone" name="phone" type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 000-0000" className={errors.phone ? "border-destructive" : ""} />
+                          <Input id="apply-phone" name="phone" type="tel" autoComplete="tel" value={phone} onChange={(e) => { setPhone(e.target.value); setErrors(p => ({ ...p, phone: "" })); }} placeholder="(555) 000-0000" className={errors.phone ? "border-destructive" : ""} />
                           {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
                         </div>
                         <div className="space-y-1">
                           <Label htmlFor="apply-cdlNumber" className="text-xs text-muted-foreground">CDL Number *</Label>
-                          <Input id="apply-cdlNumber" name="cdlNumber" autoComplete="off" value={cdlNumber} onChange={(e) => setCdlNumber(e.target.value)} placeholder="CDL-XX-000000" className={errors.cdlNumber ? "border-destructive" : ""} />
+                          <Input id="apply-cdlNumber" name="cdlNumber" autoComplete="off" value={cdlNumber} onChange={(e) => { setCdlNumber(e.target.value); setErrors(p => ({ ...p, cdlNumber: "" })); }} placeholder="CDL-XX-000000" className={errors.cdlNumber ? "border-destructive" : ""} />
                           {errors.cdlNumber && <p className="text-xs text-destructive">{errors.cdlNumber}</p>}
                         </div>
                         <div className="space-y-1">
                           <Label htmlFor="apply-zipCode" className="text-xs text-muted-foreground">Zip Code *</Label>
-                          <Input id="apply-zipCode" name="zipCode" autoComplete="postal-code" value={zipCode} onChange={(e) => setZipCode(e.target.value)} placeholder="00000" className={errors.zipCode ? "border-destructive" : ""} />
+                          <Input id="apply-zipCode" name="zipCode" autoComplete="postal-code" value={zipCode} onChange={(e) => { setZipCode(e.target.value); setErrors(p => ({ ...p, zipCode: "" })); }} placeholder="00000" className={errors.zipCode ? "border-destructive" : ""} />
                           {errors.zipCode && <p className="text-xs text-destructive">{errors.zipCode}</p>}
                         </div>
                         <div className="space-y-1">
@@ -728,6 +750,7 @@ const ApplyNow = () => {
                       sessionStorage.removeItem(MATCH_STEP_KEY);
                       setMatchesStartedAt(null);
                       setAnimationComplete(false);
+                      setMatchRefreshDone(false);
                       setStep(1);
                     }}
                   >

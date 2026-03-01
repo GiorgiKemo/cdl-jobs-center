@@ -12,10 +12,10 @@ const Footer = () => {
             <h2 className="font-display font-semibold text-secondary-foreground mb-4 text-base">For Drivers</h2>
             <div className="flex flex-col gap-2">
               {[
-                { label: "Trucking Job", path: "/jobs" },
-                { label: "Job Search", path: "/jobs" },
+                { label: "Browse Jobs", path: "/jobs" },
                 { label: "Apply Now", path: "/apply" },
                 { label: "Company Directory", path: "/companies" },
+                { label: "Driver Dashboard", path: "/driver-dashboard" },
                 { label: "Pricing", path: "/pricing" },
               ].map((item) => (
                 <Link key={item.label} to={item.path} className="text-sm text-muted-foreground hover:text-primary transition-colors">
@@ -46,7 +46,10 @@ const Footer = () => {
           {/* About + Follow Us */}
           <div>
             <h2 className="font-display font-semibold text-secondary-foreground mb-4 text-base">About</h2>
-            <p className="text-sm text-muted-foreground mb-6">CDL Job Center © {new Date().getFullYear()}</p>
+            <p className="text-sm text-muted-foreground mb-4">
+              CDL Job Center connects CDL drivers with top trucking companies across the United States using AI-powered matching.
+            </p>
+            <p className="text-xs text-muted-foreground mb-6">© {new Date().getFullYear()} CDL Job Center</p>
             <h2 className="font-display font-semibold text-secondary-foreground mb-3 text-base">Follow Us</h2>
             <div className="flex items-center gap-3">
               <a

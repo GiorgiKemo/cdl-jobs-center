@@ -130,7 +130,7 @@ const EasyApplyDialog = ({ trigger, companyName = "General Application" }: EasyA
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="max-w-[560px] gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b border-border px-4 py-3 sm:px-5">
-          <DialogTitle className="text-3xl font-medium text-foreground">Quick Apply</DialogTitle>
+          <DialogTitle className="text-lg font-semibold text-foreground">Quick Apply</DialogTitle>
           <DialogDescription className="sr-only">
             Quick application form.
           </DialogDescription>
@@ -159,14 +159,14 @@ const EasyApplyDialog = ({ trigger, companyName = "General Application" }: EasyA
           </div>
 
           <div className="border-y border-border bg-muted/40">
-            <p className="px-4 pb-3 pt-4 text-2xl font-semibold text-accent sm:px-5">Endorsements (optional):</p>
+            <p className="px-4 pb-3 pt-4 text-sm font-semibold text-accent sm:px-5">Endorsements (optional):</p>
             <div className="grid grid-cols-1 divide-y divide-border border-t border-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
               <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
-                <span className="text-xl text-foreground">CDL</span>
+                <span className="text-sm text-foreground">CDL</span>
                 <OffOnToggle checked={endorseCdl} onChange={setEndorseCdl} />
               </div>
               <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
-                <span className="text-xl text-foreground">Owner Operator</span>
+                <span className="text-sm text-foreground">Owner Operator</span>
                 <OffOnToggle checked={ownerOperator} onChange={setOwnerOperator} />
               </div>
             </div>
@@ -176,7 +176,7 @@ const EasyApplyDialog = ({ trigger, companyName = "General Application" }: EasyA
             <Button
               type="submit"
               disabled={submitting}
-              className="h-12 rounded-md bg-accent px-9 text-3xl font-semibold text-accent-foreground hover:bg-accent/90"
+              className="h-10 rounded-md bg-accent px-8 text-sm font-semibold text-accent-foreground hover:bg-accent/90"
             >
               {submitting ? "Sending…" : "Send"}
             </Button>

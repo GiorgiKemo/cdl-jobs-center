@@ -36,8 +36,19 @@ const AnimatedNumber = ({ value, suffix }: { value: number; suffix: string }) =>
 
 const Stats = () => {
   return (
-    <section className="py-20 bg-background">
+    <section className="py-20 bg-secondary/30">
       <div className="container mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center mb-12"
+        >
+          <span className="text-primary font-medium text-sm uppercase tracking-widest">By the Numbers</span>
+          <h2 className="font-display text-4xl md:text-5xl font-bold mt-3">
+            Trusted by <span className="text-gradient">Thousands</span>
+          </h2>
+        </motion.div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
           {stats.map((stat, i) => (
             <motion.div

@@ -505,7 +505,7 @@ const Navbar = () => {
                 </Button>
                 <Button
                   size="sm"
-                  className="glow-orange dark:text-slate-950"
+                  className="glow-orange"
                   onClick={() => {
                     if (location.pathname === "/apply") {
                       toast.info("Sign in or create an account to apply");
@@ -694,7 +694,7 @@ const Navbar = () => {
                   </Button>
                   <Button
                     size="sm"
-                    className="flex-1 dark:text-slate-950"
+                    className="flex-1"
                     onClick={() => {
                       setIsOpen(false);
                       if (location.pathname === "/apply") {

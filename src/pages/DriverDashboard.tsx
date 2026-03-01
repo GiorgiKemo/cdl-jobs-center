@@ -193,7 +193,7 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const t = searchParams.get("tab");
     if (isDriverTab(t)) return t;
-    return "overview";
+    return "applications";
   });
   const [expandedApp, setExpandedApp] = useState<string | null>(null);
   const [stageFilter, setStageFilter] = useState<PipelineStage | "All">("All");
@@ -501,7 +501,7 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
           </button>
         )}
 
-        <div className="flex border-b border-border mb-6 overflow-x-auto" role="tablist">
+        <div className="flex border-b border-border mb-6 overflow-x-auto scrollbar-hide" role="tablist" style={{ scrollbarWidth: "none" }}>
           {tabs.map((tab) => (
             <button
               key={tab.id}
