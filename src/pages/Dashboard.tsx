@@ -12,7 +12,7 @@ import { useJobs } from "@/hooks/useJobs";
 import { Job } from "@/data/jobs";
 import { COMPANY_GOALS } from "@/data/constants";
 import { toast } from "sonner";
-import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload, Bell, MessageSquare, Users, Phone as PhoneIcon, Mail as MailIcon, MapPin, Truck as TruckIcon, Lock, RefreshCw, CreditCard, Send, Briefcase, Check, Sparkles } from "lucide-react";
+import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload, Bell, MessageSquare, Users, Phone as PhoneIcon, Mail as MailIcon, MapPin, Truck as TruckIcon, Lock, RefreshCw, CreditCard, Send, Briefcase, Check, Sparkles, CheckCircle, ShieldCheck, Clock, XCircle, FileText } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -35,6 +35,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ImageCropDialog } from "@/components/ImageCropDialog";
+import { useVerificationRequest, useSubmitVerification } from "@/hooks/useVerification";
 
 const FREIGHT_TYPES = [
   "Box", "Car Hauler", "Drop and Hook", "Dry Bulk", "Dry Van", "Flatbed",
@@ -112,6 +113,7 @@ interface ReceivedApplication {
   extra: Record<string, boolean>;
   companyName: string;
   submittedAt: string;
+  availableDate: string;
   pipeline_stage: PipelineStage;
 }
 
@@ -138,6 +140,7 @@ function rowToApp(row: Record<string, any>): ReceivedApplication {
     extra: row.extra ?? {},
     companyName: row.company_name ?? "",
     submittedAt: row.submitted_at ?? "",
+    availableDate: row.available_date ?? "",
     pipeline_stage: (row.pipeline_stage ?? "New") as PipelineStage,
   };
 }
@@ -224,6 +227,9 @@ const AppCard = ({
           <div className="grid sm:grid-cols-2 gap-2">
             <p><span className="text-muted-foreground">Solo/Team:</span> {app.soloTeam}</p>
             <p><span className="text-muted-foreground">CDL #:</span> {app.cdlNumber || "—"}</p>
+            {app.availableDate && (
+              <p><span className="text-muted-foreground">Available:</span> {formatDate(app.availableDate)}</p>
+            )}
           </div>
           <p><span className="text-muted-foreground">Job Preferences:</span> {flaggedToggles(app.prefs ?? {})}</p>
           <p><span className="text-muted-foreground">Endorsements:</span> {flaggedToggles(app.endorse ?? {})}</p>
@@ -271,6 +277,11 @@ const PipelineCard = ({
           {app.submittedAt && (
             <p className="text-xs text-muted-foreground">
               Applied {formatDate(app.submittedAt)}
+            </p>
+          )}
+          {app.availableDate && (
+            <p className="text-xs text-muted-foreground">
+              Available {formatDate(app.availableDate)}
             </p>
           )}
         </div>
@@ -638,6 +649,18 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
   });
   const hasUnsavedChanges = lastSavedSnapshot !== null && currentProfileSnapshot !== lastSavedSnapshot;
   const isProfileSaved = profileSaveStatus === "saved" && !hasUnsavedChanges;
+
+  // Verification request state
+  const { data: verificationRequest, isLoading: verificationLoading } = useVerificationRequest(user!.id);
+  const submitVerification = useSubmitVerification();
+  const [showVerifyForm, setShowVerifyForm] = useState(false);
+  const [verifyDot, setVerifyDot] = useState("");
+  const [verifyEin, setVerifyEin] = useState("");
+  const [verifyYears, setVerifyYears] = useState("");
+  const [verifyFleet, setVerifyFleet] = useState("");
+  const [verifyNotes, setVerifyNotes] = useState("");
+  const [verifyDocs, setVerifyDocs] = useState<string[]>([]);
+  const [verifyUploading, setVerifyUploading] = useState(false);
 
   // Fetch applications for this company
   const appsKey = ["company-applications", user!.id];
@@ -1403,6 +1426,173 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                 )}
               </Button>
             </div>
+            {/* ── Verification Status ──────────────────────────────────────── */}
+            <div className="border border-border bg-card p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-primary" />
+                <h3 className="font-display font-semibold text-base">Company Verification</h3>
+              </div>
+
+              {verificationLoading ? (
+                <div className="flex justify-center py-4"><Spinner size="sm" /></div>
+              ) : verificationRequest?.status === "approved" ? (
+                <div className="flex items-center gap-3 p-4 bg-green-500/10 border border-green-500/30 rounded-md">
+                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
+                  <div>
+                    <p className="font-medium text-green-700 dark:text-green-400 text-sm">Your company is verified</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Drivers can see the verified badge on your profile and job listings.</p>
+                  </div>
+                </div>
+              ) : verificationRequest?.status === "pending" ? (
+                <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-md">
+                  <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <div>
+                    <p className="font-medium text-amber-700 dark:text-amber-400 text-sm">Verification request under review</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Submitted on {verificationRequest.createdAt ? formatDate(verificationRequest.createdAt) : "—"}. We'll review your request shortly.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {verificationRequest?.status === "rejected" && (
+                    <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-md">
+                      <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-red-700 dark:text-red-400 text-sm">Verification request was not approved</p>
+                        {verificationRequest.rejectionReason && (
+                          <p className="text-xs text-muted-foreground mt-0.5">Reason: {verificationRequest.rejectionReason}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">You can submit a new request with updated information.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {!showVerifyForm ? (
+                    <div className="text-center py-2">
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Get your company verified to build trust with drivers and stand out in search results.
+                      </p>
+                      <Button onClick={() => setShowVerifyForm(true)}>
+                        <ShieldCheck className="h-4 w-4 mr-2" />
+                        Request Verification
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 border-t border-border pt-4">
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="verify-dot" className="text-xs text-muted-foreground">DOT / MC Number</Label>
+                          <Input id="verify-dot" placeholder="e.g. 1234567" value={verifyDot} onChange={(e) => setVerifyDot(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="verify-ein" className="text-xs text-muted-foreground">Business EIN (optional)</Label>
+                          <Input id="verify-ein" placeholder="e.g. 12-3456789" value={verifyEin} onChange={(e) => setVerifyEin(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="verify-years" className="text-xs text-muted-foreground">Years in Business</Label>
+                          <Select value={verifyYears} onValueChange={setVerifyYears} name="verifyYears">
+                            <SelectTrigger id="verify-years"><SelectValue placeholder="Select..." /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0-1">Less than 1 year</SelectItem>
+                              <SelectItem value="1-3">1–3 years</SelectItem>
+                              <SelectItem value="3-5">3–5 years</SelectItem>
+                              <SelectItem value="5-10">5–10 years</SelectItem>
+                              <SelectItem value="10+">10+ years</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="verify-fleet" className="text-xs text-muted-foreground">Fleet Size</Label>
+                          <Select value={verifyFleet} onValueChange={setVerifyFleet} name="verifyFleet">
+                            <SelectTrigger id="verify-fleet"><SelectValue placeholder="Select..." /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1-10">1–10 trucks</SelectItem>
+                              <SelectItem value="11-50">11–50 trucks</SelectItem>
+                              <SelectItem value="51-200">51–200 trucks</SelectItem>
+                              <SelectItem value="200+">200+ trucks</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="verify-notes" className="text-xs text-muted-foreground">Additional Notes (optional)</Label>
+                        <Textarea id="verify-notes" placeholder="Any additional information to support your verification..." value={verifyNotes} onChange={(e) => setVerifyNotes(e.target.value)} rows={3} className="resize-none" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Supporting Documents (optional)</Label>
+                        <p className="text-xs text-muted-foreground mb-1.5">Upload business license, DOT certificate, or similar documentation.</p>
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          multiple
+                          onChange={async (e) => {
+                            const files = Array.from(e.target.files ?? []);
+                            if (files.length === 0) return;
+                            setVerifyUploading(true);
+                            const urls: string[] = [];
+                            for (const file of files) {
+                              const path = `${user!.id}/${Date.now()}-${file.name}`;
+                              const { error } = await supabase.storage.from("verification-documents").upload(path, file, { upsert: true });
+                              if (error) {
+                                toast.error(`Failed to upload ${file.name}`);
+                                continue;
+                              }
+                              const { data: { publicUrl } } = supabase.storage.from("verification-documents").getPublicUrl(path);
+                              urls.push(publicUrl);
+                            }
+                            setVerifyDocs((prev) => [...prev, ...urls]);
+                            setVerifyUploading(false);
+                            e.target.value = "";
+                          }}
+                          className="block text-sm text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 file:cursor-pointer"
+                        />
+                        {verifyDocs.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {verifyDocs.map((url, i) => (
+                              <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded text-xs">
+                                <FileText className="h-3 w-3" />
+                                Document {i + 1}
+                                <button type="button" onClick={() => setVerifyDocs((d) => d.filter((_, j) => j !== i))} className="ml-1 text-destructive hover:text-destructive/80">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-3 pt-1">
+                        <Button
+                          disabled={submitVerification.isPending || verifyUploading || !verifyDot}
+                          onClick={() => {
+                            submitVerification.mutate({
+                              companyId: user!.id,
+                              dotNumber: verifyDot,
+                              businessEin: verifyEin,
+                              yearsInBusiness: verifyYears,
+                              fleetSize: verifyFleet,
+                              notes: verifyNotes,
+                              documentUrls: verifyDocs,
+                            }, {
+                              onSuccess: () => {
+                                toast.success("Verification request submitted!");
+                                setShowVerifyForm(false);
+                                setVerifyDot(""); setVerifyEin(""); setVerifyYears(""); setVerifyFleet(""); setVerifyNotes(""); setVerifyDocs([]);
+                              },
+                              onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to submit request."),
+                            });
+                          }}
+                        >
+                          {submitVerification.isPending ? "Submitting..." : verifyUploading ? "Uploading..." : "Submit Verification Request"}
+                        </Button>
+                        <Button variant="outline" onClick={() => setShowVerifyForm(false)}>Cancel</Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
             <NotificationPreferences userId={user!.id} role="company" />
           </div>
         )}

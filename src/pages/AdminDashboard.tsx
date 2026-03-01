@@ -32,6 +32,13 @@ import {
   Phone as PhoneIcon,
   Mail as MailIcon,
   Sparkles,
+  ShieldCheck,
+  CheckCircle,
+  XCircle,
+  Clock,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   useAdminStats,
@@ -48,11 +55,13 @@ import { formatDate } from "@/lib/dateUtils";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { useAllVerificationRequests, useReviewVerification } from "@/hooks/useVerification";
+import { Textarea } from "@/components/ui/textarea";
 import { useMatchingRollout } from "@/hooks/useMatchScores";
 import { usePageTitle } from "@/hooks/usePageTitle";
 
 /* ── Types ──────────────────────────────────────────────────────────── */
-type AdminTab = "overview" | "users" | "subscriptions" | "jobs" | "leads" | "matching";
+type AdminTab = "overview" | "users" | "subscriptions" | "jobs" | "leads" | "matching" | "verification";
 
 /* ── Outer guard ────────────────────────────────────────────────────── */
 const AdminDashboard = () => {
@@ -129,6 +138,14 @@ function AdminDashboardInner() {
     },
     staleTime: 30_000,
   });
+
+  /* verification data */
+  const { data: verificationRequests = [] } = useAllVerificationRequests();
+  const reviewVerification = useReviewVerification();
+  const [expandedRequestId, setExpandedRequestId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectDialogRequestId, setRejectDialogRequestId] = useState<string | null>(null);
+  const pendingVerifications = verificationRequests.filter((r) => r.status === "pending");
 
   /* tab state */
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
@@ -319,6 +336,11 @@ function AdminDashboardInner() {
           <button className={tabClass("matching")} onClick={() => setActiveTab("matching")}>
             <span className="flex items-center gap-1.5">
               <Sparkles className="h-3.5 w-3.5" /> Matching
+            </span>
+          </button>
+          <button className={tabClass("verification")} onClick={() => setActiveTab("verification")}>
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5" /> Verification
             </span>
           </button>
         </div>
@@ -911,6 +933,178 @@ function AdminDashboardInner() {
             </div>
           </div>
         )}
+
+        {/* ── TAB: Verification ──────────────────────────────────────── */}
+        {activeTab === "verification" && (
+          <div className="space-y-6">
+            <h2 className="font-display font-semibold text-base">
+              Company Verification Requests
+            </h2>
+
+            {/* Pending */}
+            <div className="border border-border bg-card">
+              <div className="px-5 py-3 border-b border-border flex items-center gap-2">
+                <Clock className="h-4 w-4 text-amber-500" />
+                <h3 className="font-semibold text-sm">Pending ({pendingVerifications.length})</h3>
+              </div>
+              {pendingVerifications.length === 0 ? (
+                <div className="px-5 py-8 text-center text-sm text-muted-foreground">
+                  No pending verification requests.
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {pendingVerifications.map((req) => {
+                    const isExpanded = expandedRequestId === req.id;
+                    return (
+                      <div key={req.id} className="px-5 py-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm">{req.companyName ?? "Unknown Company"}</p>
+                            <p className="text-xs text-muted-foreground">{req.companyEmail} · Submitted {formatDate(req.createdAt)}</p>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => setExpandedRequestId(isExpanded ? null : req.id)}>
+                            {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                            <span className="ml-1.5">{isExpanded ? "Collapse" : "Review"}</span>
+                          </Button>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="mt-4 space-y-3 border-t border-border pt-4">
+                            <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                              <p><span className="text-muted-foreground">DOT/MC #:</span> {req.dotNumber || "—"}</p>
+                              <p><span className="text-muted-foreground">Business EIN:</span> {req.businessEin || "—"}</p>
+                              <p><span className="text-muted-foreground">Years in Business:</span> {req.yearsInBusiness || "—"}</p>
+                              <p><span className="text-muted-foreground">Fleet Size:</span> {req.fleetSize || "—"}</p>
+                            </div>
+                            {req.notes && (
+                              <p className="text-sm"><span className="text-muted-foreground">Notes:</span> {req.notes}</p>
+                            )}
+                            {req.documentUrls.length > 0 && (
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1.5">Supporting Documents:</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {req.documentUrls.map((url, i) => (
+                                    <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded text-xs text-primary hover:underline">
+                                      <ExternalLink className="h-3 w-3" />
+                                      Document {i + 1}
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            <div className="flex gap-3 pt-2">
+                              <Button
+                                size="sm"
+                                disabled={reviewVerification.isPending}
+                                onClick={() => {
+                                  reviewVerification.mutate({
+                                    requestId: req.id,
+                                    companyId: req.companyId,
+                                    decision: "approved",
+                                    reviewedBy: user!.id,
+                                  }, {
+                                    onSuccess: () => toast.success(`${req.companyName} has been verified!`),
+                                    onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to approve."),
+                                  });
+                                }}
+                              >
+                                <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
+                                Approve
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-red-500/50 text-red-600 hover:bg-red-500/10"
+                                onClick={() => { setRejectDialogRequestId(req.id); setRejectReason(""); }}
+                              >
+                                <XCircle className="h-3.5 w-3.5 mr-1.5" />
+                                Reject
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* History */}
+            {verificationRequests.filter((r) => r.status !== "pending").length > 0 && (
+              <div className="border border-border bg-card">
+                <div className="px-5 py-3 border-b border-border">
+                  <h3 className="font-semibold text-sm">Review History</h3>
+                </div>
+                <div className="divide-y divide-border">
+                  {verificationRequests.filter((r) => r.status !== "pending").map((req) => (
+                    <div key={req.id} className="px-5 py-3 flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{req.companyName ?? "Unknown"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(req.createdAt)}
+                          {req.rejectionReason && ` · Reason: ${req.rejectionReason}`}
+                        </p>
+                      </div>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                        req.status === "approved"
+                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                          : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+                      }`}>
+                        {req.status === "approved" ? "Approved" : "Rejected"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Reject Verification Dialog */}
+        <Dialog open={!!rejectDialogRequestId} onOpenChange={(open) => { if (!open) setRejectDialogRequestId(null); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reject Verification Request</DialogTitle>
+              <DialogDescription>
+                Provide a reason for rejection. The company will see this message.
+              </DialogDescription>
+            </DialogHeader>
+            <Textarea
+              placeholder="Reason for rejection (optional)..."
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={3}
+              className="resize-none"
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRejectDialogRequestId(null)}>Cancel</Button>
+              <Button
+                variant="destructive"
+                disabled={reviewVerification.isPending}
+                onClick={() => {
+                  const req = verificationRequests.find((r) => r.id === rejectDialogRequestId);
+                  if (!req) return;
+                  reviewVerification.mutate({
+                    requestId: req.id,
+                    companyId: req.companyId,
+                    decision: "rejected",
+                    rejectionReason: rejectReason,
+                    reviewedBy: user!.id,
+                  }, {
+                    onSuccess: () => {
+                      toast.success(`Verification request for ${req.companyName} rejected.`);
+                      setRejectDialogRequestId(null);
+                    },
+                    onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to reject."),
+                  });
+                }}
+              >
+                {reviewVerification.isPending ? "Rejecting..." : "Reject"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Change Plan Dialog (shared by Users + Subscriptions tabs) */}
         <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen}>

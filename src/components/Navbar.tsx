@@ -12,6 +12,7 @@ import {
   User,
   LayoutDashboard,
   MessageSquare,
+  CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -220,20 +221,22 @@ const Navbar = () => {
   const { data: unreadMsgCount = 0 } = useUnreadCount(user?.id, user?.role as "driver" | "company" | undefined);
   const { data: notifCount = 0 } = useUnreadNotificationCount(user?.id);
 
-  // Company logo for navbar avatar
-  const { data: companyLogoUrl } = useQuery({
+  // Company logo + verification status for navbar
+  const { data: companyNavData } = useQuery({
     queryKey: ["company-logo", user?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from("company_profiles")
-        .select("logo_url")
+        .select("logo_url, is_verified")
         .eq("id", user!.id)
         .maybeSingle();
-      return (data?.logo_url as string) || null;
+      return { logoUrl: (data?.logo_url as string) || null, isVerified: !!data?.is_verified };
     },
     enabled: !!user && user.role === "company",
     staleTime: 5 * 60_000,
   });
+  const companyLogoUrl = companyNavData?.logoUrl ?? null;
+  const companyIsVerified = companyNavData?.isVerified ?? false;
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -438,8 +441,11 @@ const Navbar = () => {
                       </span>
                     )}
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-foreground">
+                      <span className="flex items-center gap-1 truncate text-sm font-semibold text-foreground">
                         {user.name}
+                        {companyIsVerified && (
+                          <CheckCircle className="h-3.5 w-3.5 shrink-0 text-green-500" aria-label="Verified company" />
+                        )}
                       </span>
                       <span className="block text-[11px] text-muted-foreground">
                         {user.role === "admin"
