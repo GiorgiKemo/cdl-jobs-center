@@ -65,11 +65,13 @@ const SignIn = () => {
 
           <div className="border border-border bg-card">
             {/* Header */}
-            <div className="border-l-4 border-primary px-5 py-4 border-b border-border">
-              <p className="font-display font-bold text-lg">Sign In to Your Account</p>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Access your driver profile and saved jobs
-              </p>
+            <div className="border-b border-border px-5 py-4">
+              <div className="border-l-4 border-primary pl-3">
+                <p className="font-display font-bold text-lg">Sign In to Your Account</p>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Access your driver profile and saved jobs
+                </p>
+              </div>
             </div>
 
             <form onSubmit={handleSubmit} className="px-5 py-6 space-y-4">
