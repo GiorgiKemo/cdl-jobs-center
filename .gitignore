@@ -33,6 +33,7 @@ dist-ssr
 tmp-storage.json
 smoke-artifacts/
 .claude/
+qa-checklist.html
 
 # Local Vercel metadata
 .vercel/
