@@ -31,6 +31,16 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://cdljobscenter.com/dashboard</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://cdljobscenter.com/driver-dashboard</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://cdljobscenter.com/signin</loc>
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>

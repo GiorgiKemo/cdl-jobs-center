@@ -2,6 +2,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
+export type MessageDeliveryStatus =
+  | "sent"
+  | "delivered"
+  | "read"
+  | "failed_to_deliver";
+
 export interface Message {
   id: string;
   applicationId: string;
@@ -10,10 +16,12 @@ export interface Message {
   body: string;
   createdAt: string;
   readAt: string | null;
+  deliveryStatus: MessageDeliveryStatus;
 }
 
 export interface ConversationSummary {
   applicationId: string;
+  driverId: string | null;
   otherPartyName: string;
   jobTitle: string | null;
   lastMessage: string | null;
@@ -23,6 +31,10 @@ export interface ConversationSummary {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToMessage(row: Record<string, any>): Message {
+  const deliveryStatus = row.read_at
+    ? "read"
+    : (row.delivery_status as MessageDeliveryStatus | undefined) ?? "delivered";
+
   return {
     id: row.id,
     applicationId: row.application_id,
@@ -31,6 +43,7 @@ function rowToMessage(row: Record<string, any>): Message {
     body: row.body,
     createdAt: row.created_at,
     readAt: row.read_at ?? null,
+    deliveryStatus,
   };
 }
 
@@ -43,7 +56,7 @@ export function useConversations(userId: string | undefined, role: "driver" | "c
       const col = role === "driver" ? "driver_id" : "company_id";
       const { data: apps, error: appErr } = await supabase
         .from("applications")
-        .select("id, company_name, first_name, last_name, job_title")
+        .select("id, driver_id, company_name, first_name, last_name, job_title")
         .eq(col, userId!);
       if (appErr) throw appErr;
       if (!apps || apps.length === 0) return [] as ConversationSummary[];
@@ -77,6 +90,7 @@ export function useConversations(userId: string | undefined, role: "driver" | "c
 
         return {
           applicationId: app.id,
+          driverId: app.driver_id ?? null,
           otherPartyName,
           jobTitle: app.job_title ?? null,
           lastMessage: latest?.body ?? null,
@@ -130,37 +144,57 @@ export function useSendMessage() {
       senderRole: "driver" | "company";
       body: string;
     }) => {
-      const { error } = await supabase.from("messages").insert({
-        application_id: params.applicationId,
-        sender_id: params.senderId,
-        sender_role: params.senderRole,
-        body: params.body,
-      });
+      const { data, error } = await supabase
+        .from("messages")
+        .insert({
+          application_id: params.applicationId,
+          sender_id: params.senderId,
+          sender_role: params.senderRole,
+          body: params.body,
+        })
+        .select("*")
+        .single();
       if (error) throw error;
+      return rowToMessage(data as Record<string, unknown>);
     },
     // Optimistic update: show message instantly
     onMutate: async (vars) => {
       await qc.cancelQueries({ queryKey: ["messages", vars.applicationId] });
-      const prev = qc.getQueryData<Message[]>(["messages", vars.applicationId]);
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const optimistic: Message = {
-        id: `temp-${Date.now()}`,
+        id: tempId,
         applicationId: vars.applicationId,
         senderId: vars.senderId,
         senderRole: vars.senderRole,
         body: vars.body,
         createdAt: new Date().toISOString(),
         readAt: null,
+        deliveryStatus: "sent",
       };
       qc.setQueryData<Message[]>(["messages", vars.applicationId], (old) => [...(old ?? []), optimistic]);
-      return { prev };
+      return { tempId };
     },
     onError: (_err, vars, ctx) => {
-      if (ctx?.prev) qc.setQueryData(["messages", vars.applicationId], ctx.prev);
+      if (ctx?.tempId) {
+        qc.setQueryData<Message[]>(["messages", vars.applicationId], (old) =>
+          (old ?? []).map((msg) =>
+            msg.id === ctx.tempId
+              ? { ...msg, deliveryStatus: "failed_to_deliver" as const }
+              : msg,
+          ),
+        );
+      }
       toast.error("Failed to send message. Please try again.");
     },
-    onSettled: (_data, _err, vars) => {
+    onSuccess: (saved, vars, ctx) => {
+      if (ctx?.tempId) {
+        qc.setQueryData<Message[]>(["messages", vars.applicationId], (old) =>
+          (old ?? []).map((msg) => (msg.id === ctx.tempId ? saved : msg)),
+        );
+      }
       qc.invalidateQueries({ queryKey: ["messages", vars.applicationId] });
       qc.invalidateQueries({ queryKey: ["conversations"] });
+      qc.invalidateQueries({ queryKey: ["unread-messages-count"] });
     },
   });
 }

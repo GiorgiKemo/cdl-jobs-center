@@ -206,7 +206,13 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isDark, toggle } = useTheme();
-  const { user, signOut } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
+
+  // Use cached role during auth loading so nav links don't flash
+  const cachedRole = authLoading
+    ? (localStorage.getItem("cdl-cached-role") as "driver" | "company" | "admin" | null)
+    : null;
+  const effectiveRole = user?.role ?? cachedRole;
 
   // Notification counts
   const { data: unreadMsgCount = 0 } = useUnreadCount(user?.id, user?.role as "driver" | "company" | undefined);
@@ -287,13 +293,13 @@ const Navbar = () => {
             {navLinks
               .filter(
                 (link) =>
-                  !(link.name === "Apply Now" && user?.role === "company") &&
-                  !(link.name === "Drivers" && user?.role === "driver") &&
-                  !(link.name === "Pricing" && user?.role === "driver"),
+                  !(link.name === "Apply Now" && effectiveRole === "company") &&
+                  !(link.name === "Drivers" && effectiveRole === "driver") &&
+                  !(link.name === "Pricing" && effectiveRole === "driver"),
               )
               .map((link) => {
                 const displayName =
-                  link.name === "Apply Now" && user?.role === "driver"
+                  link.name === "Apply Now" && effectiveRole === "driver"
                     ? "Find My Matches"
                     : link.name;
                 return link.dropdown ? (
@@ -389,9 +395,11 @@ const Navbar = () => {
 
           <div className="hidden lg:flex items-center gap-3">
             <TruckToggle isDark={isDark} onClick={toggle} />
-            {user ? (
+            {authLoading ? (
+              <div className="h-9 w-32 animate-pulse rounded-md bg-muted" />
+            ) : user ? (
               <>
-                <NotificationCenter userId={user.id} />
+                <NotificationCenter userId={user.id} role={user.role as "driver" | "company"} />
                 {/* Profile dropdown */}
                 <div className="relative" ref={profileRef}>
                   <button
@@ -546,14 +554,14 @@ const Navbar = () => {
                   .filter(
                     (link) =>
                       !(
-                        link.name === "Apply Now" && user?.role === "company"
+                        link.name === "Apply Now" && effectiveRole === "company"
                       ) &&
-                      !(link.name === "Drivers" && user?.role === "driver") &&
-                      !(link.name === "Pricing" && user?.role === "driver"),
+                      !(link.name === "Drivers" && effectiveRole === "driver") &&
+                      !(link.name === "Pricing" && effectiveRole === "driver"),
                   )
                   .map((link) => {
                     const displayName =
-                      link.name === "Apply Now" && user?.role === "driver"
+                      link.name === "Apply Now" && effectiveRole === "driver"
                         ? "Find My Matches"
                         : link.name;
                     return link.dropdown ? (
@@ -615,7 +623,12 @@ const Navbar = () => {
                       </Link>
                     );
                   })}
-                {user ? (
+                {authLoading ? (
+                  <div className="flex gap-2 pt-2">
+                    <div className="h-9 flex-1 animate-pulse rounded-md bg-muted" />
+                    <div className="h-9 flex-1 animate-pulse rounded-md bg-muted" />
+                  </div>
+                ) : user ? (
                   <>
                     <Link
                       to={

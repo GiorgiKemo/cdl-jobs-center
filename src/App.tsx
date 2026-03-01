@@ -6,25 +6,45 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Spinner } from "./components/ui/Spinner";
 
-const Index = lazy(() => import("./pages/Index"));
-const ApplyNow = lazy(() => import("./pages/ApplyNow"));
-const Jobs = lazy(() => import("./pages/Jobs"));
-const JobDetail = lazy(() => import("./pages/JobDetail"));
+// Auto-reload on stale chunk errors (happens after new deployments)
+function lazyWithRetry(factory: () => Promise<{ default: React.ComponentType }>) {
+  return lazy(() =>
+    factory().catch(() => {
+      const key = "chunk_reload";
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, "1");
+        window.location.reload();
+        // Return a never-resolving promise so React doesn't try to render
+        // while the page is reloading
+        return new Promise<{ default: React.ComponentType }>(() => {});
+      }
+      // Already reloaded once — clear the flag and retry the import
+      sessionStorage.removeItem(key);
+      return factory();
+    })
+  );
+}
 
-const Drivers = lazy(() => import("./pages/Drivers"));
-const DriverProfile = lazy(() => import("./pages/DriverProfile"));
-const Companies = lazy(() => import("./pages/Companies"));
-const CompanyProfile = lazy(() => import("./pages/CompanyProfile"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const DriverDashboard = lazy(() => import("./pages/DriverDashboard"));
-const SignIn = lazy(() => import("./pages/SignIn"));
-const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
-const TermsOfService = lazy(() => import("./pages/TermsOfService"));
-const Pricing = lazy(() => import("./pages/Pricing"));
-const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
-const NotFound = lazy(() => import("./pages/NotFound"));
+const Index = lazyWithRetry(() => import("./pages/Index"));
+const ApplyNow = lazyWithRetry(() => import("./pages/ApplyNow"));
+const Jobs = lazyWithRetry(() => import("./pages/Jobs"));
+const JobDetail = lazyWithRetry(() => import("./pages/JobDetail"));
+
+const Drivers = lazyWithRetry(() => import("./pages/Drivers"));
+const DriverProfile = lazyWithRetry(() => import("./pages/DriverProfile"));
+const Companies = lazyWithRetry(() => import("./pages/Companies"));
+const CompanyProfile = lazyWithRetry(() => import("./pages/CompanyProfile"));
+const Dashboard = lazyWithRetry(() => import("./pages/Dashboard"));
+const DriverDashboard = lazyWithRetry(() => import("./pages/DriverDashboard"));
+const SignIn = lazyWithRetry(() => import("./pages/SignIn"));
+const PrivacyPolicy = lazyWithRetry(() => import("./pages/PrivacyPolicy"));
+const TermsOfService = lazyWithRetry(() => import("./pages/TermsOfService"));
+const Pricing = lazyWithRetry(() => import("./pages/Pricing"));
+const AdminDashboard = lazyWithRetry(() => import("./pages/AdminDashboard"));
+const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -61,10 +81,10 @@ const App = () => (
             <Route path="/drivers/:id" element={<DriverProfile />} />
             <Route path="/companies" element={<Companies />} />
             <Route path="/companies/:id" element={<CompanyProfile />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/driver-dashboard" element={<DriverDashboard />} />
+            <Route path="/dashboard" element={<ProtectedRoute requiredRole="company"><Dashboard /></ProtectedRoute>} />
+            <Route path="/driver-dashboard" element={<ProtectedRoute requiredRole="driver"><DriverDashboard /></ProtectedRoute>} />
             <Route path="/pricing" element={<Pricing />} />
-            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />

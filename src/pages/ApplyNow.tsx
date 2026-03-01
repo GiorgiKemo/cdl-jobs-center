@@ -196,6 +196,13 @@ const ApplyNow = () => {
     }
   }, [step, matchesLoading, matches.length, matchesStartedAt]);
 
+  // Reset matchesStartedAt when entering step 4 (prevents stale timestamps on back-navigation)
+  useEffect(() => {
+    if (step === 4 && !matchesStartedAt) {
+      setMatchesStartedAt(Date.now());
+    }
+  }, [step, matchesStartedAt]);
+
   // Poll for fresh matches during step 4
   useEffect(() => {
     if (step !== 4 || !user?.id) return;

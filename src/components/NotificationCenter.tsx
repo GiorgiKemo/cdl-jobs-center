@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, CheckCheck, FileText, MessageSquare, Users, Zap, CreditCard, UserCircle, BarChart, PartyPopper } from "lucide-react";
+import { Bell, CheckCheck, FileText, MessageSquare, Users, Zap, CreditCard, UserCircle, BarChart, PartyPopper, Settings } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { timeAgo } from "@/lib/dateUtils";
 
 interface NotificationCenterProps {
   userId: string;
+  role?: "driver" | "company";
 }
 
 const typeIcons: Record<string, typeof Bell> = {
@@ -56,7 +57,7 @@ function getNotificationLink(notif: Notification): string | undefined {
   }
 }
 
-export function NotificationCenter({ userId }: NotificationCenterProps) {
+export function NotificationCenter({ userId, role }: NotificationCenterProps) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const { data: notifications = [] } = useNotifications(userId);
@@ -100,31 +101,45 @@ export function NotificationCenter({ userId }: NotificationCenterProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <p className="font-semibold text-sm">Notifications</p>
-          {notifications.length > 0 && (
-            <div className="flex items-center gap-1.5">
-              {unreadCount > 0 && (
+          <div className="flex items-center gap-1.5">
+            {notifications.length > 0 && (
+              <>
+                {unreadCount > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => markAllRead.mutate()}
+                    disabled={markAllRead.isPending || clearAll.isPending}
+                  >
+                    <CheckCheck className="h-3.5 w-3.5 mr-1" />
+                    Mark all read
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => markAllRead.mutate()}
-                  disabled={markAllRead.isPending || clearAll.isPending}
+                  className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                  onClick={() => clearAll.mutate()}
+                  disabled={clearAll.isPending || markAllRead.isPending}
                 >
-                  <CheckCheck className="h-3.5 w-3.5 mr-1" />
-                  Mark all read
+                  {clearAll.isPending ? "Clearing..." : "Clear all"}
                 </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs text-muted-foreground hover:text-destructive"
-                onClick={() => clearAll.mutate()}
-                disabled={clearAll.isPending || markAllRead.isPending}
-              >
-                {clearAll.isPending ? "Clearing..." : "Clear all"}
-              </Button>
-            </div>
-          )}
+              </>
+            )}
+            <button
+              onClick={() => {
+                const path = role === "driver" ? "/driver-dashboard" : "/dashboard";
+                navigate(`${path}?tab=profile&section=notifications`);
+                setOpen(false);
+              }}
+              className="p-1 rounded hover:bg-muted transition-colors"
+              aria-label="Notification settings"
+              title="Email preferences"
+            >
+              <Settings className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          </div>
         </div>
 
         {/* Notification list */}

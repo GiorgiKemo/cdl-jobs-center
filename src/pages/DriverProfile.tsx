@@ -42,18 +42,17 @@ const DriverProfile = () => {
   const navigate = useNavigate();
 
   // Check if this driver has applied to any of the company's jobs
-  const { data: applicationId } = useQuery({
-    queryKey: ["driver-application", id, user?.id],
+  const { data: hasApplication = false } = useQuery({
+    queryKey: ["driver-has-application", id, user?.id],
     enabled: !!id && !!user && user.role === "company",
     queryFn: async () => {
-      const { data } = await supabase
+      const { count, error } = await supabase
         .from("applications")
-        .select("id")
+        .select("id", { head: true, count: "exact" })
         .eq("driver_id", id)
         .eq("company_id", user!.id)
-        .limit(1)
-        .maybeSingle();
-      return data?.id ?? null;
+      if (error) throw error;
+      return (count ?? 0) > 0;
     },
   });
 
@@ -205,9 +204,9 @@ const DriverProfile = () => {
               <Button variant="outline" onClick={() => navigate("/drivers")}>
                 Back to Directory
               </Button>
-              {applicationId && (
+              {hasApplication && (
                 <Button
-                  onClick={() => navigate(`/dashboard?tab=messages&app=${applicationId}`)}
+                  onClick={() => navigate(`/dashboard?tab=messages&driver=${encodeURIComponent(id ?? "")}`)}
                   className="gap-2"
                 >
                   <MessageSquare className="h-4 w-4" />

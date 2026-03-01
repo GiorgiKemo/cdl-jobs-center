@@ -29,6 +29,8 @@ If you violate the rules you may be given a warning. In some cases, you may be b
 
 Insulting administrators and moderators is also punishable by a ban — Respect other people's labor.`;
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const COMPANY_GOALS = [
   "Acquire more driver leads",
   "Hire more CDL Class A drivers",
@@ -155,6 +157,10 @@ export function SignInModal({ onClose }: SignInModalProps) {
       toast.error("Please fill in all required fields.");
       return;
     }
+    if (!EMAIL_RE.test(regEmail)) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
     if (regPassword.length < 6) {
       toast.error("Password must be at least 6 characters.");
       return;
@@ -195,6 +201,10 @@ export function SignInModal({ onClose }: SignInModalProps) {
     e.preventDefault();
     if (!contactName || !companyName || !regEmail || !regPassword) {
       toast.error("Please fill in all required fields.");
+      return;
+    }
+    if (!EMAIL_RE.test(regEmail)) {
+      toast.error("Please enter a valid email address.");
       return;
     }
     if (regPassword.length < 6) {

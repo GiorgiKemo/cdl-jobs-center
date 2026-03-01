@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { clearAllApplicationDrafts } from "@/hooks/useApplication";
 
+const ROLE_CACHE_KEY = "cdl-cached-role";
+
 const parseUserRole = (value: unknown): User["role"] | null => {
   if (value === "driver" || value === "company" || value === "admin") return value;
   return null;
@@ -53,12 +55,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (data) {
+      const role = parseUserRole(data.role) ?? fallbackRole ?? "driver";
       setUser({
         id: data.id,
         name: data.name ?? fallbackDisplayName(userEmail, fallbackName),
         email: userEmail,
-        role: parseUserRole(data.role) ?? fallbackRole ?? "driver",
+        role,
       });
+      localStorage.setItem(ROLE_CACHE_KEY, role);
     } else if (fallbackRole) {
       // If profile row creation lags behind auth, keep the session usable.
       setUser({
@@ -67,8 +71,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: userEmail,
         role: fallbackRole,
       });
+      localStorage.setItem(ROLE_CACHE_KEY, fallbackRole);
     } else {
       setUser(null);
+      localStorage.removeItem(ROLE_CACHE_KEY);
     }
 
     setLoading(false);
@@ -93,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await loadProfile(session.user);
         } else {
           setUser(null);
+          localStorage.removeItem(ROLE_CACHE_KEY);
           setLoading(false);
         }
       },
@@ -110,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     name: string,
     email: string,
     password: string,
-    role: "driver" | "company" | "admin",
+    role: "driver" | "company",
   ) => {
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -123,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
+    localStorage.removeItem(ROLE_CACHE_KEY);
     queryClient.clear();
     clearAllApplicationDrafts();
   }, [queryClient]);

@@ -548,6 +548,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
   const [autoOpenApplicationToken, setAutoOpenApplicationToken] = useState(0);
   const lastAutoScrollAppIdRef = useRef<string | null>(null);
   const [initialChatAppId, setInitialChatAppId] = useState<string | null>(() => searchParams.get("app"));
+  const [initialChatDriverId, setInitialChatDriverId] = useState<string | null>(() => searchParams.get("driver"));
   const [appPage, setAppPage] = useState(0);
   const [leadPage, setLeadPage] = useState(0);
   const [leadStateFilter, setLeadStateFilter] = useState("all");
@@ -571,10 +572,12 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
     const tabFromUrl = searchParams.get("tab");
     if (!tabFromUrl || !isCompanyTab(tabFromUrl)) return;
     const appFromUrl = searchParams.get("app");
+    const driverFromUrl = searchParams.get("driver");
 
     setActiveTab(tabFromUrl);
     if (tabFromUrl === "messages") {
       setInitialChatAppId(appFromUrl);
+      setInitialChatDriverId(driverFromUrl);
     } else if (tabFromUrl === "applications") {
       setFocusedApplicationId(appFromUrl);
       if (appFromUrl) {
@@ -587,6 +590,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
     next.delete("tab");
     if (tabFromUrl !== "messages") {
       next.delete("app");
+      next.delete("driver");
     }
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
@@ -764,6 +768,8 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
   };
 
   const updateAppStage = async (appId: string, stage: PipelineStage) => {
+    // Cancel in-flight queries to avoid stale data overwriting optimistic update
+    await qc.cancelQueries({ queryKey: appsKey });
     // Optimistic local update
     qc.setQueryData<ReceivedApplication[]>(appsKey, (prev) =>
       (prev ?? []).map((a) => a.id === appId ? { ...a, pipeline_stage: stage } : a)
@@ -782,8 +788,10 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowedTypes.includes(file.type)) { toast.error("Only image files are allowed (JPEG, PNG, WebP, GIF)."); return; }
     if (file.size > 2 * 1024 * 1024) { toast.error("Logo must be under 2MB."); return; }
-    const ext = file.name.split(".").pop() ?? "png";
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
     const path = `${user!.id}/logo.${ext}`;
     const { error } = await supabase.storage.from("company-logos").upload(path, file, { upsert: true });
     if (error) { toast.error("Upload failed: " + error.message); return; }
@@ -823,6 +831,9 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
 
   const switchTab = (tab: Tab) => {
     setActiveTab(tab);
+    if (tab !== "messages") {
+      setInitialChatDriverId(null);
+    }
     if (tab === "applications" || tab === "pipeline") {
       setAppPage(0);
       // Mark all current applications as "seen" so the navbar badge clears
@@ -1329,7 +1340,13 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
 
         {/* ── Tab: Messages ──────────────────────────────────────────────────── */}
         {activeTab === "messages" && (
-          <ChatPanel userId={user!.id} userRole="company" userName={user!.name} initialApplicationId={initialChatAppId} />
+          <ChatPanel
+            userId={user!.id}
+            userRole="company"
+            userName={user!.name}
+            initialApplicationId={initialChatAppId}
+            initialDriverId={initialChatDriverId}
+          />
         )}
 
         {/* ── Tab: Leads ───────────────────────────────────────────────────── */}

@@ -1,6 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   buildNotificationEmail,
+  buildRichBody,
+  escapeHtml,
   getCtaForType,
 } from "../_shared/email/templates.ts";
 
@@ -12,7 +14,43 @@ const corsHeaders = {
 };
 
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
-const SITE_URL = "https://cdljobscenter.com";
+const SITE_URL = Deno.env.get("SITE_URL") ?? "https://cdl-jobs-center.vercel.app";
+
+/** Only these types trigger transactional emails */
+const EMAIL_ENABLED_TYPES = new Set([
+  "new_application",
+  "stage_change",
+  "new_message",
+  "welcome",
+]);
+
+/** Descriptive email subjects per type (overrides the short in-app title) */
+function getEmailSubject(
+  type: string,
+  metadata: Record<string, unknown>
+): string {
+  const m = metadata;
+  switch (type) {
+    case "new_application": {
+      const driver = (m.driver_name as string) || "A driver";
+      const job = (m.job_title as string) || "your position";
+      return `New Application: ${driver} applied for ${job}`;
+    }
+    case "stage_change": {
+      const stage = (m.new_stage as string) || "updated";
+      const job = (m.job_title as string) || "a position";
+      return `Application Update: Your ${job} application moved to "${stage}"`;
+    }
+    case "new_message": {
+      const sender = (m.sender_name as string) || "Someone";
+      return `New Message from ${sender} - CDL Jobs Center`;
+    }
+    case "welcome":
+      return "Welcome to CDL Jobs Center - Let's Get Started!";
+    default:
+      return "CDL Jobs Center Notification";
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -35,6 +73,15 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Only send emails for enabled notification types
+    if (!EMAIL_ENABLED_TYPES.has(type)) {
+      console.log(`Email not enabled for type "${type}" — skipping`);
+      return new Response(
+        JSON.stringify({ skipped: true, reason: "type_not_email_enabled" }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
     const brevoApiKey = Deno.env.get("BREVO_API_KEY");
     const senderEmail = Deno.env.get("BREVO_SENDER_EMAIL");
     if (!brevoApiKey || !senderEmail) {
@@ -45,7 +92,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch user email + notification preferences
+    // Fetch user profile + notification preferences
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -92,14 +139,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build email
+    // Build rich email content
     const { ctaText, ctaUrl } = getCtaForType(type, metadata);
     const dashPath = profile.role === "driver" ? "/driver-dashboard" : "/dashboard";
     const preferencesUrl = `${SITE_URL}${dashPath}?tab=profile`;
+    const subject = getEmailSubject(type, metadata);
+    const bodyHtml = buildRichBody(type, title, body, metadata);
 
     const html = buildNotificationEmail({
       title,
-      body,
+      bodyHtml,
       ctaText,
       ctaUrl,
       preferencesUrl,
@@ -115,7 +164,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         sender: { name: "CDL Jobs Center", email: senderEmail },
         to: [{ email: authUser.email }],
-        subject: title,
+        subject,
         htmlContent: html,
       }),
     });

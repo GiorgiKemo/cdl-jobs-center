@@ -1,8 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buildNotificationEmail } from "../_shared/email/templates.ts";
+import { buildNotificationEmail, escapeHtml } from "../_shared/email/templates.ts";
 
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
-const SITE_URL = "https://cdljobscenter.com";
+const SITE_URL = Deno.env.get("SITE_URL") ?? "https://cdl-jobs-center.vercel.app";
 
 /** Send email via Brevo. Returns true if sent, false if skipped/failed. */
 async function sendEmail(
@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
           if (authUser?.email) {
             const html = buildNotificationEmail({
               title,
-              body,
+              bodyHtml: escapeHtml(body),
               ctaText: "View Dashboard",
               ctaUrl: `${SITE_URL}${dashLink}`,
               preferencesUrl: `${SITE_URL}${dashLink}?tab=profile`,
@@ -182,7 +182,7 @@ Deno.serve(async (req) => {
         if (canEmail) {
           const html = buildNotificationEmail({
             title,
-            body,
+            bodyHtml: escapeHtml(body),
             ctaText: "Complete Profile",
             ctaUrl: `${SITE_URL}/driver-dashboard?tab=profile`,
             preferencesUrl: `${SITE_URL}/driver-dashboard?tab=profile`,
@@ -246,7 +246,7 @@ Deno.serve(async (req) => {
           if (authUser?.email) {
             const html = buildNotificationEmail({
               title,
-              body,
+              bodyHtml: escapeHtml(body),
               ctaText: "Upgrade Plan",
               ctaUrl: `${SITE_URL}/pricing`,
               preferencesUrl: `${SITE_URL}/dashboard?tab=profile`,

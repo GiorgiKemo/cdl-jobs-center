@@ -41,8 +41,8 @@ export function useNotifications(userId: string | undefined, limit = 30) {
       return (data ?? []).map(rowToNotification);
     },
     enabled: !!userId,
-    refetchInterval: 15_000,
-    staleTime: 10_000,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
   });
 }
 
@@ -60,8 +60,8 @@ export function useUnreadNotificationCount(userId: string | undefined) {
       return count ?? 0;
     },
     enabled: !!userId,
-    refetchInterval: 15_000,
-    staleTime: 10_000,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
   });
 }
 

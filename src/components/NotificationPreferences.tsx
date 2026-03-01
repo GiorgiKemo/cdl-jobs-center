@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
@@ -66,10 +67,24 @@ export function NotificationPreferences({ userId, role }: NotificationPreference
     }
   };
 
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (loaded && searchParams.get("section") === "notifications" && sectionRef.current) {
+      sectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      sectionRef.current.classList.add("ring-2", "ring-primary", "ring-offset-2");
+      const timer = setTimeout(() => {
+        sectionRef.current?.classList.remove("ring-2", "ring-primary", "ring-offset-2");
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [loaded, searchParams]);
+
   if (!loaded) return null;
 
   return (
-    <div className="border border-border bg-card p-5 mt-6">
+    <div ref={sectionRef} id="notification-preferences" className="border border-border bg-card p-5 mt-6 rounded-lg transition-all">
       <h3 className="font-semibold text-sm mb-1">Email Notifications</h3>
       <p className="text-xs text-muted-foreground mb-4">
         Choose which notifications you receive by email. In-app notifications are always enabled.

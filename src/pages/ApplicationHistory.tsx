@@ -2,7 +2,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { ClipboardList, ChevronDown, ChevronUp } from "lucide-react";
+import { ClipboardList, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -25,16 +25,22 @@ interface Application {
   notes?: string;
 }
 
+const PAGE_SIZE = 20;
+
 const ApplicationHistory = () => {
   const { user } = useAuth();
+  const [page, setPage] = useState(0);
   const { data: applications = [], isLoading } = useQuery({
-    queryKey: ["driver-applications-history", user?.id],
+    queryKey: ["driver-applications-history", user?.id, page],
     queryFn: async () => {
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
       const { data, error } = await supabase
         .from("applications")
         .select("*")
         .eq("driver_id", user!.id)
-        .order("updated_at", { ascending: false });
+        .order("updated_at", { ascending: false })
+        .range(from, to);
       if (error) throw error;
       return (data ?? []).map((row): Application => ({
         id: row.id as string,
@@ -158,6 +164,26 @@ const ApplicationHistory = () => {
                 </div>
               );
             })}
+          </div>
+          {/* Pagination */}
+          <div className="flex items-center justify-between px-5 py-3 border border-t-0 border-border bg-card">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page === 0}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+            </Button>
+            <span className="text-xs text-muted-foreground">Page {page + 1}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={applications.length < PAGE_SIZE}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
           </div>
         )}
       </main>

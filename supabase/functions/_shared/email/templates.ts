@@ -4,15 +4,16 @@
  */
 
 const BRAND_COLOR = "#2563eb"; // primary blue
+const ACCENT_GREEN = "#16a34a";
 const BG_COLOR = "#f8fafc";
 const CARD_BG = "#ffffff";
 const TEXT_COLOR = "#1e293b";
 const MUTED_COLOR = "#64748b";
-const SITE_URL = "https://cdljobscenter.com";
+const SITE_URL = Deno.env.get("SITE_URL") ?? "https://cdl-jobs-center.vercel.app";
 
 interface EmailTemplateParams {
   title: string;
-  body: string;
+  bodyHtml: string;
   ctaText?: string;
   ctaUrl?: string;
   preferencesUrl?: string;
@@ -20,7 +21,7 @@ interface EmailTemplateParams {
 
 export function buildNotificationEmail({
   title,
-  body,
+  bodyHtml,
   ctaText,
   ctaUrl,
   preferencesUrl,
@@ -75,7 +76,7 @@ export function buildNotificationEmail({
                 </tr>
                 <tr>
                   <td style="font-size: 14px; line-height: 1.6; color: ${TEXT_COLOR};">
-                    ${escapeHtml(body)}
+                    ${bodyHtml}
                   </td>
                 </tr>
                 ${ctaBlock}
@@ -109,9 +110,9 @@ export function getCtaForType(
   const fullUrl = link ? `${SITE_URL}${link}` : SITE_URL;
 
   const ctaMap: Record<string, string> = {
-    new_application: "View Application",
-    stage_change: "View Status",
-    new_message: "Read Message",
+    new_application: "Review Application",
+    stage_change: "Check Your Status",
+    new_message: "Read & Reply",
     new_match: "View Match",
     new_lead: "View Lead",
     subscription_event: "View Subscription",
@@ -126,7 +127,137 @@ export function getCtaForType(
   };
 }
 
-function escapeHtml(str: string): string {
+// ── Rich email body builders per notification type ──────────────
+
+const p = (text: string) =>
+  `<p style="margin: 0 0 12px 0; font-size: 14px; line-height: 1.6; color: ${TEXT_COLOR};">${text}</p>`;
+const bold = (text: string) =>
+  `<strong style="color: ${TEXT_COLOR};">${text}</strong>`;
+const badge = (text: string, color: string) =>
+  `<span style="display: inline-block; background-color: ${color}; color: #ffffff; font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 12px;">${escapeHtml(text)}</span>`;
+const divider = `<hr style="border: none; border-top: 1px solid #e2e8f0; margin: 16px 0;">`;
+
+/**
+ * Build rich, descriptive HTML body based on notification type + metadata.
+ * Falls back to plain escaped text for unknown types.
+ */
+export function buildRichBody(
+  type: string,
+  title: string,
+  body: string,
+  metadata: Record<string, unknown>
+): string {
+  const m = metadata;
+
+  switch (type) {
+    case "new_application": {
+      const driver = escapeHtml((m.driver_name as string) || "A driver");
+      const job = escapeHtml((m.job_title as string) || "a position");
+      return [
+        p(`${bold(driver)} just submitted an application for ${bold(job)}.`),
+        p("Here's what to do next:"),
+        `<ul style="margin: 0 0 12px 0; padding-left: 20px; font-size: 14px; line-height: 1.8; color: ${TEXT_COLOR};">
+          <li>Review the driver's qualifications and experience</li>
+          <li>Move the application through your hiring pipeline</li>
+          <li>Send the driver a message if you'd like more information</li>
+        </ul>`,
+        p(`The sooner you respond, the more likely you are to secure top talent. Don't let this one slip away!`),
+      ].join("");
+    }
+
+    case "stage_change": {
+      const job = escapeHtml((m.job_title as string) || "a position");
+      const company = escapeHtml((m.company_name as string) || "a company");
+      const newStage = (m.new_stage as string) || "";
+      const oldStage = (m.old_stage as string) || "";
+
+      const stageColors: Record<string, string> = {
+        New: "#6b7280",
+        Reviewing: BRAND_COLOR,
+        Interview: "#7c3aed",
+        Hired: ACCENT_GREEN,
+        Rejected: "#dc2626",
+      };
+      const stageBadge = badge(newStage, stageColors[newStage] || BRAND_COLOR);
+
+      let encouragement = "";
+      if (newStage === "Reviewing") {
+        encouragement = "The hiring team is actively reviewing your qualifications. Hang tight!";
+      } else if (newStage === "Interview") {
+        encouragement = "Great news! The company is interested in speaking with you. Check your messages for details.";
+      } else if (newStage === "Hired") {
+        encouragement = "Congratulations! You've been selected for this position. Check your messages for next steps.";
+      } else if (newStage === "Rejected") {
+        encouragement = "Unfortunately, the company has decided to move forward with other candidates. Don't be discouraged — new jobs are posted daily.";
+      }
+
+      return [
+        p(`Your application for ${bold(job)} at ${bold(company)} has been updated.`),
+        divider,
+        `<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 0 12px 0;">
+          <tr>
+            <td style="font-size: 13px; color: ${MUTED_COLOR}; padding-right: 8px;">Previous status:</td>
+            <td style="font-size: 13px; color: ${TEXT_COLOR};">${escapeHtml(oldStage)}</td>
+          </tr>
+          <tr>
+            <td style="font-size: 13px; color: ${MUTED_COLOR}; padding-right: 8px; padding-top: 4px;">New status:</td>
+            <td style="padding-top: 4px;">${stageBadge}</td>
+          </tr>
+        </table>`,
+        divider,
+        encouragement ? p(encouragement) : "",
+      ].join("");
+    }
+
+    case "new_message": {
+      const sender = escapeHtml((m.sender_name as string) || "Someone");
+      const preview = escapeHtml(body || "");
+
+      return [
+        p(`You have a new message from ${bold(sender)}.`),
+        preview
+          ? `<div style="background-color: #f1f5f9; border-left: 3px solid ${BRAND_COLOR}; padding: 12px 16px; margin: 0 0 12px 0; border-radius: 0 6px 6px 0;">
+              <p style="margin: 0; font-size: 13px; color: ${MUTED_COLOR}; font-style: italic;">"${preview}"</p>
+            </div>`
+          : "",
+        p("Reply promptly to keep the conversation going and move the hiring process forward."),
+      ].join("");
+    }
+
+    case "welcome": {
+      const isDriver = (m.link as string)?.includes("driver");
+
+      if (isDriver) {
+        return [
+          p("Welcome aboard! Your CDL Jobs Center account is ready to go."),
+          p("Here's how to get started:"),
+          `<ol style="margin: 0 0 12px 0; padding-left: 20px; font-size: 14px; line-height: 1.8; color: ${TEXT_COLOR};">
+            <li>${bold("Complete your driver profile")} — add your CDL class, endorsements, and experience so our AI can match you with the best jobs</li>
+            <li>${bold("Browse available jobs")} — hundreds of CDL positions are posted from companies across the country</li>
+            <li>${bold("Apply with one click")} — once your profile is set up, applying is fast and easy</li>
+          </ol>`,
+          p("The more complete your profile, the better your AI match scores will be. Companies are actively looking for drivers like you!"),
+        ].join("");
+      }
+
+      return [
+        p("Welcome to CDL Jobs Center! Your company account is ready."),
+        p("Here's how to get started:"),
+        `<ol style="margin: 0 0 12px 0; padding-left: 20px; font-size: 14px; line-height: 1.8; color: ${TEXT_COLOR};">
+          <li>${bold("Post your first job")} — describe the position and our AI will start matching qualified CDL drivers</li>
+          <li>${bold("Set up your company profile")} — add your logo, about section, and contact info to build trust with drivers</li>
+          <li>${bold("Review incoming applications")} — manage your hiring pipeline with our built-in tools</li>
+        </ol>`,
+        p("Thousands of qualified CDL drivers are searching for their next opportunity. Your first applicants could arrive within hours of posting!"),
+      ].join("");
+    }
+
+    default:
+      return p(escapeHtml(body));
+  }
+}
+
+export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
