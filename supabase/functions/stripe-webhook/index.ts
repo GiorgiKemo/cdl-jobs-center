@@ -111,6 +111,15 @@ Deno.serve(async (req) => {
           { onConflict: "company_id" }
         );
 
+        // Notify: subscription activated
+        await supabase.from("notifications").insert({
+          user_id: userId,
+          type: "subscription_event",
+          title: "Subscription Activated",
+          body: `Your ${plan} plan is now active.`,
+          metadata: { plan, link: "/dashboard?tab=profile" },
+        });
+
         console.log(
           `checkout.session.completed: userId=${userId} plan=${plan}`
         );
@@ -137,13 +146,39 @@ Deno.serve(async (req) => {
           })
           .eq("stripe_subscription_id", sub.id);
 
-        if (error) console.error("subscription.updated error:", error);
-        else console.log(`subscription.updated: subId=${sub.id} plan=${plan}`);
+        if (error) {
+          console.error("subscription.updated error:", error);
+        } else {
+          // Look up company_id for notification
+          const { data: subRow } = await supabase
+            .from("subscriptions")
+            .select("company_id")
+            .eq("stripe_subscription_id", sub.id)
+            .single();
+
+          if (subRow?.company_id) {
+            await supabase.from("notifications").insert({
+              user_id: subRow.company_id,
+              type: "subscription_event",
+              title: "Subscription Updated",
+              body: `Your plan has been updated to ${plan}.`,
+              metadata: { plan, link: "/dashboard?tab=profile" },
+            });
+          }
+          console.log(`subscription.updated: subId=${sub.id} plan=${plan}`);
+        }
         break;
       }
 
       case "customer.subscription.deleted": {
         const sub = event.data.object as Stripe.Subscription;
+
+        // Look up company_id before we null out the stripe_subscription_id
+        const { data: delSubRow } = await supabase
+          .from("subscriptions")
+          .select("company_id")
+          .eq("stripe_subscription_id", sub.id)
+          .single();
 
         const { error } = await supabase
           .from("subscriptions")
@@ -157,8 +192,20 @@ Deno.serve(async (req) => {
           })
           .eq("stripe_subscription_id", sub.id);
 
-        if (error) console.error("subscription.deleted error:", error);
-        else console.log(`subscription.deleted: subId=${sub.id} → free`);
+        if (error) {
+          console.error("subscription.deleted error:", error);
+        } else {
+          if (delSubRow?.company_id) {
+            await supabase.from("notifications").insert({
+              user_id: delSubRow.company_id,
+              type: "subscription_event",
+              title: "Subscription Canceled",
+              body: "Your subscription has been canceled. You're now on the free plan.",
+              metadata: { plan: "free", link: "/pricing" },
+            });
+          }
+          console.log(`subscription.deleted: subId=${sub.id} → free`);
+        }
         break;
       }
 

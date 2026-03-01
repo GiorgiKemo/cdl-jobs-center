@@ -1,0 +1,146 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  buildNotificationEmail,
+  getCtaForType,
+} from "../_shared/email/templates.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
+const SITE_URL = "https://cdljobscenter.com";
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  try {
+    const {
+      user_id,
+      type,
+      title,
+      body,
+      metadata = {},
+    } = await req.json();
+
+    if (!user_id || !type || !title) {
+      return new Response(
+        JSON.stringify({ error: "Missing required fields" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const brevoApiKey = Deno.env.get("BREVO_API_KEY");
+    const senderEmail = Deno.env.get("BREVO_SENDER_EMAIL");
+    if (!brevoApiKey || !senderEmail) {
+      console.log("BREVO_API_KEY or BREVO_SENDER_EMAIL not set — skipping email");
+      return new Response(
+        JSON.stringify({ skipped: true, reason: "no_api_key" }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    // Fetch user email + notification preferences
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const { data: profile, error: profileErr } = await supabase
+      .from("profiles")
+      .select("name, notification_preferences")
+      .eq("id", user_id)
+      .single();
+
+    if (profileErr || !profile) {
+      console.error("Profile not found for user:", user_id);
+      return new Response(
+        JSON.stringify({ skipped: true, reason: "no_profile" }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check email preference for this notification type
+    const prefs = (profile.notification_preferences ?? {}) as Record<
+      string,
+      boolean
+    >;
+    if (prefs[type] === false) {
+      console.log(`Email preference disabled for ${type}, user ${user_id}`);
+      return new Response(
+        JSON.stringify({ skipped: true, reason: "preference_disabled" }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    // Get user email from auth
+    const {
+      data: { user: authUser },
+      error: authErr,
+    } = await supabase.auth.admin.getUserById(user_id);
+
+    if (authErr || !authUser?.email) {
+      console.error("Auth user not found:", user_id);
+      return new Response(
+        JSON.stringify({ skipped: true, reason: "no_email" }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    // Build email
+    const { ctaText, ctaUrl } = getCtaForType(type, metadata);
+    const preferencesUrl = `${SITE_URL}/dashboard?tab=profile`;
+
+    const html = buildNotificationEmail({
+      title,
+      body,
+      ctaText,
+      ctaUrl,
+      preferencesUrl,
+    });
+
+    // Send via Brevo
+    const emailRes = await fetch(BREVO_API_URL, {
+      method: "POST",
+      headers: {
+        "api-key": brevoApiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sender: { name: "CDL Jobs Center", email: senderEmail },
+        to: [{ email: authUser.email }],
+        subject: title,
+        htmlContent: html,
+      }),
+    });
+
+    if (!emailRes.ok) {
+      const errBody = await emailRes.text();
+      console.error("Brevo API error:", emailRes.status, errBody);
+      return new Response(
+        JSON.stringify({ error: "email_send_failed", detail: errBody }),
+        { status: 502, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const result = await emailRes.json();
+    console.log(`Email sent for ${type} to ${authUser.email}:`, result.messageId);
+
+    return new Response(
+      JSON.stringify({ sent: true, message_id: result.messageId }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Internal error";
+    console.error("send-notification error:", message);
+    return new Response(
+      JSON.stringify({ error: message }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+});

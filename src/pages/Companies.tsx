@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Link } from "react-router-dom";
@@ -39,6 +40,7 @@ const COMPANY_STATES = [
 ];
 
 const Companies = () => {
+  usePageTitle("Company Directory");
   const [stateFilter, setStateFilter] = useState("All");
 
   const {

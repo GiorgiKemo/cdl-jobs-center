@@ -15,21 +15,19 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/context/auth";
 import { SignInModal } from "@/components/SignInModal";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
 import { useUnreadCount } from "@/hooks/useMessages";
+import { useUnreadNotificationCount } from "@/hooks/useNotifications";
+import { NotificationCenter } from "@/components/NotificationCenter";
 
 const jobDropdownItems = [
   { name: "All Jobs", path: "/jobs" },
@@ -209,52 +207,9 @@ const Navbar = () => {
   const { isDark, toggle } = useTheme();
   const { user, signOut } = useAuth();
 
-  // Unseen notification counts
-  const isCompany = user?.role === "company";
-  const isDriver = user?.role === "driver";
-
-  // Company: new applications since last viewed
-  const { data: newAppCount = 0 } = useQuery({
-    queryKey: ["new-app-count", user?.id],
-    queryFn: async () => {
-      const lastSeen =
-        localStorage.getItem(`cdl-apps-seen-${user!.id}`) ??
-        "1970-01-01T00:00:00Z";
-      const { count, error } = await supabase
-        .from("applications")
-        .select("*", { count: "exact", head: true })
-        .eq("company_id", user!.id)
-        .gt("submitted_at", lastSeen);
-      if (error) return 0;
-      return count ?? 0;
-    },
-    enabled: !!isCompany,
-    refetchInterval: 30_000,
-  });
-
-  // Driver: applications whose status changed since last viewed
-  const { data: driverUpdateCount = 0 } = useQuery({
-    queryKey: ["driver-update-count", user?.id],
-    queryFn: async () => {
-      const lastSeen =
-        localStorage.getItem(`cdl-apps-seen-${user!.id}`) ??
-        "1970-01-01T00:00:00Z";
-      const { count, error } = await supabase
-        .from("applications")
-        .select("*", { count: "exact", head: true })
-        .eq("driver_id", user!.id)
-        .neq("pipeline_stage", "New")
-        .gt("updated_at", lastSeen);
-      if (error) return 0;
-      return count ?? 0;
-    },
-    enabled: !!isDriver,
-    refetchInterval: 30_000,
-  });
-
-  const { data: unreadMsgCount = 0 } = useUnreadCount(user?.id);
-  const notifCount =
-    (isCompany ? newAppCount : driverUpdateCount) + unreadMsgCount;
+  // Notification counts
+  const { data: unreadMsgCount = 0 } = useUnreadCount(user?.id, user?.role as "driver" | "company" | undefined);
+  const { data: notifCount = 0 } = useUnreadNotificationCount(user?.id);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -332,10 +287,15 @@ const Navbar = () => {
               .filter(
                 (link) =>
                   !(link.name === "Apply Now" && user?.role === "company") &&
-                  !(link.name === "Drivers" && user?.role === "driver"),
+                  !(link.name === "Drivers" && user?.role === "driver") &&
+                  !(link.name === "Pricing" && user?.role === "driver"),
               )
-              .map((link) =>
-                link.dropdown ? (
+              .map((link) => {
+                const displayName =
+                  link.name === "Apply Now" && user?.role === "driver"
+                    ? "Find My Matches"
+                    : link.name;
+                return link.dropdown ? (
                   <div
                     key={link.path}
                     className="relative"
@@ -357,7 +317,7 @@ const Navbar = () => {
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      {link.name}
+                      {displayName}
                       <ChevronDown
                         className={`h-3.5 w-3.5 transition-transform duration-200 ${jobsDropdownOpen ? "rotate-180" : ""}`}
                       />
@@ -409,7 +369,7 @@ const Navbar = () => {
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {link.name}
+                    {displayName}
                     {location.pathname === link.path && (
                       <motion.div
                         layoutId="activeTab"
@@ -422,14 +382,15 @@ const Navbar = () => {
                       />
                     )}
                   </Link>
-                ),
-              )}
+                );
+              })}
           </div>
 
           <div className="hidden lg:flex items-center gap-3">
             <TruckToggle isDark={isDark} onClick={toggle} />
             {user ? (
               <>
+                <NotificationCenter userId={user.id} />
                 {/* Profile dropdown */}
                 <div className="relative" ref={profileRef}>
                   <button
@@ -441,15 +402,6 @@ const Navbar = () => {
                   >
                     <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/12 text-xs font-semibold text-primary">
                       {getInitials(user.name)}
-                      {notifCount > 0 && (
-                        <span
-                          className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-background"
-                          aria-label={`${notifCount} update${notifCount > 1 ? "s" : ""}`}
-                          title={`${notifCount} update${notifCount > 1 ? "s" : ""}`}
-                        >
-                          {notifCount > 99 ? "99+" : notifCount}
-                        </span>
-                      )}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-foreground">
@@ -478,18 +430,6 @@ const Navbar = () => {
                         role="menu"
                         aria-label="Account menu"
                       >
-                        {notifCount > 0 && (
-                          <>
-                            <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
-                              <span className="inline-flex items-center rounded-full bg-red-500/10 px-2 py-0.5 text-red-600 dark:text-red-400">
-                                {isCompany
-                                  ? `${notifCount} new application${notifCount > 1 ? "s" : ""}`
-                                  : `${notifCount} application update${notifCount > 1 ? "s" : ""}`}
-                              </span>
-                            </div>
-                            <hr className="my-1 border-border" />
-                          </>
-                        )}
                         <Link
                           to={
                             user.role === "admin"
@@ -597,10 +537,15 @@ const Navbar = () => {
                       !(
                         link.name === "Apply Now" && user?.role === "company"
                       ) &&
-                      !(link.name === "Drivers" && user?.role === "driver"),
+                      !(link.name === "Drivers" && user?.role === "driver") &&
+                      !(link.name === "Pricing" && user?.role === "driver"),
                   )
-                  .map((link) =>
-                    link.dropdown ? (
+                  .map((link) => {
+                    const displayName =
+                      link.name === "Apply Now" && user?.role === "driver"
+                        ? "Find My Matches"
+                        : link.name;
+                    return link.dropdown ? (
                       <div key={link.path}>
                         <button
                           onClick={() => setJobsMobileOpen(!jobsMobileOpen)}
@@ -611,7 +556,7 @@ const Navbar = () => {
                               : "hover:bg-muted text-muted-foreground"
                           }`}
                         >
-                          {link.name}
+                          {displayName}
                           <ChevronDown
                             className={`h-4 w-4 transition-transform duration-200 ${jobsMobileOpen ? "rotate-180" : ""}`}
                           />
@@ -655,10 +600,10 @@ const Navbar = () => {
                             : "hover:bg-muted text-muted-foreground"
                         }`}
                       >
-                        {link.name}
+                        {displayName}
                       </Link>
-                    ),
-                  )}
+                    );
+                  })}
                 {user ? (
                   <>
                     <Link
@@ -753,22 +698,24 @@ const Navbar = () => {
 
       {signInOpen && <SignInModal onClose={() => setSignInOpen(false)} />}
 
-      <AlertDialog open={signOutOpen} onOpenChange={setSignOutOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Sign out</AlertDialogTitle>
-            <AlertDialogDescription>
+      <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sign out</DialogTitle>
+            <DialogDescription>
               Are you sure you want to sign out of your account?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSignOut}>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSignOutOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmSignOut}>
               Sign Out
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

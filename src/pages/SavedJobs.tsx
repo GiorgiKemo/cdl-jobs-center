@@ -1,25 +1,41 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Bookmark, BookmarkCheck, Truck } from "lucide-react";
-import { useState, useMemo } from "react";
-import { useJobs } from "@/hooks/useJobs";
+import { useEffect } from "react";
+import { useAuth } from "@/context/auth";
+import { useActiveJobs } from "@/hooks/useJobs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { toast } from "sonner";
+import { Spinner } from "@/components/ui/Spinner";
 
 const SavedJobs = () => {
-  const { loadAll } = useJobs();
-  const savedJobs = useSavedJobs();
-  const [savedIds, setSavedIds] = useState<string[]>(() => savedJobs.load());
+  usePageTitle("Saved Jobs");
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
-  const allJobs = useMemo(() => loadAll().filter((j) => !j.status || j.status === "Active"), []);
+  // Redirect non-drivers
+  useEffect(() => {
+    if (user && user.role !== "driver") navigate("/dashboard", { replace: true });
+    if (!user) navigate("/signin", { replace: true });
+  }, [user, navigate]);
+
+  if (!user || user.role !== "driver") return null;
+
+  return <SavedJobsInner driverId={user.id} />;
+};
+
+const SavedJobsInner = ({ driverId }: { driverId: string }) => {
+  const { jobs: allJobs, isLoading: jobsLoading } = useActiveJobs();
+  const { savedIds, isLoading: savedLoading, toggle } = useSavedJobs(driverId);
 
   const jobs = allJobs.filter((j) => savedIds.includes(j.id));
+  const isLoading = jobsLoading || savedLoading;
 
-  const handleRemove = (id: string, company: string) => {
-    savedJobs.toggle(id);
-    setSavedIds(savedJobs.load());
+  const handleRemove = async (id: string, company: string) => {
+    await toggle(id);
     toast.success(`Removed ${company} from saved jobs`);
   };
 
@@ -30,7 +46,7 @@ const SavedJobs = () => {
         {/* Breadcrumb */}
         <p className="text-sm text-muted-foreground mb-4">
           <Link to="/" className="text-primary hover:underline">Main</Link>
-          <span className="mx-1">»</span>
+          <span className="mx-1">&raquo;</span>
           Saved Jobs
         </p>
 
@@ -40,7 +56,9 @@ const SavedJobs = () => {
           <span className="text-sm text-muted-foreground">({jobs.length})</span>
         </div>
 
-        {jobs.length === 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center py-12"><Spinner size="md" /></div>
+        ) : jobs.length === 0 ? (
           <div className="border border-border bg-card p-12 text-center">
             <Bookmark className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
             <p className="font-medium text-foreground mb-1">No saved jobs yet</p>

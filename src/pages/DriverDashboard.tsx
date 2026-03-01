@@ -18,13 +18,14 @@ import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { ChatPanel } from "@/components/ChatPanel";
+import { NotificationPreferences } from "@/components/NotificationPreferences";
 import { useUnreadCount } from "@/hooks/useMessages";
 import { formatRelativeDate } from "@/lib/dateUtils";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import {
   useDriverJobMatches,
-  useMatchingRollout,
   useRecordDriverMatchFeedback,
   useRefreshMyMatches,
   useTrackDriverMatchEvent,
@@ -93,15 +94,7 @@ function rowToApp(row: Record<string, any>): StoredApplication {
   };
 }
 
-const US_STATES = [
-  "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware",
-  "Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky",
-  "Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi",
-  "Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico",
-  "New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania",
-  "Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont",
-  "Virginia","Washington","West Virginia","Wisconsin","Wyoming",
-];
+import { US_STATES } from "@/data/constants";
 
 const LICENSE_CLASS_LABELS: Record<string, string> = { a: "Class A", b: "Class B", c: "Class C", permit: "Permit Only" };
 const YEARS_EXP_LABELS: Record<string, string> = { none: "None", "less-1": "< 1 year", "1-3": "1–3 years", "3-5": "3–5 years", "5+": "5+ years" };
@@ -149,6 +142,7 @@ const StageBadge = ({ stage }: { stage?: PipelineStage }) => {
 };
 
 const DriverDashboard = () => {
+  usePageTitle("Driver Dashboard");
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -175,25 +169,20 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
   const { jobs: allActiveJobs } = useActiveJobs();
   const { savedIds, toggle: toggleSave } = useSavedJobs(user!.id);
   const { profile, isLoading: profileLoading, saveProfile } = useDriverProfile(user!.id);
-  const { data: unreadMsgCount = 0 } = useUnreadCount(user!.id);
+  const { data: unreadMsgCount = 0 } = useUnreadCount(user!.id, "driver");
   const { data: aiMatches = [], isLoading: aiMatchesLoading } = useDriverJobMatches(
     user!.id,
     { limit: 20, minScore: 0, excludeHidden: true },
   );
   const matchesLoading = aiMatchesLoading;
-  const { data: rollout } = useMatchingRollout();
   const feedbackMutation = useRecordDriverMatchFeedback(user!.id);
   const trackEventMutation = useTrackDriverMatchEvent(user!.id);
   const refreshMatchesMutation = useRefreshMyMatches(user!.id);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const lastConsumedTab = useRef<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const t = searchParams.get("tab");
-    if (isDriverTab(t)) {
-      lastConsumedTab.current = t;
-      return t;
-    }
+    if (isDriverTab(t)) return t;
     return "overview";
   });
   const [expandedApp, setExpandedApp] = useState<string | null>(null);
@@ -202,7 +191,8 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
   const [aiMinScore, setAiMinScore] = useState<"all" | "40" | "60" | "80">("all");
   const [feedbackPendingByJob, setFeedbackPendingByJob] = useState<Record<string, DriverFeedback | null>>({});
   const [trackedViewJobIds, setTrackedViewJobIds] = useState<Set<string>>(new Set());
-  const [initialChatAppId, setInitialChatAppId] = useState<string | null>(null);
+  const [initialChatAppId, setInitialChatAppId] = useState<string | null>(() => searchParams.get("app"));
+  const lastAutoScrollAppIdRef = useRef<string | null>(null);
   const [dismissedApps, setDismissedApps] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem(`cdl-dismissed-apps-${user!.id}`);
@@ -210,15 +200,26 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
     } catch { return new Set(); }
   });
 
-  // Consume deep-link tab from URL (fires on navigation, not on unrelated param changes)
+  // Consume deep-link tab/app from URL so notification links always switch tabs.
   useEffect(() => {
     const tabFromUrl = searchParams.get("tab");
     if (!tabFromUrl || !isDriverTab(tabFromUrl)) return;
-    if (lastConsumedTab.current === tabFromUrl) return;
-    lastConsumedTab.current = tabFromUrl;
+    const appFromUrl = searchParams.get("app");
+
     setActiveTab(tabFromUrl);
+    if (tabFromUrl === "messages") {
+      setInitialChatAppId(appFromUrl);
+    } else if (tabFromUrl === "applications" && appFromUrl) {
+      setStageFilter("All");
+      setExpandedApp(appFromUrl);
+      lastAutoScrollAppIdRef.current = null;
+    }
+
     const next = new URLSearchParams(searchParams);
     next.delete("tab");
+    if (tabFromUrl !== "messages") {
+      next.delete("app");
+    }
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
@@ -234,6 +235,8 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
       if (error) throw error;
       return (data ?? []).map(rowToApp);
     },
+    enabled: !!user?.id,
+    staleTime: 30_000,
   });
 
   // Profile form state — initialized from DB once loaded
@@ -290,6 +293,17 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
 
   // Filtered applications for the applications tab
   const filteredApps = stageFilter === "All" ? applications : applications.filter((a) => a.pipeline_stage === stageFilter);
+
+  useEffect(() => {
+    if (activeTab !== "applications" || !expandedApp) return;
+    if (lastAutoScrollAppIdRef.current === expandedApp) return;
+
+    const targetEl = document.getElementById(`driver-application-${expandedApp}`);
+    if (targetEl) {
+      targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      lastAutoScrollAppIdRef.current = expandedApp;
+    }
+  }, [activeTab, expandedApp, filteredApps.length]);
 
   // Saved jobs data — full job objects for the saved tab
   const savedJobs = allActiveJobs.filter((j) => savedIds.includes(j.id));
@@ -507,7 +521,7 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
             </div>
 
             {/* Recommended Jobs For You */}
-            {rollout?.driverUiEnabled && !rollout.shadowMode && (
+            {(
               <div>
                 <div className="flex items-center gap-2 mb-3 border-l-4 border-primary pl-3">
                   <Sparkles className="h-4 w-4 text-primary" />
@@ -659,14 +673,6 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
         {/* AI MATCHES */}
         {activeTab === "ai-matches" && (
           <div className="space-y-5">
-            {!rollout?.driverUiEnabled || rollout.shadowMode ? (
-              <div className="border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-                <Sparkles className="h-8 w-8 mx-auto mb-3 text-primary" />
-                <p className="font-medium text-foreground mb-1">AI Matches is not available yet</p>
-                <p>This feature is currently in staged rollout for driver accounts.</p>
-              </div>
-            ) : (
-              <>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="rounded-xl border border-border bg-card p-4">
                     <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Best Match</p>
@@ -779,8 +785,6 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
                     ))}
                   </div>
                 )}
-              </>
-            )}
           </div>
         )}
 
@@ -835,7 +839,11 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
                     ? app.jobTitle
                     : "General Application";
                   return (
-                    <div key={app.id} className={`relative border bg-card ${unseen ? "border-primary/50" : "border-border"}`}>
+                    <div
+                      id={`driver-application-${app.id}`}
+                      key={app.id}
+                      className={`relative border bg-card ${unseen ? "border-primary/50" : "border-border"}`}
+                    >
                       {unseen && (
                         <span className="absolute -top-1.5 -right-1.5 h-3 w-3 rounded-full bg-red-500 border-2 border-background" />
                       )}
@@ -1096,6 +1104,7 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
                 )}
               </Button>
             </div>
+            <NotificationPreferences userId={user!.id} role="driver" />
           </div>
         )}
 

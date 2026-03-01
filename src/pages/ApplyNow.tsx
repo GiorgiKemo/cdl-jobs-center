@@ -1,6 +1,6 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Link } from "react-router-dom";
+import { Link, useNavigationType } from "react-router-dom";
 import { useApplication } from "@/hooks/useApplication";
 import { useAuth } from "@/context/auth";
 import { useDriverProfile } from "@/hooks/useDriverProfile";
@@ -18,18 +18,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { SignInModal } from "@/components/SignInModal";
 import { AIGenerationScreen } from "@/components/matching/AIGenerationScreen";
 import { MatchResultsReveal } from "@/components/matching/MatchResultsReveal";
-import { Sparkles, ChevronDown, ChevronUp, Check, Clock, User, Briefcase, Settings, CheckCircle2, X } from "lucide-react";
+import { Sparkles, ChevronDown, ChevronUp, Check, Clock, User, Briefcase, Settings, CheckCircle2, X, RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-
-const US_STATES = [
-  "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware",
-  "Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky",
-  "Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi",
-  "Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico",
-  "New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania",
-  "Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont",
-  "Virginia","Washington","West Virginia","Wisconsin","Wyoming",
-];
+import { usePageTitle } from "@/hooks/usePageTitle";
+import { US_STATES } from "@/data/constants";
 
 // ── Inline helpers ──
 
@@ -111,8 +103,12 @@ const ToggleRow = ({ id, name, label, checked, onChange }: { id?: string; name?:
   </div>
 );
 
+const MATCH_STEP_KEY = "cdl-ai-match-step";
+
 const ApplyNow = () => {
+  usePageTitle("Apply Now");
   const { user, loading } = useAuth();
+  const navType = useNavigationType();
   const [signInOpen, setSignInOpen] = useState(false);
   const { load, save } = useApplication();
   const saved = load();
@@ -120,7 +116,16 @@ const ApplyNow = () => {
   const refreshMyMatches = useRefreshMyMatches(user?.id);
   const queryClient = useQueryClient();
 
-  const [step, setStep] = useState(1);
+  // Only restore step from sessionStorage on back-navigation (POP).
+  // Clicking "Apply Now" link is a PUSH — always start fresh at step 1.
+  const [step, setStep] = useState(() => {
+    if (navType !== "POP") return 1;
+    const raw = sessionStorage.getItem(MATCH_STEP_KEY);
+    if (!raw) return 1;
+    const n = parseInt(raw, 10);
+    if (n === 4) return 5; // can't replay animation, jump to results
+    return n >= 1 && n <= 5 ? n : 1;
+  });
   const [submitting, setSubmitting] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
@@ -128,6 +133,12 @@ const ApplyNow = () => {
   // AI matching state
   const [matchesStartedAt, setMatchesStartedAt] = useState<number | null>(null);
   const [animationComplete, setAnimationComplete] = useState(false);
+  const handleAnimationComplete = useCallback(() => setAnimationComplete(true), []);
+
+  // Persist step to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem(MATCH_STEP_KEY, String(step));
+  }, [step]);
 
   const [firstName, setFirstName] = useState(saved.firstName ?? "");
   const [lastName, setLastName] = useState(saved.lastName ?? "");
@@ -172,11 +183,18 @@ const ApplyNow = () => {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Fetch matches — only when step >= 4
-  const { data: matches = [] } = useDriverJobMatches(
-    step >= 4 ? user?.id : undefined,
+  // Fetch matches unconditionally so they survive back-navigation
+  const { data: matches = [], isLoading: matchesLoading } = useDriverJobMatches(
+    user?.id,
     { limit: 20, minScore: 0, excludeHidden: true },
   );
+
+  // If restored to step 5 but no matches exist (stale session), fall back to step 1
+  useEffect(() => {
+    if (step === 5 && !matchesLoading && matches.length === 0 && !matchesStartedAt) {
+      setStep(1);
+    }
+  }, [step, matchesLoading, matches.length, matchesStartedAt]);
 
   // Poll for fresh matches during step 4
   useEffect(() => {
@@ -346,7 +364,10 @@ const ApplyNow = () => {
     try {
       saveDraft();
 
-      // Run profile save + application insert + match refresh in parallel
+      // Fire match refresh in background — don't block form submission
+      refreshMyMatches.mutateAsync().catch(() => {});
+
+      // Run profile save + application insert in parallel
       await Promise.all([
         // 1. Upsert driver profile
         saveProfile({
@@ -362,9 +383,7 @@ const ApplyNow = () => {
           driver_type: driverType, license_class: licenseClass,
           years_exp: yearsExp, license_state: licenseState, solo_team: soloTeam,
           notes, prefs, endorse, hauler, route, extra, pipeline_stage: "New",
-        }).then(({ error }) => { if (error) console.error("Application insert error:", error); }),
-        // 3. Trigger match refresh (non-fatal)
-        refreshMyMatches.mutateAsync().catch(() => {}),
+        }).then(({ error }) => { if (error) toast.error("Failed to save application record."); }),
       ]);
 
       // 4. Transition to AI generation screen
@@ -374,7 +393,6 @@ const ApplyNow = () => {
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Something went wrong. Please try again.";
-      console.error("Submit error:", err);
       toast.error(msg);
     } finally {
       setSubmitting(false);
@@ -684,15 +702,33 @@ const ApplyNow = () => {
 
             {/* ── STEP 4: AI Generation Animation ── */}
             {step === 4 && (
-              <AIGenerationScreen onAllPhasesComplete={() => setAnimationComplete(true)} />
+              <AIGenerationScreen onAllPhasesComplete={handleAnimationComplete} />
             )}
 
             {/* ── STEP 5: Match Results ── */}
             {step === 5 && (
-              <MatchResultsReveal
-                matches={matches}
-                isStillComputing={isStillComputing}
-              />
+              <>
+                <MatchResultsReveal
+                  matches={matches}
+                  isStillComputing={isStillComputing}
+                />
+                <div className="flex justify-center mt-4">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      sessionStorage.removeItem(MATCH_STEP_KEY);
+                      setMatchesStartedAt(null);
+                      setAnimationComplete(false);
+                      setStep(1);
+                    }}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-1.5" />
+                    Update Profile &amp; Search Again
+                  </Button>
+                </div>
+              </>
             )}
 
           </div>

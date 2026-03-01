@@ -8,6 +8,28 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const DEFAULT_ORIGIN = Deno.env.get("SITE_URL") ?? "https://cdl-jobs-center.vercel.app";
+
+const allowedOrigins = (
+  Deno.env.get("ALLOWED_ORIGINS") ??
+  `${DEFAULT_ORIGIN},http://localhost:8080,http://127.0.0.1:8080`
+)
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const resolveAllowedOrigin = (req: Request) => {
+  const requestOrigin = req.headers.get("origin");
+  if (!requestOrigin) return DEFAULT_ORIGIN;
+
+  try {
+    const normalized = new URL(requestOrigin).origin;
+    return allowedOrigins.includes(normalized) ? normalized : DEFAULT_ORIGIN;
+  } catch {
+    return DEFAULT_ORIGIN;
+  }
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -32,7 +54,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const token = authHeader.replace("Bearer ", "");
+    const token = authHeader.replace(/^Bearer\s+/i, "");
     const {
       data: { user },
       error: authError,
@@ -108,9 +130,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Determine origin for redirect URLs
-    const origin =
-      req.headers.get("origin") || "https://cdl-jobs-center.vercel.app";
+    // Only allow redirects to trusted origins.
+    const origin = resolveAllowedOrigin(req);
 
     // Create Checkout Session
     const session = await stripe.checkout.sessions.create({

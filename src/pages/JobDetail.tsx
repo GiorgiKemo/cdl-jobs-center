@@ -2,7 +2,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Phone, MapPin, ExternalLink, Truck, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Phone, MapPin, ExternalLink, Truck, CheckCircle2, AlertTriangle, ArrowLeft } from "lucide-react";
 import { useJobById } from "@/hooks/useJobs";
 import { useAuth } from "@/context/auth";
 import { useDriverJobMatchScore, useMatchingRollout } from "@/hooks/useMatchScores";
@@ -79,14 +79,25 @@ const JobDetail = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="container mx-auto py-8 max-w-4xl">
-        {/* Breadcrumb */}
-        <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary hover:underline">Main</Link>
-          <span className="mx-1">»</span>
-          <Link to="/jobs" className="text-primary hover:underline">jobs</Link>
-          <span className="mx-1">»</span>
-          {job.title}
-        </p>
+        {/* Breadcrumb + Back */}
+        <div className="flex items-center justify-between mb-6">
+          <p className="text-sm text-muted-foreground">
+            <Link to="/" className="text-primary hover:underline">Main</Link>
+            <span className="mx-1">»</span>
+            <Link to="/jobs" className="text-primary hover:underline">jobs</Link>
+            <span className="mx-1">»</span>
+            {job.title}
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-1.5 text-primary hover:text-primary/70 transition-colors shrink-0 text-sm font-medium"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+            Back
+          </button>
+        </div>
 
         {/* Title */}
         <div className="flex items-center gap-3 mb-4 border-l-4 border-primary pl-3">

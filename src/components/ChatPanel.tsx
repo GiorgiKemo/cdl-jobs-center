@@ -35,6 +35,7 @@ export function ChatPanel({ userId, userRole, userName, initialApplicationId }: 
   const [draft, setDraft] = useState("");
   const sendMessage = useSendMessage();
   const markRead = useMarkRead();
+  const lastMarkedKey = useRef<string | null>(null);
 
   // Pre-select conversation from prop
   useEffect(() => {
@@ -45,11 +46,12 @@ export function ChatPanel({ userId, userRole, userName, initialApplicationId }: 
 
   // Mark messages as read when opening a conversation
   useEffect(() => {
-    if (selectedAppId && selected && selected.unreadCount > 0) {
-      markRead.mutate({ applicationId: selectedAppId, userId });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAppId]);
+    if (!selectedAppId || !selected || selected.unreadCount <= 0) return;
+    const key = `${selectedAppId}:${selected.unreadCount}`;
+    if (lastMarkedKey.current === key) return;
+    lastMarkedKey.current = key;
+    markRead.mutate({ applicationId: selectedAppId, userId });
+  }, [selectedAppId, selected, markRead, userId]);
 
   const handleSend = () => {
     const body = draft.trim();
@@ -77,7 +79,7 @@ export function ChatPanel({ userId, userRole, userName, initialApplicationId }: 
     <div className="border border-border bg-card overflow-hidden h-[60vh] min-h-[400px] max-h-[800px]">
       <div className="flex h-full">
         {/* Conversation list */}
-        <div className={`w-full md:w-80 md:shrink-0 border-r border-border flex flex-col ${!showList ? "hidden md:flex" : "flex"}`}>
+        <div className={`w-full md:w-[22rem] md:shrink-0 border-r border-border flex flex-col ${!showList ? "hidden md:flex" : "flex"}`}>
           <div className="px-4 py-3 border-b border-border">
             <p className="font-semibold text-sm">Messages</p>
           </div>
@@ -145,31 +147,86 @@ function ConversationRow({
   isActive: boolean;
   onClick: () => void;
 }) {
+  const hasUnread = conv.unreadCount > 0;
+
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left flex items-center gap-3 px-4 py-3 border-b border-border transition-colors ${
-        isActive ? "bg-primary/5" : "hover:bg-muted/50"
+      className={`relative w-full min-w-0 overflow-hidden text-left flex items-center gap-3 px-4 py-3 border-b border-border transition-colors ${
+        isActive
+          ? "bg-primary/15 ring-1 ring-inset ring-primary/30 shadow-sm"
+          : hasUnread
+            ? "bg-primary/5 hover:bg-primary/10"
+            : "hover:bg-muted/50"
       }`}
+      aria-label={`${conv.otherPartyName}${hasUnread ? `, ${conv.unreadCount} unread` : ""}`}
+      aria-current={isActive ? "true" : undefined}
     >
-      <div className="h-10 w-10 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
+      {(isActive || (hasUnread && !isActive)) && (
+        <span
+          className={`absolute left-0 top-0 h-full ${isActive ? "w-1.5 bg-primary" : "w-1 bg-primary/80"}`}
+          aria-hidden
+        />
+      )}
+
+      <div className={`h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold ${
+        isActive
+          ? "bg-primary text-primary-foreground"
+          : hasUnread
+            ? "bg-primary/20 text-primary"
+            : "bg-primary/10 text-primary"
+      }`}>
         {getInitials(conv.otherPartyName)}
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-2">
-          <p className="font-medium text-sm truncate">{conv.otherPartyName}</p>
+
+      <div className="w-0 flex-1 overflow-hidden">
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-1.5">
+            {hasUnread && !isActive && (
+              <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
+            )}
+            {isActive && (
+              <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-label="Selected conversation" />
+            )}
+            <p
+              className={`truncate text-sm ${
+                isActive
+                  ? "font-semibold text-primary"
+                  : hasUnread
+                    ? "font-semibold text-foreground"
+                    : "font-medium text-foreground"
+              }`}
+            >
+              {conv.otherPartyName}
+            </p>
+          </div>
           {conv.lastMessageAt && (
             <span className="text-[10px] text-muted-foreground shrink-0">{timeAgo(conv.lastMessageAt)}</span>
           )}
         </div>
         {conv.jobTitle && (
-          <p className="text-[11px] text-muted-foreground truncate">{conv.jobTitle}</p>
+          <p
+            className={`mt-0.5 max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[11px] ${
+              isActive ? "text-primary/80" : "text-muted-foreground"
+            }`}
+          >
+            {conv.jobTitle}
+          </p>
         )}
         {conv.lastMessage && (
-          <p className="text-xs text-muted-foreground truncate mt-0.5">{conv.lastMessage}</p>
+          <p className={`mt-0.5 max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-xs ${
+            isActive
+              ? "font-medium text-primary/85"
+              : hasUnread
+                ? "font-medium text-foreground/80"
+                : "text-muted-foreground"
+          }`}>
+            {conv.lastMessage}
+          </p>
         )}
       </div>
-      {conv.unreadCount > 0 && (
+
+      {hasUnread && (
         <span className="h-5 min-w-[20px] rounded-full bg-red-500 text-[10px] font-bold text-white flex items-center justify-center px-1 shrink-0">
           {conv.unreadCount}
         </span>

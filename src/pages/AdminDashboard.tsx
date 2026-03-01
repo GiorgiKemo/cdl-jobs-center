@@ -48,12 +48,14 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useMatchingRollout } from "@/hooks/useMatchScores";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 /* ── Types ──────────────────────────────────────────────────────────── */
 type AdminTab = "overview" | "users" | "subscriptions" | "jobs" | "leads" | "matching";
 
 /* ── Outer guard ────────────────────────────────────────────────────── */
 const AdminDashboard = () => {
+  usePageTitle("Admin Dashboard");
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 

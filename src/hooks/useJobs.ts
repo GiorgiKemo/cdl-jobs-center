@@ -36,6 +36,7 @@ export function useActiveJobs() {
       if (error) throw error;
       return (data ?? []).map(rowToJob);
     },
+    staleTime: 60_000,
   });
   return { jobs: data ?? [], isLoading };
 }
@@ -93,10 +94,7 @@ export function useJobs(companyId: string) {
         status: job.status ?? "Active",
       };
       const { error } = await supabase.from("jobs").insert(payload);
-      if (error) {
-        console.error("addJob insert error:", error, "payload:", payload);
-        throw error;
-      }
+      if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: key }),
   });

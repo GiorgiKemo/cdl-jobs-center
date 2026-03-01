@@ -95,10 +95,10 @@ const ApplicationHistory = () => {
             <ClipboardList className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
             <p className="font-medium text-foreground mb-1">No applications yet</p>
             <p className="text-sm text-muted-foreground mb-4">
-              Submit your first application to get matched with top carriers.
+              Get AI-ranked jobs based on your profile and preferences.
             </p>
             <Button asChild>
-              <Link to="/apply">Apply Now</Link>
+              <Link to="/apply">Find My Matches</Link>
             </Button>
           </div>
         ) : (

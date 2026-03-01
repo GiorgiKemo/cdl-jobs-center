@@ -22,6 +22,7 @@ import {
   useDroppable,
 } from "@dnd-kit/core";
 import { ChatPanel } from "@/components/ChatPanel";
+import { NotificationPreferences } from "@/components/NotificationPreferences";
 import { useUnreadCount } from "@/hooks/useMessages";
 import { useLeads, useUpdateLeadStatus, useSyncLeads } from "@/hooks/useLeads";
 import { useSubscription, useCancelSubscription, PLANS } from "@/hooks/useSubscription";
@@ -29,6 +30,7 @@ import { useCompanyDriverMatches, useMatchingRollout } from "@/hooks/useMatchSco
 import {
 } from "@/components/ui/alert-dialog";
 import { formatDate } from "@/lib/dateUtils";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -145,15 +147,35 @@ const EMPTY_FORM = {
 };
 
 type Tab = "jobs" | "applications" | "pipeline" | "profile" | "analytics" | "messages" | "leads" | "hired" | "subscription" | "ai-matches";
-const isCompanyDeepLinkTab = (value: string | null): value is Tab =>
+const isCompanyTab = (value: string | null): value is Tab =>
+  value === "jobs" ||
+  value === "applications" ||
+  value === "pipeline" ||
+  value === "profile" ||
+  value === "analytics" ||
   value === "messages" ||
   value === "leads" ||
+  value === "hired" ||
   value === "subscription" ||
   value === "ai-matches";
 
 // ── Application card with expand/collapse ────────────────────────────────────
-const AppCard = ({ app }: { app: ReceivedApplication }) => {
+const AppCard = ({
+  app,
+  isHighlighted = false,
+  autoOpenToken,
+}: {
+  app: ReceivedApplication;
+  isHighlighted?: boolean;
+  autoOpenToken?: number;
+}) => {
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (autoOpenToken !== undefined) {
+      setOpen(true);
+    }
+  }, [autoOpenToken]);
 
   const flaggedToggles = (map: Record<string, boolean>) =>
     Object.entries(map)
@@ -162,7 +184,10 @@ const AppCard = ({ app }: { app: ReceivedApplication }) => {
       .join(", ") || "None";
 
   return (
-    <div className="border border-border bg-card">
+    <div
+      id={`company-application-${app.id}`}
+      className={`border bg-card transition-colors ${isHighlighted ? "border-primary ring-1 ring-primary/30" : "border-border"}`}
+    >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4">
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-foreground">
@@ -465,6 +490,7 @@ const AiMatchesContent = ({
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 const Dashboard = () => {
+  usePageTitle("Company Dashboard");
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -489,7 +515,7 @@ const Dashboard = () => {
 const DashboardInner = ({ user }: { user: AuthUser }) => {
   const qc = useQueryClient();
   const { jobs, addJob, updateJob, removeJob } = useJobs(user!.id);
-  const { data: unreadMsgCount = 0 } = useUnreadCount(user!.id);
+  const { data: unreadMsgCount = 0 } = useUnreadCount(user!.id, "company");
   const {
     data: leads = [],
     isLoading: leadsLoading,
@@ -507,15 +533,20 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
   const leadLimit = subscription ? PLANS[subscription.plan].leads : 3;
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const lastConsumedTab = useRef<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const t = searchParams.get("tab");
-    if (isCompanyDeepLinkTab(t)) {
-      lastConsumedTab.current = t;
-      return t;
-    }
+    if (isCompanyTab(t)) return t;
     return "jobs";
   });
+  const [focusedApplicationId, setFocusedApplicationId] = useState<string | null>(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "applications") {
+      return searchParams.get("app");
+    }
+    return null;
+  });
+  const [autoOpenApplicationToken, setAutoOpenApplicationToken] = useState(0);
+  const lastAutoScrollAppIdRef = useRef<string | null>(null);
   const [initialChatAppId, setInitialChatAppId] = useState<string | null>(() => searchParams.get("app"));
   const [appPage, setAppPage] = useState(0);
   const [leadPage, setLeadPage] = useState(0);
@@ -535,16 +566,28 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
   const [aiJobFilter, setAiJobFilter] = useState<string>("all");
   const [aiSourceFilter, setAiSourceFilter] = useState<string>("all");
 
-  // Consume deep-link tab from URL (fires on navigation, not on unrelated param changes)
+  // Consume deep-link tab/app from URL so navbar notification links always switch tabs.
   useEffect(() => {
     const tabFromUrl = searchParams.get("tab");
-    if (!tabFromUrl || !isCompanyDeepLinkTab(tabFromUrl)) return;
-    // Skip if we already consumed this exact tab value (prevents re-fire loops)
-    if (lastConsumedTab.current === tabFromUrl) return;
-    lastConsumedTab.current = tabFromUrl;
+    if (!tabFromUrl || !isCompanyTab(tabFromUrl)) return;
+    const appFromUrl = searchParams.get("app");
+
     setActiveTab(tabFromUrl);
+    if (tabFromUrl === "messages") {
+      setInitialChatAppId(appFromUrl);
+    } else if (tabFromUrl === "applications") {
+      setFocusedApplicationId(appFromUrl);
+      if (appFromUrl) {
+        setAutoOpenApplicationToken((prev) => prev + 1);
+        lastAutoScrollAppIdRef.current = null;
+      }
+    }
+
     const next = new URLSearchParams(searchParams);
     next.delete("tab");
+    if (tabFromUrl !== "messages") {
+      next.delete("app");
+    }
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
@@ -583,7 +626,30 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
       if (error) throw error;
       return (data ?? []).map(rowToApp);
     },
+    enabled: !!user?.id,
+    staleTime: 30_000,
   });
+
+  useEffect(() => {
+    if (activeTab !== "applications" || !focusedApplicationId || applications.length === 0) return;
+
+    const targetIndex = applications.findIndex((app) => app.id === focusedApplicationId);
+    if (targetIndex < 0) return;
+
+    const targetPage = Math.floor(targetIndex / APP_PAGE_SIZE);
+    if (targetPage !== appPage) {
+      setAppPage(targetPage);
+      return;
+    }
+
+    if (lastAutoScrollAppIdRef.current === focusedApplicationId) return;
+
+    const targetEl = document.getElementById(`company-application-${focusedApplicationId}`);
+    if (targetEl) {
+      targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      lastAutoScrollAppIdRef.current = focusedApplicationId;
+    }
+  }, [activeTab, focusedApplicationId, applications, appPage]);
 
   // Load company profile on mount
   useEffect(() => {
@@ -675,7 +741,6 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
       const msg = err instanceof Error
         ? err.message
         : (err as { message?: string })?.message ?? "Failed to save job.";
-      console.error("Save job error:", err);
       toast.error(msg);
     } finally {
       setSavingJob(false);
@@ -741,10 +806,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
         updated_at: new Date().toISOString(),
       };
       const { error } = await supabase.from("company_profiles").upsert(payload);
-      if (error) {
-        console.error("Save profile error:", error, "payload:", payload);
-        throw error;
-      }
+      if (error) throw error;
       setLastSavedSnapshot(currentProfileSnapshot);
       setProfileSaveStatus("saved");
       toast.success("Profile saved.");
@@ -752,7 +814,6 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
       const msg = err instanceof Error
         ? err.message
         : (err as { message?: string })?.message ?? "Failed to save profile.";
-      console.error("Save profile catch:", err);
       setProfileSaveStatus("idle");
       toast.error(msg);
     }
@@ -1057,7 +1118,14 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
               return (
                 <>
                   <div className="space-y-3">
-                    {pageApps.map((app) => <AppCard key={app.id} app={app} />)}
+                    {pageApps.map((app) => (
+                      <AppCard
+                        key={app.id}
+                        app={app}
+                        isHighlighted={focusedApplicationId === app.id}
+                        autoOpenToken={focusedApplicationId === app.id ? autoOpenApplicationToken : undefined}
+                      />
+                    ))}
                   </div>
                   {totalPages > 1 && (
                     <div className="flex items-center justify-between mt-4 text-sm">
@@ -1253,6 +1321,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                 )}
               </Button>
             </div>
+            <NotificationPreferences userId={user!.id} role="company" />
           </div>
         )}
 

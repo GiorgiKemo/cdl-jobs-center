@@ -10,6 +10,7 @@ const heroVideo = "/mainvideo.mp4";
 const Hero = () => {
   const { user } = useAuth();
   const isCompany = user?.role === "company";
+  const isDriver = user?.role === "driver";
   return (
     <section className="relative overflow-hidden bg-secondary min-h-[90vh] flex items-center">
       {/* Background image */}
@@ -61,7 +62,9 @@ const Hero = () => {
             >
               {isCompany
                 ? "Post once, get matched with qualified CDL drivers instantly. Over 150 carriers trust us."
-                : "Apply once, get matched with top carriers instantly. Over 2,000 drivers placed and counting."}
+                : isDriver
+                  ? "Get AI-ranked jobs based on your profile and preferences. Over 2,000 drivers placed and counting."
+                  : "Apply once, get matched with top carriers instantly. Over 2,000 drivers placed and counting."}
             </motion.p>
 
             <motion.div
@@ -76,7 +79,7 @@ const Hero = () => {
                 asChild
               >
                 <Link to={isCompany ? "/dashboard" : "/apply"}>
-                  {isCompany ? "Post a Job" : "Apply Now"}
+                  {isCompany ? "Post a Job" : isDriver ? "Find My Matches" : "Apply Now"}
                   <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </Button>

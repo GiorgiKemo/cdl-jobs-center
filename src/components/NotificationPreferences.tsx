@@ -1,0 +1,96 @@
+import { useState, useEffect } from "react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
+
+interface NotificationPreferencesProps {
+  userId: string;
+  role: "driver" | "company";
+}
+
+interface PrefItem {
+  key: string;
+  label: string;
+  description: string;
+}
+
+const COMPANY_PREFS: PrefItem[] = [
+  { key: "new_application", label: "New Applications", description: "When a driver applies to one of your jobs" },
+  { key: "new_message", label: "New Messages", description: "When you receive a new message" },
+  { key: "new_match", label: "AI Matches", description: "When a new candidate match is found" },
+  { key: "new_lead", label: "New Leads", description: "When a new lead is captured" },
+  { key: "subscription_event", label: "Subscription Updates", description: "Plan changes and billing events" },
+  { key: "weekly_digest", label: "Weekly Digest", description: "Weekly summary of activity" },
+];
+
+const DRIVER_PREFS: PrefItem[] = [
+  { key: "stage_change", label: "Application Status", description: "When your application status changes" },
+  { key: "new_message", label: "New Messages", description: "When you receive a new message" },
+  { key: "new_match", label: "AI Matches", description: "When a new job match is found" },
+  { key: "profile_reminder", label: "Profile Reminders", description: "Reminders to complete your profile" },
+  { key: "weekly_digest", label: "Weekly Digest", description: "Weekly summary of activity" },
+];
+
+export function NotificationPreferences({ userId, role }: NotificationPreferencesProps) {
+  const prefs = role === "company" ? COMPANY_PREFS : DRIVER_PREFS;
+  const [values, setValues] = useState<Record<string, boolean>>({});
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("notification_preferences")
+        .eq("id", userId)
+        .single();
+      if (data?.notification_preferences) {
+        setValues(data.notification_preferences as Record<string, boolean>);
+      }
+      setLoaded(true);
+    })();
+  }, [userId]);
+
+  const handleToggle = async (key: string, checked: boolean) => {
+    const next = { ...values, [key]: checked };
+    setValues(next);
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ notification_preferences: next })
+      .eq("id", userId);
+
+    if (error) {
+      setValues(values); // revert
+      toast.error("Failed to update notification preference.");
+    }
+  };
+
+  if (!loaded) return null;
+
+  return (
+    <div className="border border-border bg-card p-5 mt-6">
+      <h3 className="font-semibold text-sm mb-1">Email Notifications</h3>
+      <p className="text-xs text-muted-foreground mb-4">
+        Choose which notifications you receive by email. In-app notifications are always enabled.
+      </p>
+      <div className="space-y-4">
+        {prefs.map((pref) => (
+          <div key={pref.key} className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <Label htmlFor={`pref-${pref.key}`} className="text-sm font-medium cursor-pointer">
+                {pref.label}
+              </Label>
+              <p className="text-xs text-muted-foreground">{pref.description}</p>
+            </div>
+            <Switch
+              id={`pref-${pref.key}`}
+              checked={values[pref.key] !== false}
+              onCheckedChange={(checked) => handleToggle(pref.key, checked)}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

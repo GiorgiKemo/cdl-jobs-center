@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 
 export interface Message {
   id: string;
@@ -96,6 +97,7 @@ export function useConversations(userId: string | undefined, role: "driver" | "c
     },
     enabled: !!userId,
     refetchInterval: 30_000,
+    staleTime: 15_000,
   });
 }
 
@@ -154,6 +156,7 @@ export function useSendMessage() {
     },
     onError: (_err, vars, ctx) => {
       if (ctx?.prev) qc.setQueryData(["messages", vars.applicationId], ctx.prev);
+      toast.error("Failed to send message. Please try again.");
     },
     onSettled: (_data, _err, vars) => {
       qc.invalidateQueries({ queryKey: ["messages", vars.applicationId] });
@@ -185,19 +188,33 @@ export function useMarkRead() {
 }
 
 /** Total unread message count for navbar badge */
-export function useUnreadCount(userId: string | undefined) {
+export function useUnreadCount(userId: string | undefined, role: "driver" | "company" | undefined) {
   return useQuery({
     queryKey: ["unread-messages-count", userId],
     queryFn: async () => {
+      if (role !== "driver" && role !== "company") return 0;
+      // 1. Get application IDs belonging to this user
+      const col = role === "driver" ? "driver_id" : "company_id";
+      const { data: apps, error: appErr } = await supabase
+        .from("applications")
+        .select("id")
+        .eq(col, userId!);
+      if (appErr || !apps || apps.length === 0) return 0;
+
+      const appIds = apps.map((a) => a.id);
+
+      // 2. Count unread messages only within those applications
       const { count, error } = await supabase
         .from("messages")
         .select("*", { count: "exact", head: true })
+        .in("application_id", appIds)
         .neq("sender_id", userId!)
         .is("read_at", null);
       if (error) return 0;
       return count ?? 0;
     },
-    enabled: !!userId,
+    enabled: !!userId && !!role,
     refetchInterval: 30_000,
+    staleTime: 15_000,
   });
 }

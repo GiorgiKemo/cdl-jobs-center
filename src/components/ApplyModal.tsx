@@ -7,22 +7,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useApplication } from "@/hooks/useApplication";
 import { useAuth } from "@/context/auth";
 import { useDriverProfile } from "@/hooks/useDriverProfile";
 import { supabase } from "@/lib/supabase";
+import { useQueryClient } from "@tanstack/react-query";
 
-const US_STATES = [
-  "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware",
-  "Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky",
-  "Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi",
-  "Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico",
-  "New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania",
-  "Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont",
-  "Virginia","Washington","West Virginia","Wisconsin","Wyoming",
-];
+import { US_STATES } from "@/data/constants";
 
 const ToggleRow = ({ id, name, label, checked, onChange }: { id?: string; name?: string; label: string; checked: boolean; onChange: (v: boolean) => void }) => (
   <div className="flex items-center justify-between py-1">
@@ -54,6 +47,7 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
   const { load, save } = useApplication();
   const saved = load();
   const { profile } = useDriverProfile(user?.id ?? "");
+  const qc = useQueryClient();
 
   // Basic info — pre-fill from saved
   const [firstName, setFirstName] = useState(saved.firstName ?? "");
@@ -160,10 +154,7 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
       };
 
       // Save form draft for next time, but do not block submit if storage fails.
-      const savedOk = save(data);
-      if (!savedOk) {
-        console.warn("Could not save application draft to localStorage.");
-      }
+      save(data);
 
       const insertPromise = supabase.from("applications").insert({
         driver_id: user.id,
@@ -202,15 +193,23 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
           error instanceof Error
             ? error.message
             : (error as { message?: string })?.message ?? "Submission failed.";
-        console.error("Application insert error:", error);
         toast.error(msg);
         return;
       }
+
+      if (jobId) {
+        qc.setQueryData(["has-applied-job", user.id, jobId], true);
+      }
+      qc.invalidateQueries({ queryKey: ["driver-applications", user.id] });
+      qc.invalidateQueries({ queryKey: ["driver-applications-history", user.id] });
+      if (companyId) {
+        qc.invalidateQueries({ queryKey: ["company-applications", companyId] });
+      }
+
       toast.success(`Application submitted to ${companyName}!`);
       onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Submission failed. Please try again.";
-      console.error("Application submit error:", err);
       toast.error(msg);
     } finally {
       setSubmitting(false);
@@ -223,6 +222,9 @@ export function ApplyModal({ companyName, companyId, jobId, jobTitle, onClose }:
         <DialogTitle className="sr-only">
           Apply to {companyName}{jobTitle ? ` — ${jobTitle}` : ""}
         </DialogTitle>
+        <DialogDescription className="sr-only">
+          Fill out the application form to apply for this position.
+        </DialogDescription>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <div>

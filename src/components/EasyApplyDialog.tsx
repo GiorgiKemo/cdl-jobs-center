@@ -79,6 +79,10 @@ const EasyApplyDialog = ({ trigger, companyName = "General Application" }: EasyA
       toast.error("Please fill in your name, email, and phone.");
       return;
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
     if (!user || user.role !== "driver") {
       toast.error("You must be signed in as a driver to apply.");
       return;
@@ -108,7 +112,6 @@ const EasyApplyDialog = ({ trigger, companyName = "General Application" }: EasyA
           error instanceof Error
             ? error.message
             : (error as { message?: string })?.message ?? "Submission failed.";
-        console.error("Quick apply error:", error);
         toast.error(msg);
         return;
       }
@@ -116,7 +119,6 @@ const EasyApplyDialog = ({ trigger, companyName = "General Application" }: EasyA
       setOpen(false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Submission failed. Please try again.";
-      console.error("Quick apply error:", err);
       toast.error(msg);
     } finally {
       setSubmitting(false);

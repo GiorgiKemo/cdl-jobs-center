@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -87,6 +87,13 @@ const CompanyProfile = () => {
     enabled: !!id,
   });
 
+  useEffect(() => {
+    if (!isLoading && !company) {
+      toast.error("Company not found.");
+      navigate("/companies", { replace: true });
+    }
+  }, [isLoading, company, navigate]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -99,11 +106,7 @@ const CompanyProfile = () => {
     );
   }
 
-  if (!company) {
-    toast.error("Company not found.");
-    navigate("/companies");
-    return null;
-  }
+  if (!company) return null;
 
   const isOwnProfile = user?.role === "company" && user.id === id;
 

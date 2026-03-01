@@ -6,9 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAuth } from "@/context/auth";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { supabase } from "@/lib/supabase";
 
 const SignIn = () => {
+  usePageTitle("Sign In");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);

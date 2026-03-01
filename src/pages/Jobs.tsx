@@ -10,6 +10,7 @@ import { useActiveJobs } from "@/hooks/useJobs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { useAuth } from "@/context/auth";
 import { useDriverAllJobMatches, useMatchingRollout } from "@/hooks/useMatchScores";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { toast } from "sonner";
 
 const urlTypeMap: Record<string, string> = {
@@ -26,6 +27,7 @@ const urlTypeMap: Record<string, string> = {
 const PAGE_SIZE = 10;
 
 const Jobs = () => {
+  usePageTitle("Browse Jobs");
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { jobs: allActiveJobs } = useActiveJobs();

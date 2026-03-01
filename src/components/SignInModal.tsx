@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { X } from "lucide-react";
+import { X, Mail, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/context/auth";
 import { supabase } from "@/lib/supabase";
 
-type View = "login" | "rules" | "register" | "forgot";
+type View = "login" | "rules" | "register" | "forgot" | "confirm-email";
 
 const RULES_TEXT = `General rules of conduct on the website:
 
@@ -183,8 +183,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
           wants_contact: wantsContact || "",
         });
       }
-      toast.success("Account created! You're now signed in.");
-      onClose();
+      setView("confirm-email");
     } catch (err) {
       toast.error(friendlyRegisterError(err));
     } finally {
@@ -222,8 +221,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
           company_goal: companyGoal || "",
         });
       }
-      toast.success("Company account created! You're now signed in.");
-      onClose();
+      setView("confirm-email");
     } catch (err) {
       toast.error(friendlyRegisterError(err));
     } finally {
@@ -235,8 +233,11 @@ export function SignInModal({ onClose }: SignInModalProps) {
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="w-full max-w-md p-0 gap-0 max-h-[90vh] flex flex-col overflow-hidden [&>button.absolute]:hidden">
         <DialogTitle className="sr-only">
-          {view === "login" ? "Login" : view === "forgot" ? "Reset Password" : view === "rules" ? "Rules" : "Register"}
+          {view === "login" ? "Login" : view === "forgot" ? "Reset Password" : view === "rules" ? "Rules" : view === "confirm-email" ? "Confirm Email" : "Register"}
         </DialogTitle>
+        <DialogDescription className="sr-only">
+          {view === "login" ? "Sign in to your account" : view === "forgot" ? "Reset your password" : view === "confirm-email" ? "Confirm your email address" : "Create a new account"}
+        </DialogDescription>
 
         {/* ── LOGIN VIEW ── */}
         {view === "login" && (
@@ -620,6 +621,56 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 </button>
               </form>
             )}
+          </>
+        )}
+
+        {/* ── CONFIRM EMAIL VIEW ── */}
+        {view === "confirm-email" && (
+          <>
+            <ModalHeader title="Check Your Email" onClose={onClose} />
+            <div className="px-5 py-8 text-center space-y-4">
+              <div className="mx-auto h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <Mail className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <p className="font-semibold text-base">Confirm your email address</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  We sent a confirmation link to <span className="font-medium text-foreground">{regEmail}</span>.
+                  Click the link in the email to activate your account.
+                </p>
+              </div>
+              <div className="pt-2 space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  disabled={submitting}
+                  onClick={async () => {
+                    setSubmitting(true);
+                    try {
+                      const { error } = await supabase.auth.resend({
+                        type: "signup",
+                        email: regEmail,
+                      });
+                      if (error) throw error;
+                      toast.success("Confirmation email resent! Check your inbox.");
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : "Failed to resend email.");
+                    } finally {
+                      setSubmitting(false);
+                    }
+                  }}
+                >
+                  <RotateCw className="h-4 w-4 mr-2" />
+                  {submitting ? "Sending…" : "Resend Confirmation Email"}
+                </Button>
+                <Button className="w-full" onClick={() => setView("login")}>
+                  Back to Login
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Didn't receive it? Check your spam folder or try resending.
+              </p>
+            </div>
           </>
         )}
 

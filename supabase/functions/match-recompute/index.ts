@@ -153,7 +153,6 @@ Deno.serve(async (req) => {
 
 // ── Helpers ────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseClient = ReturnType<typeof createClient>;
 
 const RULES_RAW_MAX = 90;
@@ -290,10 +289,15 @@ async function getDriverBehaviorContext(
 }
 
 function computeBehaviorScore(
-  jobRow: Record<string, any>,
+  jobRow: Record<string, unknown>,
   context: DriverBehaviorContext,
 ): { score: number; hidden: boolean; detail: string; caution?: string; reason?: string } {
-  const feedback = context.feedbackByJob.get(jobRow.id as string);
+  const jobId = String(jobRow.id ?? "");
+  const companyId = String(jobRow.company_id ?? "");
+  const routeTypeValue =
+    typeof jobRow.route_type === "string" ? jobRow.route_type : null;
+
+  const feedback = context.feedbackByJob.get(jobId);
   if (feedback === "hide") {
     return {
       score: 0,
@@ -306,18 +310,18 @@ function computeBehaviorScore(
   let score = 0;
   const details: string[] = [];
 
-  const interactionBoost = context.jobEventBoost.get(jobRow.id as string) ?? 0;
+  const interactionBoost = context.jobEventBoost.get(jobId) ?? 0;
   if (interactionBoost > 0) {
     score += Math.min(4, interactionBoost);
     details.push(`Recent interactions +${Math.min(4, interactionBoost)}`);
   }
 
-  if (context.positiveCompanyIds.has(jobRow.company_id as string)) {
+  if (companyId && context.positiveCompanyIds.has(companyId)) {
     score += 2;
     details.push("Company affinity +2");
   }
 
-  const routeType = normalizeRouteType((jobRow.route_type as string | null) ?? null);
+  const routeType = normalizeRouteType(routeTypeValue);
   if (routeType && context.positiveRouteTypes.has(routeType)) {
     score += 1;
     details.push("Route affinity +1");

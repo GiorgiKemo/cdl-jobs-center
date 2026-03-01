@@ -7,6 +7,7 @@ import { useAuth } from "@/context/auth";
 import { PLANS, useSubscription, type Plan } from "@/hooks/useSubscription";
 import { supabase } from "@/lib/supabase";
 import { Check, Zap, TrendingUp, Crown } from "lucide-react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { toast } from "sonner";
 
 const tierDetails: Array<{
@@ -52,6 +53,7 @@ const tierDetails: Array<{
 ];
 
 const Pricing = () => {
+  usePageTitle("Pricing");
   const { user } = useAuth();
   const navigate = useNavigate();
   const isCompany = user?.role === "company";

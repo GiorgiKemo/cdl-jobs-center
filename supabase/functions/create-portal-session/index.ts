@@ -8,6 +8,28 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const DEFAULT_ORIGIN = Deno.env.get("SITE_URL") ?? "https://cdl-jobs-center.vercel.app";
+
+const allowedOrigins = (
+  Deno.env.get("ALLOWED_ORIGINS") ??
+  `${DEFAULT_ORIGIN},http://localhost:8080,http://127.0.0.1:8080`
+)
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const resolveAllowedOrigin = (req: Request) => {
+  const requestOrigin = req.headers.get("origin");
+  if (!requestOrigin) return DEFAULT_ORIGIN;
+
+  try {
+    const normalized = new URL(requestOrigin).origin;
+    return allowedOrigins.includes(normalized) ? normalized : DEFAULT_ORIGIN;
+  } catch {
+    return DEFAULT_ORIGIN;
+  }
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -32,7 +54,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const token = authHeader.replace("Bearer ", "");
+    const token = authHeader.replace(/^Bearer\s+/i, "");
     const {
       data: { user },
       error: authError,
@@ -43,6 +65,20 @@ Deno.serve(async (req) => {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Verify user is a company account
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!profile || profile.role !== "company") {
+      return new Response(
+        JSON.stringify({ error: "Only company accounts can access billing portal" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     // Look up stripe_customer_id
@@ -62,8 +98,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const origin =
-      req.headers.get("origin") || "https://cdl-jobs-center.vercel.app";
+    const origin = resolveAllowedOrigin(req);
 
     // Create Customer Portal session
     const session = await stripe.billingPortal.sessions.create({

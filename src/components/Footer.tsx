@@ -46,7 +46,7 @@ const Footer = () => {
           {/* About + Follow Us */}
           <div>
             <h3 className="font-display font-semibold text-secondary-foreground mb-4">About</h3>
-            <p className="text-sm text-muted-foreground mb-6">CDL Job Center © - 2022</p>
+            <p className="text-sm text-muted-foreground mb-6">CDL Job Center © {new Date().getFullYear()}</p>
             <h3 className="font-display font-semibold text-secondary-foreground mb-3">Follow Us</h3>
             <div className="flex items-center gap-3">
               <a
@@ -88,7 +88,7 @@ const Footer = () => {
 
         <div className="border-t border-border/20 pt-8 flex flex-col md:flex-row items-center justify-between gap-2">
           <p className="text-sm text-muted-foreground">
-            © Copyright 2022 - CDL Job Center
+            © Copyright {new Date().getFullYear()} - CDL Job Center
           </p>
           <p className="text-sm text-muted-foreground">
             All Rights Reserved —{" "}
