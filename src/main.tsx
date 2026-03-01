@@ -12,15 +12,5 @@ if (sentryDsn) {
   });
 }
 
-// Intentional crash for validating Sentry alert -> GitHub issue automation.
-if (new URLSearchParams(window.location.search).get("sentry_github_test") === "1") {
-  throw new Error("Sentry GitHub integration test error");
-}
-
-// Non-destructive Sentry test: ?sentry_test=1 sends a test event without crashing.
-if (new URLSearchParams(window.location.search).get("sentry_test") === "1") {
-  Sentry.captureException(new Error("Sentry test event — if you see this, Sentry is working"));
-  console.info("[Sentry] Test event sent. Check your Sentry dashboard.");
-}
 
 createRoot(document.getElementById("root")!).render(<App />);
