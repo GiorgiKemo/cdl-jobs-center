@@ -9,6 +9,7 @@ import { useAuth } from "@/context/auth";
 import { supabase } from "@/lib/supabase";
 import { friendlySignInError } from "@/lib/authErrorMessages";
 import { getPasswordStrength, type PasswordStrengthLevel } from "@/lib/passwordStrength";
+import { DRIVER_INTERESTS, DRIVER_NEXT_JOB, COMPANY_GOALS } from "@/data/constants";
 
 type View = "login" | "rules" | "register" | "forgot" | "confirm-email";
 
@@ -33,33 +34,6 @@ Insulting administrators and moderators is also punishable by a ban — Respect 
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const COMPANY_GOALS = [
-  "Acquire more driver leads",
-  "Hire more CDL Class A drivers",
-  "Post Jobs to attract applicants",
-  "Receive driver exposure",
-  "Use CDL Jobs Center Recruiting team to help you hire drivers",
-];
-
-const DRIVER_INTERESTS = [
-  "Lease purchase",
-  "Company driver",
-  "Owner operator",
-  "Team driving",
-  "Local routes",
-  "Regional routes",
-  "OTR (Over the road)",
-];
-
-const DRIVER_NEXT_JOB = [
-  "Higher pay",
-  "Better home time",
-  "Sign-on bonus",
-  "Health benefits",
-  "Stable routes",
-  "Career growth",
-  "Newer equipment",
-];
 
 interface SignInModalProps {
   onClose: () => void;
@@ -152,8 +126,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
   const [zipCode, setZipCode] = useState("");
   const [driverPhone, setDriverPhone] = useState("");
   const [cdlNumber, setCdlNumber] = useState("");
-  const [interestedIn, setInterestedIn] = useState(DRIVER_INTERESTS[0]);
-  const [nextJobWant, setNextJobWant] = useState(DRIVER_NEXT_JOB[0]);
+  const [interestedIn, setInterestedIn] = useState<string>(DRIVER_INTERESTS[0]);
+  const [nextJobWant, setNextJobWant] = useState<string>(DRIVER_NEXT_JOB[0]);
   const [hasAccidents, setHasAccidents] = useState("No");
   const [wantsContact, setWantsContact] = useState("Yes");
 
@@ -163,7 +137,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
   const [companyName, setCompanyName] = useState("");
   const [companyAddress, setCompanyAddress] = useState("");
   const [companyPhone, setCompanyPhone] = useState("");
-  const [companyGoal, setCompanyGoal] = useState(COMPANY_GOALS[0]);
+  const [companyGoal, setCompanyGoal] = useState<string>(COMPANY_GOALS[0]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -217,29 +191,53 @@ export function SignInModal({ onClose }: SignInModalProps) {
       return;
     }
     setSubmitting(true);
+    const timeout = setTimeout(() => {
+      setSubmitting(false);
+      toast.error("Registration is taking too long. Please try again.");
+    }, 15000);
     try {
-      const newUser = await register(regUsername, regEmail, regPassword, "driver");
-      // Save driver profile fields collected during registration
-      if (newUser) {
-        const [first, ...rest] = driverName.trim().split(/\s+/);
-        await supabase.from("driver_profiles").upsert({
-          id: newUser.id,
-          first_name: first || "",
-          last_name: rest.join(" ") || "",
-          phone: driverPhone || "",
-          cdl_number: cdlNumber || "",
-          zip_code: zipCode || "",
-          home_address: homeAddress || "",
-          interested_in: interestedIn || "",
-          next_job_want: nextJobWant || "",
-          has_accidents: hasAccidents || "",
-          wants_contact: wantsContact || "",
-        });
+      const [first, ...rest] = driverName.trim().split(/\s+/);
+      const driverFields = {
+        first_name: first || "",
+        last_name: rest.join(" ") || "",
+        phone: driverPhone || "",
+        cdl_number: cdlNumber || "",
+        zip_code: zipCode || "",
+        home_address: homeAddress || "",
+        interested_in: interestedIn || "",
+        next_job_want: nextJobWant || "",
+        has_accidents: hasAccidents || "",
+        wants_contact: wantsContact || "",
+      };
+      await register(regUsername, regEmail, regPassword, "driver", driverFields);
+
+      // Check if session was created (email confirmation not required)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        try {
+          const { error: upsertErr } = await supabase.from("driver_profiles").upsert({ id: session.user.id, ...driverFields });
+          // If full upsert fails (e.g. new columns not yet migrated), retry with base columns only
+          if (upsertErr) {
+            await supabase.from("driver_profiles").upsert({
+              id: session.user.id,
+              first_name: driverFields.first_name,
+              last_name: driverFields.last_name,
+              phone: driverFields.phone,
+              cdl_number: driverFields.cdl_number,
+              zip_code: driverFields.zip_code,
+            });
+          }
+        } catch { /* deferred population in AuthContext handles this */ }
+        toast.success("Registration successful!");
+        onClose();
+      } else {
+        setView("confirm-email");
       }
-      setView("confirm-email");
     } catch (err) {
+      console.error("[SignInModal] driver register error:", err);
       toast.error(friendlyRegisterError(err));
     } finally {
+      clearTimeout(timeout);
       setSubmitting(false);
     }
   };
@@ -263,25 +261,47 @@ export function SignInModal({ onClose }: SignInModalProps) {
       return;
     }
     setSubmitting(true);
+    const timeout = setTimeout(() => {
+      setSubmitting(false);
+      toast.error("Registration is taking too long. Please try again.");
+    }, 15000);
     try {
-      const newUser = await register(companyName, regEmail, regPassword, "company");
-      // Save company profile fields collected during registration
-      if (newUser) {
-        await supabase.from("company_profiles").upsert({
-          id: newUser.id,
-          company_name: companyName,
-          phone: companyPhone || "",
-          address: companyAddress || "",
-          email: regEmail,
-          contact_name: contactName || "",
-          contact_title: contactTitle || "",
-          company_goal: companyGoal || "",
-        });
+      const companyFields = {
+        company_name: companyName,
+        company_phone: companyPhone || "",
+        company_address: companyAddress || "",
+        company_email: regEmail,
+        contact_name: contactName || "",
+        contact_title: contactTitle || "",
+        company_goal: companyGoal || "",
+      };
+      await register(companyName, regEmail, regPassword, "company", companyFields);
+
+      // Check if session was created (email confirmation not required)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        try {
+          await supabase.from("company_profiles").upsert({
+            id: session.user.id,
+            company_name: companyName,
+            phone: companyPhone || "",
+            address: companyAddress || "",
+            email: regEmail,
+            contact_name: contactName || "",
+            contact_title: contactTitle || "",
+            company_goal: companyGoal || "",
+          });
+        } catch { /* deferred population in AuthContext handles this */ }
+        toast.success("Registration successful!");
+        onClose();
+      } else {
+        setView("confirm-email");
       }
-      setView("confirm-email");
     } catch (err) {
+      console.error("[SignInModal] company register error:", err);
       toast.error(friendlyRegisterError(err));
     } finally {
+      clearTimeout(timeout);
       setSubmitting(false);
     }
   };

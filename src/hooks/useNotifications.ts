@@ -71,12 +71,43 @@ export function useMarkNotificationsRead() {
 
   return useMutation({
     mutationFn: async (notifIds: string[]) => {
-      const { error } = await supabase.rpc("mark_notifications_read", {
-        p_notif_ids: notifIds,
-      });
+      // Use direct UPDATE instead of RPC for reliability (works even if
+      // the mark_notifications_read function hasn't been deployed yet).
+      const { error } = await supabase
+        .from("notifications")
+        .update({ read: true })
+        .in("id", notifIds);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onMutate: async (notifIds) => {
+      await qc.cancelQueries({ queryKey: ["notifications"] });
+      await qc.cancelQueries({ queryKey: ["unread-notification-count"] });
+
+      // Optimistic: mark notifications read in cache immediately
+      const prevNotifications = qc.getQueriesData<Notification[]>({
+        queryKey: ["notifications"],
+      });
+      const prevCounts = qc.getQueriesData<number>({
+        queryKey: ["unread-notification-count"],
+      });
+
+      const idSet = new Set(notifIds);
+      qc.setQueriesData<Notification[]>({ queryKey: ["notifications"] }, (old) =>
+        old?.map((n) => (idSet.has(n.id) ? { ...n, read: true } : n)),
+      );
+      qc.setQueriesData<number>({ queryKey: ["unread-notification-count"] }, (old) =>
+        Math.max(0, (old ?? 0) - notifIds.length),
+      );
+
+      return { prevNotifications, prevCounts };
+    },
+    onError: (_err, _vars, context) => {
+      if (!context) return;
+      for (const [key, data] of context.prevNotifications) qc.setQueryData(key, data);
+      for (const [key, data] of context.prevCounts) qc.setQueryData(key, data);
+      console.warn("[Notifications] Failed to mark as read:", _err);
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["notifications"] });
       qc.invalidateQueries({ queryKey: ["unread-notification-count"] });
     },
@@ -89,10 +120,40 @@ export function useMarkAllNotificationsRead() {
 
   return useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("mark_all_notifications_read");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const { error } = await supabase
+        .from("notifications")
+        .update({ read: true })
+        .eq("user_id", user.id)
+        .eq("read", false);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ["notifications"] });
+      await qc.cancelQueries({ queryKey: ["unread-notification-count"] });
+
+      const prevNotifications = qc.getQueriesData<Notification[]>({
+        queryKey: ["notifications"],
+      });
+      const prevCounts = qc.getQueriesData<number>({
+        queryKey: ["unread-notification-count"],
+      });
+
+      qc.setQueriesData<Notification[]>({ queryKey: ["notifications"] }, (old) =>
+        old?.map((n) => ({ ...n, read: true })),
+      );
+      qc.setQueriesData<number>({ queryKey: ["unread-notification-count"] }, () => 0);
+
+      return { prevNotifications, prevCounts };
+    },
+    onError: (_err, _vars, context) => {
+      if (!context) return;
+      for (const [key, data] of context.prevNotifications) qc.setQueryData(key, data);
+      for (const [key, data] of context.prevCounts) qc.setQueryData(key, data);
+      console.warn("[Notifications] Failed to mark all as read:", _err);
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["notifications"] });
       qc.invalidateQueries({ queryKey: ["unread-notification-count"] });
     },
@@ -105,7 +166,12 @@ export function useClearAllNotifications() {
 
   return useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("clear_all_notifications");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const { error } = await supabase
+        .from("notifications")
+        .delete()
+        .eq("user_id", user.id);
       if (error) throw error;
     },
     onMutate: async () => {

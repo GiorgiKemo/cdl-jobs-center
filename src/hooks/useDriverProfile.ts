@@ -13,6 +13,11 @@ export interface DriverProfile {
   zipCode: string;
   dateOfBirth: string;
   about: string;
+  homeAddress: string;
+  interestedIn: string;
+  nextJobWant: string;
+  hasAccidents: string;
+  wantsContact: string;
 }
 
 export function useDriverProfile(driverId: string) {
@@ -41,6 +46,11 @@ export function useDriverProfile(driverId: string) {
         zipCode: data.zip_code ?? "",
         dateOfBirth: data.date_of_birth ?? "",
         about: data.about ?? "",
+        homeAddress: data.home_address ?? "",
+        interestedIn: data.interested_in ?? "",
+        nextJobWant: data.next_job_want ?? "",
+        hasAccidents: data.has_accidents ?? "",
+        wantsContact: data.wants_contact ?? "",
       } as DriverProfile;
     },
     enabled: !!driverId,
@@ -61,6 +71,11 @@ export function useDriverProfile(driverId: string) {
         zip_code: profile.zipCode,
         date_of_birth: profile.dateOfBirth,
         about: profile.about,
+        home_address: profile.homeAddress,
+        interested_in: profile.interestedIn,
+        next_job_want: profile.nextJobWant,
+        has_accidents: profile.hasAccidents,
+        wants_contact: profile.wantsContact,
         updated_at: new Date().toISOString(),
       });
       if (error) throw error;

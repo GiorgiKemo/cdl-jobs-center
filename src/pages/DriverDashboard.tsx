@@ -12,6 +12,7 @@ import { useAuth, type User as AuthUser } from "@/context/auth";
 import { useActiveJobs } from "@/hooks/useJobs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { useDriverProfile, DriverProfile } from "@/hooks/useDriverProfile";
+import { DRIVER_INTERESTS, DRIVER_NEXT_JOB } from "@/data/constants";
 import { Truck, Briefcase, Bookmark, User, BarChart3, ChevronDown, ChevronUp, MapPin, DollarSign, Bell, MessageSquare, Check, Sparkles, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -111,6 +112,11 @@ const EMPTY_DRIVER_PROFILE: DriverProfile = {
   zipCode: "",
   dateOfBirth: "",
   about: "",
+  homeAddress: "",
+  interestedIn: "",
+  nextJobWant: "",
+  hasAccidents: "",
+  wantsContact: "",
 };
 
 const snapshotDriverProfile = (p: DriverProfile) =>
@@ -126,6 +132,10 @@ const snapshotDriverProfile = (p: DriverProfile) =>
     zipCode: p.zipCode,
     dateOfBirth: p.dateOfBirth,
     about: p.about,
+    homeAddress: p.homeAddress,
+    interestedIn: p.interestedIn,
+    nextJobWant: p.nextJobWant,
+    wantsContact: p.wantsContact,
   });
 
 const STAGE_CONFIG: Record<PipelineStage, { label: string; className: string }> = {
@@ -170,11 +180,11 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
   const { savedIds, toggle: toggleSave } = useSavedJobs(user!.id);
   const { profile, isLoading: profileLoading, saveProfile } = useDriverProfile(user!.id);
   const { data: unreadMsgCount = 0 } = useUnreadCount(user!.id, "driver");
-  const { data: aiMatches = [], isLoading: aiMatchesLoading } = useDriverJobMatches(
+  const { data: aiMatches = [], isLoading: aiMatchesLoading, isError: aiMatchesError } = useDriverJobMatches(
     user!.id,
     { limit: 20, minScore: 0, excludeHidden: true },
   );
-  const matchesLoading = aiMatchesLoading;
+  const matchesLoading = aiMatchesLoading && !aiMatchesError;
   const feedbackMutation = useRecordDriverMatchFeedback(user!.id);
   const trackEventMutation = useTrackDriverMatchEvent(user!.id);
   const refreshMatchesMutation = useRefreshMyMatches(user!.id);
@@ -251,10 +261,14 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
   const [zipCode, setZipCode] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [about, setAbout] = useState("");
+  const [homeAddress, setHomeAddress] = useState("");
+  const [interestedIn, setInterestedIn] = useState("");
+  const [nextJobWant, setNextJobWant] = useState("");
+  const [wantsContact, setWantsContact] = useState("");
   const [profileInit, setProfileInit] = useState(false);
   const [profileSaveStatus, setProfileSaveStatus] = useState<SaveStatus>("idle");
   const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string | null>(null);
-  const currentProfile: DriverProfile = { firstName, lastName, phone, cdlNumber, driverType, licenseClass, yearsExp, licenseState, zipCode, dateOfBirth, about };
+  const currentProfile: DriverProfile = { firstName, lastName, phone, cdlNumber, driverType, licenseClass, yearsExp, licenseState, zipCode, dateOfBirth, about, homeAddress, interestedIn, nextJobWant, hasAccidents: profile?.hasAccidents ?? "", wantsContact };
   const currentProfileSnapshot = snapshotDriverProfile(currentProfile);
   const hasUnsavedChanges = lastSavedSnapshot !== null && currentProfileSnapshot !== lastSavedSnapshot;
   const isProfileSaved = profileSaveStatus === "saved" && !hasUnsavedChanges;
@@ -274,6 +288,10 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
       setZipCode(loadedProfile.zipCode);
       setDateOfBirth(loadedProfile.dateOfBirth);
       setAbout(loadedProfile.about);
+      setHomeAddress(loadedProfile.homeAddress);
+      setInterestedIn(loadedProfile.interestedIn);
+      setNextJobWant(loadedProfile.nextJobWant);
+      setWantsContact(loadedProfile.wantsContact);
       setLastSavedSnapshot(snapshotDriverProfile(loadedProfile));
       setProfileInit(true);
     }
@@ -747,7 +765,7 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
                   </div>
                 </div>
 
-                {aiMatchesLoading ? (
+                {aiMatchesLoading && !aiMatchesError ? (
                   <div className="space-y-4">
                     {[1, 2, 3].map((item) => (
                       <div key={`ai-skeleton-${item}`} className="h-52 animate-pulse rounded-xl border border-border bg-card" />
@@ -1084,6 +1102,43 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
                   className="resize-none"
                 />
               </div>
+              <hr className="border-border" />
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Job Preferences</p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2 space-y-1">
+                  <Label htmlFor="driver-homeAddress" className="text-xs text-muted-foreground">Home Address</Label>
+                  <Input id="driver-homeAddress" name="homeAddress" autoComplete="street-address" value={homeAddress} onChange={(e) => setHomeAddress(e.target.value)} placeholder="123 Main St, City, State ZIP" />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="driver-interestedIn" className="text-xs text-muted-foreground">I am interested in</Label>
+                  <Select value={interestedIn} onValueChange={setInterestedIn} name="interestedIn">
+                    <SelectTrigger id="driver-interestedIn"><SelectValue placeholder="Select preference" /></SelectTrigger>
+                    <SelectContent>
+                      {DRIVER_INTERESTS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="driver-nextJobWant" className="text-xs text-muted-foreground">In my next job I want</Label>
+                  <Select value={nextJobWant} onValueChange={setNextJobWant} name="nextJobWant">
+                    <SelectTrigger id="driver-nextJobWant"><SelectValue placeholder="Select priority" /></SelectTrigger>
+                    <SelectContent>
+                      {DRIVER_NEXT_JOB.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="driver-wantsContact" className="text-xs text-muted-foreground">Receive job alerts and employment offers</Label>
+                  <Select value={wantsContact} onValueChange={setWantsContact} name="wantsContact">
+                    <SelectTrigger id="driver-wantsContact"><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <Button
                 onClick={handleSaveProfile}
                 disabled={profileSaveStatus === "saving"}

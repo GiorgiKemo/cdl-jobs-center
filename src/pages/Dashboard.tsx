@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth, type User as AuthUser } from "@/context/auth";
 import { useJobs } from "@/hooks/useJobs";
 import { Job } from "@/data/jobs";
+import { COMPANY_GOALS } from "@/data/constants";
 import { toast } from "sonner";
 import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload, Bell, MessageSquare, Users, Phone as PhoneIcon, Mail as MailIcon, MapPin, Truck as TruckIcon, Lock, RefreshCw, CreditCard, Send, Briefcase, Check, Sparkles } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -56,6 +57,9 @@ type CompanyProfileForm = {
   about: string;
   website: string;
   logo: string;
+  contactName: string;
+  contactTitle: string;
+  companyGoal: string;
 };
 
 const snapshotCompanyProfile = (p: CompanyProfileForm) =>
@@ -67,6 +71,9 @@ const snapshotCompanyProfile = (p: CompanyProfileForm) =>
     about: p.about,
     website: p.website,
     logo: p.logo,
+    contactName: p.contactName,
+    contactTitle: p.contactTitle,
+    companyGoal: p.companyGoal,
   });
 
 const PIPELINE_STAGES: Array<{ label: PipelineStage; headerClass: string }> = [
@@ -603,6 +610,9 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
   const [profileAbout, setProfileAbout] = useState("");
   const [profileWebsite, setProfileWebsite] = useState("");
   const [profileLogo, setProfileLogo] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [contactTitle, setContactTitle] = useState("");
+  const [companyGoal, setCompanyGoal] = useState("");
   const [profileSaveStatus, setProfileSaveStatus] = useState<SaveStatus>("idle");
   const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string | null>(null);
   const currentProfileSnapshot = snapshotCompanyProfile({
@@ -613,6 +623,9 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
     about: profileAbout,
     website: profileWebsite,
     logo: profileLogo,
+    contactName,
+    contactTitle,
+    companyGoal,
   });
   const hasUnsavedChanges = lastSavedSnapshot !== null && currentProfileSnapshot !== lastSavedSnapshot;
   const isProfileSaved = profileSaveStatus === "saved" && !hasUnsavedChanges;
@@ -672,6 +685,9 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
           about: data?.about ?? "",
           website: data?.website ?? "",
           logo: data?.logo_url ?? "",
+          contactName: data?.contact_name ?? "",
+          contactTitle: data?.contact_title ?? "",
+          companyGoal: data?.company_goal ?? "",
         };
         setProfileName(loadedProfile.name);
         setProfileEmail(loadedProfile.email);
@@ -680,6 +696,9 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
         setProfileAbout(loadedProfile.about);
         setProfileWebsite(loadedProfile.website);
         setProfileLogo(loadedProfile.logo);
+        setContactName(loadedProfile.contactName);
+        setContactTitle(loadedProfile.contactTitle);
+        setCompanyGoal(loadedProfile.companyGoal);
         setLastSavedSnapshot(snapshotCompanyProfile(loadedProfile));
       })
       .catch(() => {});
@@ -813,6 +832,9 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
         about: profileAbout,
         website: profileWebsite,
         logo_url: profileLogo || "",
+        contact_name: contactName,
+        contact_title: contactTitle,
+        company_goal: companyGoal,
         updated_at: new Date().toISOString(),
       };
       const { error } = await supabase.from("company_profiles").upsert(payload);
@@ -1299,6 +1321,14 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                   <Label htmlFor="company-phone" className="text-xs text-muted-foreground">Phone</Label>
                   <Input id="company-phone" name="phone" autoComplete="tel" placeholder="(555) 000-0000" value={profilePhone} onChange={(e) => setProfilePhone(e.target.value)} />
                 </div>
+                <div className="space-y-1">
+                  <Label htmlFor="company-contactName" className="text-xs text-muted-foreground">Contact Name</Label>
+                  <Input id="company-contactName" name="contactName" autoComplete="name" placeholder="John Doe" value={contactName} onChange={(e) => setContactName(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="company-contactTitle" className="text-xs text-muted-foreground">Contact Title</Label>
+                  <Input id="company-contactTitle" name="contactTitle" autoComplete="organization-title" placeholder="Recruiting Manager" value={contactTitle} onChange={(e) => setContactTitle(e.target.value)} />
+                </div>
                 <div className="sm:col-span-2 space-y-1">
                   <Label htmlFor="company-address" className="text-xs text-muted-foreground">Address</Label>
                   <Input id="company-address" name="address" autoComplete="street-address" placeholder="123 Main St, City, State ZIP" value={profileAddress} onChange={(e) => setProfileAddress(e.target.value)} />
@@ -1312,6 +1342,15 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                   <Textarea id="company-about" name="about" placeholder="Tell drivers about your company, culture, and opportunities..."
                     value={profileAbout} onChange={(e) => setProfileAbout(e.target.value)}
                     rows={5} className="resize-none" />
+                </div>
+                <div className="sm:col-span-2 space-y-1">
+                  <Label htmlFor="company-goal" className="text-xs text-muted-foreground">Primary Goal</Label>
+                  <Select value={companyGoal} onValueChange={setCompanyGoal} name="companyGoal">
+                    <SelectTrigger id="company-goal"><SelectValue placeholder="What do you want to accomplish?" /></SelectTrigger>
+                    <SelectContent>
+                      {COMPANY_GOALS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <Button

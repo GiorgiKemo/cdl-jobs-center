@@ -10,7 +10,9 @@ import { useActiveJobs } from "@/hooks/useJobs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { useAuth } from "@/context/auth";
 import { useDriverAllJobMatches, useMatchingRollout } from "@/hooks/useMatchScores";
+import { useDriverProfile, type DriverProfile } from "@/hooks/useDriverProfile";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import type { Job } from "@/data/jobs";
 import { toast } from "sonner";
 
 const urlTypeMap: Record<string, string> = {
@@ -26,6 +28,24 @@ const urlTypeMap: Record<string, string> = {
 
 const PAGE_SIZE = 10;
 
+const INTEREST_MATCH: Record<string, (j: Job) => boolean> = {
+  "Lease purchase": (j) => j.driverType?.toLowerCase().includes("lease") ?? false,
+  "Company driver": (j) => j.driverType === "Company Driver",
+  "Owner operator": (j) => j.driverType === "Owner Operator",
+  "Team driving": (j) => j.teamDriving === "Team" || j.teamDriving === "Both",
+  "Local routes": (j) => j.routeType === "Local",
+  "Regional routes": (j) => j.routeType === "Regional",
+  "OTR (Over the road)": (j) => j.routeType === "OTR",
+};
+
+function isPreferenceMatch(job: Job, profile: DriverProfile | null): boolean {
+  if (!profile) return false;
+  if (profile.interestedIn && INTEREST_MATCH[profile.interestedIn]) {
+    return INTEREST_MATCH[profile.interestedIn](job);
+  }
+  return false;
+}
+
 const Jobs = () => {
   usePageTitle("Browse Jobs");
   const [searchParams, setSearchParams] = useSearchParams();
@@ -35,6 +55,7 @@ const Jobs = () => {
   const { savedIds, isSaved, toggle } = useSavedJobs(driverId);
   const { data: matchScoreMap } = useDriverAllJobMatches(user?.role === "driver" ? user.id : undefined);
   const { data: rollout } = useMatchingRollout();
+  const { profile: driverProfile } = useDriverProfile(driverId);
 
   // Initialize all filters from URL params on first render
   const initialFreight = (() => {
@@ -288,7 +309,7 @@ const Jobs = () => {
                         <div className="flex items-start justify-between gap-2 mb-0.5">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h2 className="font-display font-semibold text-lg text-primary">{job.company}</h2>
-                            {user?.role === "driver" && rollout?.driverUiEnabled && matchScoreMap?.has(job.id) && (() => {
+                            {user?.role === "driver" && rollout?.driverUiEnabled && matchScoreMap?.has(job.id) ? (() => {
                               const score = Math.round(matchScoreMap.get(job.id)!);
                               const badgeColor =
                                 score >= 70
@@ -301,7 +322,11 @@ const Jobs = () => {
                                   {score}% Match
                                 </span>
                               );
-                            })()}
+                            })() : user?.role === "driver" && isPreferenceMatch(job, driverProfile) && (
+                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
+                                Matches your preferences
+                              </span>
+                            )}
                           </div>
                           <button
                             onClick={() => handleToggleSave(job.id, job.company)}

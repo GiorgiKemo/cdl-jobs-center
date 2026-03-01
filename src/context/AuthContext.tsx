@@ -63,6 +63,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role,
       });
       localStorage.setItem(ROLE_CACHE_KEY, role);
+
+      // Deferred profile population: on first sign-in after email confirmation,
+      // persist registration fields stored in user_metadata to the profile table.
+      const meta = sessionUser.user_metadata;
+      if (meta) {
+        try {
+          if (role === "driver" && (meta.first_name || meta.phone || meta.cdl_number || meta.home_address)) {
+            const { data: existing } = await supabase
+              .from("driver_profiles")
+              .select("id")
+              .eq("id", userId)
+              .maybeSingle();
+            if (!existing) {
+              const { error: upsertErr } = await supabase.from("driver_profiles").upsert({
+                id: userId,
+                first_name: meta.first_name || "",
+                last_name: meta.last_name || "",
+                phone: meta.phone || "",
+                cdl_number: meta.cdl_number || "",
+                zip_code: meta.zip_code || "",
+                home_address: meta.home_address || "",
+                interested_in: meta.interested_in || "",
+                next_job_want: meta.next_job_want || "",
+                has_accidents: meta.has_accidents || "",
+                wants_contact: meta.wants_contact || "",
+              });
+              // Fallback: if new columns don't exist yet, retry with base columns
+              if (upsertErr) {
+                await supabase.from("driver_profiles").upsert({
+                  id: userId,
+                  first_name: meta.first_name || "",
+                  last_name: meta.last_name || "",
+                  phone: meta.phone || "",
+                  cdl_number: meta.cdl_number || "",
+                  zip_code: meta.zip_code || "",
+                });
+              }
+            }
+          } else if (role === "company" && (meta.company_name || meta.contact_name)) {
+            const { data: existing } = await supabase
+              .from("company_profiles")
+              .select("id")
+              .eq("id", userId)
+              .maybeSingle();
+            if (!existing) {
+              const { error: upsertErr } = await supabase.from("company_profiles").upsert({
+                id: userId,
+                company_name: meta.company_name || meta.name || "",
+                phone: meta.company_phone || "",
+                address: meta.company_address || "",
+                email: meta.company_email || userEmail,
+                contact_name: meta.contact_name || "",
+                contact_title: meta.contact_title || "",
+                company_goal: meta.company_goal || "",
+              });
+              // Fallback: if new columns don't exist yet, retry with base columns
+              if (upsertErr) {
+                await supabase.from("company_profiles").upsert({
+                  id: userId,
+                  company_name: meta.company_name || meta.name || "",
+                  phone: meta.company_phone || "",
+                  address: meta.company_address || "",
+                  email: meta.company_email || userEmail,
+                });
+              }
+            }
+          }
+        } catch (e) {
+          // Non-fatal: profile fields can be filled in later from the dashboard.
+          // Log for debugging (e.g. missing columns if migration not applied).
+          console.warn("[AuthContext] deferred profile population failed:", e);
+        }
+      }
     } else if (fallbackRole) {
       // If profile row creation lags behind auth, keep the session usable.
       setUser({
@@ -118,13 +191,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     password: string,
     role: "driver" | "company",
+    profileFields?: Record<string, string>,
   ) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { name, role } },
+      options: { data: { name, role, ...profileFields } },
     });
     if (error) throw error;
+    // Supabase returns a "fake" user with empty identities when the email
+    // is already registered (to prevent email enumeration). Detect this.
+    if (data.user && data.user.identities?.length === 0) {
+      throw new Error("This email is already registered. Please sign in instead.");
+    }
     return data.user;
   }, []);
 
