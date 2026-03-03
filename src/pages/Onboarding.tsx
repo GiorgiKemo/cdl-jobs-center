@@ -50,32 +50,15 @@ const Onboarding = () => {
     setSaving(role);
 
     try {
-      // 1. Update profiles row with chosen role + clear onboarding flag
-      const displayName = user.name || user.email.split("@")[0] || "User";
-      const { error: profileErr } = await supabase
-        .from("profiles")
-        .update({ role, needs_onboarding: false, name: displayName })
-        .eq("id", user.id);
+      // Use SECURITY DEFINER RPC to bypass RLS — updates profiles, creates
+      // extended profile row, all in one transaction.
+      const { error: rpcErr } = await supabase.rpc("complete_onboarding", {
+        chosen_role: role,
+      });
 
-      if (profileErr) throw profileErr;
+      if (rpcErr) throw rpcErr;
 
-      // 2. Create the extended profile row so dashboard pages work
-      if (role === "driver") {
-        await supabase.from("driver_profiles").upsert({
-          id: user.id,
-          first_name: user.name?.split(" ")[0] || "",
-          last_name: user.name?.split(" ").slice(1).join(" ") || "",
-        });
-      } else {
-        await supabase.from("company_profiles").upsert({
-          id: user.id,
-          company_name: "",
-          email: user.email,
-          contact_name: user.name || "",
-        });
-      }
-
-      // 3. Update user_metadata so AuthContext picks up the role on next load
+      // Update user_metadata so AuthContext picks up the role on next load
       await supabase.auth.updateUser({ data: { role } });
 
       toast.success(role === "driver" ? "Welcome, driver!" : "Welcome aboard!");
@@ -83,7 +66,11 @@ const Onboarding = () => {
       // Force a page reload so AuthContext re-fetches the updated profile
       window.location.href = role === "company" ? "/dashboard" : "/driver-dashboard";
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      console.error("[Onboarding] handleChoice failed:", err);
+      const msg = err && typeof err === "object" && "message" in err
+        ? (err as { message: string }).message
+        : "Something went wrong. Please try again.";
+      toast.error(msg);
       setSaving(null);
     }
   };
