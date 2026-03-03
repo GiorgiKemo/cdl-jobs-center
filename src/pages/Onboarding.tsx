@@ -6,6 +6,7 @@ import { useAuth } from "@/context/auth";
 import { supabase } from "@/lib/supabase";
 import { Spinner } from "@/components/ui/Spinner";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { withTimeout } from "@/lib/withTimeout";
 
 type RoleChoice = "driver" | "company";
 
@@ -29,11 +30,14 @@ const Onboarding = () => {
     }
 
     const check = async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("needs_onboarding")
-        .eq("id", user.id)
-        .maybeSingle();
+      const { data } = await withTimeout(
+        supabase
+          .from("profiles")
+          .select("needs_onboarding")
+          .eq("id", user.id)
+          .maybeSingle(),
+        10_000
+      );
 
       if (!data?.needs_onboarding) {
         // Already onboarded — go to dashboard
@@ -52,9 +56,10 @@ const Onboarding = () => {
     try {
       // Use SECURITY DEFINER RPC to bypass RLS — updates profiles, creates
       // extended profile row, all in one transaction.
-      const { error: rpcErr } = await supabase.rpc("complete_onboarding", {
-        chosen_role: role,
-      });
+      const { error: rpcErr } = await withTimeout(
+        supabase.rpc("complete_onboarding", { chosen_role: role }),
+        15_000
+      );
 
       if (rpcErr) throw rpcErr;
 

@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { Check, Zap, TrendingUp, Crown } from "lucide-react";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { toast } from "sonner";
+import { withTimeout } from "@/lib/withTimeout";
 
 const tierDetails: Array<{
   plan: Plan;
@@ -79,7 +80,7 @@ const Pricing = () => {
     try {
       setLoading(plan);
 
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await withTimeout(supabase.auth.getSession(), 10_000);
       if (!session) {
         navigate("/signin");
         return;

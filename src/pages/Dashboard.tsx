@@ -37,6 +37,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/dateUtils";
+import { withTimeout } from "@/lib/withTimeout";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -572,7 +573,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
     }
     try {
       setCheckoutLoading(plan);
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await withTimeout(supabase.auth.getSession(), 10_000);
       if (!session) { navigate("/signin"); return; }
 
       const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout`;
@@ -2484,7 +2485,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                       const timeout = setTimeout(() => controller.abort(), 15000);
                       try {
                         setPortalLoading(true);
-                        const { data: { session } } = await supabase.auth.getSession();
+                        const { data: { session } } = await withTimeout(supabase.auth.getSession(), 10_000);
                         if (!session) throw new Error("Not authenticated");
 
                         const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-portal-session`;

@@ -11,6 +11,7 @@ import { friendlySignInError } from "@/lib/authErrorMessages";
 import { getPasswordStrength, type PasswordStrengthLevel } from "@/lib/passwordStrength";
 import { US_STATES, DRIVER_INTERESTS, DRIVER_NEXT_JOB, COMPANY_GOALS } from "@/data/constants";
 import { SocialLoginButtons, OrDivider } from "@/components/SocialLoginButtons";
+import { withTimeout } from "@/lib/withTimeout";
 
 type View = "login" | "rules" | "register" | "forgot" | "confirm-email";
 
@@ -252,7 +253,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
       await register(regUsername, regEmail, regPassword, "driver", driverFields);
 
       // Check if session was created (email confirmation not required)
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await withTimeout(supabase.auth.getSession(), 10_000);
       if (session) {
         try {
           const { error: upsertErr } = await supabase.from("driver_profiles").upsert({ id: session.user.id, ...driverFields });
@@ -321,7 +322,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
       await register(companyName, regEmail, regPassword, "company", companyFields);
 
       // Check if session was created (email confirmation not required)
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await withTimeout(supabase.auth.getSession(), 10_000);
       if (session) {
         try {
           await supabase.from("company_profiles").upsert({
@@ -431,9 +432,9 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 if (!resetEmail) { toast.error("Please enter your email."); return; }
                 setSubmitting(true);
                 try {
-                  const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+                  const { error } = await withTimeout(supabase.auth.resetPasswordForEmail(resetEmail, {
                     redirectTo: `${window.location.origin}/signin`,
-                  });
+                  }), 15_000);
                   if (error) throw error;
                   toast.success("Password reset email sent! Check your inbox.");
                   setView("login");

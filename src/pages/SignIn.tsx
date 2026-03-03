@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 import { friendlySignInError } from "@/lib/authErrorMessages";
 import { getPasswordStrength, type PasswordStrengthLevel } from "@/lib/passwordStrength";
 import { SocialLoginButtons, OrDivider } from "@/components/SocialLoginButtons";
+import { withTimeout } from "@/lib/withTimeout";
 
 const strengthGradientByLevel: Record<PasswordStrengthLevel, string> = {
   weak: "from-rose-600 to-red-500",
@@ -98,7 +99,7 @@ const SignIn = () => {
     }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      const { error } = await withTimeout(supabase.auth.updateUser({ password: newPassword }), 15_000);
       if (error) throw error;
       toast.success("Password updated successfully!");
       setRecovering(false);
@@ -120,7 +121,7 @@ const SignIn = () => {
     }
     setLoading(true);
     try {
-      await signIn(email, password);
+      await withTimeout(signIn(email, password), 15_000);
       toast.success("Welcome back!");
       navigate("/");
     } catch (err) {
@@ -244,9 +245,9 @@ const SignIn = () => {
                           return;
                         }
                         try {
-                          const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                          const { error } = await withTimeout(supabase.auth.resetPasswordForEmail(email, {
                             redirectTo: `${window.location.origin}/signin`,
-                          });
+                          }), 15_000);
                           if (error) throw error;
                           toast.success("Password reset email sent! Check your inbox.");
                         } catch (err) {
