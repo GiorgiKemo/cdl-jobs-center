@@ -33,7 +33,7 @@
     --input: 220 100% 20%;
     --ring: 220 100% 20%;
 
-    --radius: 0rem;
+    --radius: 0.375rem;
 
     --sidebar-background: 220 60% 97%;
     --sidebar-foreground: 220 100% 15%;
@@ -137,7 +137,7 @@
     --shadow-lg: 12px 12px 0px 0px #EA3E5B;
     --shadow-xl: 16px 16px 0px 0px #EA3E5B;
     --shadow-2xl: 24px 24px 0px 0px #EA3E5B;
-    --radius: 0rem;
+    --radius: 0.375rem;
   }
 }
 
