@@ -484,6 +484,10 @@ const Navbar = () => {
                       role="menu"
                       aria-label="Account menu"
                     >
+                      <div className="px-4 py-2 border-b border-border mb-1">
+                        <p className="text-sm font-medium truncate">{user.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                      </div>
                       <Link
                         to={
                           user.role === "admin"
