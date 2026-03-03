@@ -789,7 +789,7 @@ const Navbar = () => {
         </Suspense>
       )}
 
-      <Dialog open={signOutOpen} onOpenChange={(open) => { if (!signingOut) setSignOutOpen(open); }}>
+      <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Sign out</DialogTitle>
@@ -798,7 +798,7 @@ const Navbar = () => {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSignOutOpen(false)} disabled={signingOut}>
+            <Button variant="outline" onClick={() => setSignOutOpen(false)}>
               Cancel
             </Button>
             <Button onClick={confirmSignOut} disabled={signingOut}>
