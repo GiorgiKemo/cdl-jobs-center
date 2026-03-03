@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Search, ArrowRight, RefreshCw } from "lucide-react";
+import { Sparkles, Search, ArrowRight, RefreshCw, ChevronDown } from "lucide-react";
 import type { DriverJobMatch } from "@/hooks/useMatchScores";
 
 interface MatchResultsRevealProps {
@@ -109,10 +110,16 @@ function MatchCard({
   );
 }
 
+const INITIAL_SHOW = 10;
+
 export function MatchResultsReveal({
   matches,
   isStillComputing,
 }: MatchResultsRevealProps) {
+  const [showAll, setShowAll] = useState(false);
+  const visibleMatches = showAll ? matches : matches.slice(0, INITIAL_SHOW);
+  const hasMore = matches.length > INITIAL_SHOW;
+
   if (matches.length === 0) {
     return (
       <motion.div
@@ -205,10 +212,24 @@ export function MatchResultsReveal({
 
       {/* Match cards */}
       <div className="space-y-2">
-        {matches.map((match, index) => (
+        {visibleMatches.map((match, index) => (
           <MatchCard key={match.jobId} match={match} index={index} />
         ))}
       </div>
+
+      {/* Show more */}
+      {hasMore && !showAll && (
+        <div className="flex justify-center mt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAll(true)}
+          >
+            <ChevronDown className="h-4 w-4 mr-1.5" />
+            Show {matches.length - INITIAL_SHOW} more {matches.length - INITIAL_SHOW === 1 ? "match" : "matches"}
+          </Button>
+        </div>
+      )}
 
       {/* CTAs */}
       <motion.div
