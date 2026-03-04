@@ -42,6 +42,8 @@ import {
   Ban,
   Trash2,
   ShieldOff,
+  ClipboardList,
+  TrendingUp,
 } from "lucide-react";
 import {
   useAdminStats,
@@ -54,6 +56,8 @@ import {
   useToggleCompanyVerified,
   useAdminBanUser,
   useAdminDeleteUser,
+  useAdminApplications,
+  useAdminChartData,
 } from "@/hooks/useAdmin";
 import { PLANS, type Plan } from "@/hooks/useSubscription";
 import { formatDate } from "@/lib/dateUtils";
@@ -64,9 +68,21 @@ import { useAllVerificationRequests, useReviewVerification, getVerificationDocSi
 import { Textarea } from "@/components/ui/textarea";
 import { useMatchingRollout } from "@/hooks/useMatchScores";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import {
+  BarChart,
+  Bar,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from "recharts";
 
 /* ── Types ──────────────────────────────────────────────────────────── */
-type AdminTab = "overview" | "users" | "subscriptions" | "jobs" | "leads" | "matching" | "verification";
+type AdminTab = "overview" | "users" | "subscriptions" | "jobs" | "leads" | "applications" | "matching" | "verification";
 
 /* ── Outer guard ────────────────────────────────────────────────────── */
 const AdminDashboard = () => {
@@ -101,6 +117,8 @@ function AdminDashboardInner() {
   const toggleVerified = useToggleCompanyVerified();
   const banUser = useAdminBanUser();
   const deleteUser = useAdminDeleteUser();
+  const { data: applications = [] } = useAdminApplications();
+  const { data: chartData } = useAdminChartData();
 
   /* ban/delete confirmation dialog */
   const [confirmAction, setConfirmAction] = useState<{
@@ -165,7 +183,7 @@ function AdminDashboardInner() {
   /* tab state — synced with URL so refresh preserves the tab */
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab") as AdminTab | null;
-  const VALID_TABS: AdminTab[] = ["overview", "users", "subscriptions", "jobs", "leads", "matching", "verification"];
+  const VALID_TABS: AdminTab[] = ["overview", "users", "subscriptions", "jobs", "leads", "applications", "matching", "verification"];
   const activeTab: AdminTab = tabParam && VALID_TABS.includes(tabParam) ? tabParam : "overview";
   const setActiveTab = (tab: AdminTab) => {
     setSearchParams(tab === "overview" ? {} : { tab }, { replace: true });
@@ -183,6 +201,9 @@ function AdminDashboardInner() {
 
   /* leads tab state */
   const [leadPage, setLeadPage] = useState(0);
+
+  /* applications tab state */
+  const [appPage, setAppPage] = useState(0);
 
   /* subscription dialog state */
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
@@ -354,6 +375,11 @@ function AdminDashboardInner() {
               <UserCheck className="h-3.5 w-3.5" /> Leads ({leads.length})
             </span>
           </button>
+          <button className={tabClass("applications")} onClick={() => setActiveTab("applications")}>
+            <span className="flex items-center gap-1.5">
+              <ClipboardList className="h-3.5 w-3.5" /> Applications ({applications.length})
+            </span>
+          </button>
           <button className={tabClass("matching")} onClick={() => setActiveTab("matching")}>
             <span className="flex items-center gap-1.5">
               <Sparkles className="h-3.5 w-3.5" /> Matching
@@ -367,12 +393,56 @@ function AdminDashboardInner() {
         </div>
 
         {/* ── TAB: Overview ──────────────────────────────────────────── */}
-        {activeTab === "overview" && (
+        {activeTab === "overview" && (() => {
+          // Build signup trend chart data (last 30 days)
+          const signupChartData = (() => {
+            const days: { date: string; drivers: number; companies: number }[] = [];
+            for (let i = 29; i >= 0; i--) {
+              const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+              days.push({ date: d.toISOString().slice(5, 10), drivers: 0, companies: 0 });
+            }
+            for (const s of chartData?.signups ?? []) {
+              const key = s.date.slice(5, 10);
+              const entry = days.find((d) => d.date === key);
+              if (entry) {
+                if (s.role === "company") entry.companies++;
+                else entry.drivers++;
+              }
+            }
+            return days;
+          })();
+
+          const PIPELINE_ORDER = ["applied", "reviewing", "interview", "hired", "rejected"];
+          const pipelineData = PIPELINE_ORDER.map((stage) => ({
+            stage: stage.charAt(0).toUpperCase() + stage.slice(1),
+            count: chartData?.applicationStages.find((a) => a.stage === stage)?.count ?? 0,
+          }));
+
+          const STAGE_COLORS: Record<string, string> = {
+            Applied: "hsl(217, 91%, 60%)",
+            Reviewing: "hsl(45, 93%, 47%)",
+            Interview: "hsl(280, 67%, 52%)",
+            Hired: "hsl(142, 71%, 45%)",
+            Rejected: "hsl(0, 72%, 51%)",
+          };
+
+          const JOB_STATUS_COLORS: Record<string, string> = {
+            Active: "hsl(142, 71%, 45%)",
+            Draft: "hsl(215, 14%, 60%)",
+            Paused: "hsl(45, 93%, 47%)",
+            Closed: "hsl(0, 72%, 51%)",
+          };
+
+          const recentSignups = users.slice(0, 10);
+
+          return (
           <div className="space-y-6">
-            <h2 className="font-display font-semibold text-base">
-              Platform Overview
+            <h2 className="font-display font-semibold text-base flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" /> Platform Overview
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+
+            {/* Stat cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
               {[
                 { label: "Total Users", value: stats?.totalUsers ?? 0, icon: <Users className="h-5 w-5 text-muted-foreground" /> },
                 { label: "Companies", value: stats?.totalCompanies ?? 0, icon: <Building2 className="h-5 w-5 text-muted-foreground" /> },
@@ -381,7 +451,7 @@ function AdminDashboardInner() {
                 { label: "Applications", value: stats?.totalApplications ?? 0, icon: <FileText className="h-5 w-5 text-muted-foreground" /> },
                 { label: "Leads", value: stats?.totalLeads ?? 0, icon: <PhoneIcon className="h-5 w-5 text-muted-foreground" /> },
               ].map((s) => (
-                <div key={s.label} className="border border-border bg-card p-5">
+                <div key={s.label} className="border border-border bg-card p-4">
                   <div className="flex items-center justify-between mb-2">
                     {s.icon}
                     <span className="text-2xl font-bold font-display">
@@ -391,6 +461,85 @@ function AdminDashboardInner() {
                   <p className="text-xs text-muted-foreground">{s.label}</p>
                 </div>
               ))}
+            </div>
+
+            {/* Charts row 1 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Signup Trend */}
+              <div className="border border-border bg-card p-5">
+                <p className="font-semibold text-sm mb-4">New Signups (Last 30 Days)</p>
+                <ResponsiveContainer width="100%" height={220}>
+                  <AreaChart data={signupChartData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                    <Tooltip
+                      contentStyle={{ fontSize: 12, borderRadius: 6, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }}
+                    />
+                    <Area type="monotone" dataKey="drivers" stackId="1" stroke="hsl(142, 71%, 45%)" fill="hsl(142, 71%, 45%)" fillOpacity={0.3} name="Drivers" />
+                    <Area type="monotone" dataKey="companies" stackId="1" stroke="hsl(217, 91%, 60%)" fill="hsl(217, 91%, 60%)" fillOpacity={0.3} name="Companies" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Application Pipeline */}
+              <div className="border border-border bg-card p-5">
+                <p className="font-semibold text-sm mb-4">Application Pipeline</p>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={pipelineData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="stage" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                    <Tooltip
+                      contentStyle={{ fontSize: 12, borderRadius: 6, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }}
+                    />
+                    <Bar dataKey="count" name="Applications">
+                      {pipelineData.map((entry, i) => (
+                        <Cell key={i} fill={STAGE_COLORS[entry.stage] ?? "hsl(var(--primary))"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Charts row 2 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Job Status */}
+              <div className="border border-border bg-card p-5">
+                <p className="font-semibold text-sm mb-4">Job Status Breakdown</p>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={chartData?.jobStatuses ?? []}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="status" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                    <Tooltip
+                      contentStyle={{ fontSize: 12, borderRadius: 6, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }}
+                    />
+                    <Bar dataKey="count" name="Jobs">
+                      {(chartData?.jobStatuses ?? []).map((entry, i) => (
+                        <Cell key={i} fill={JOB_STATUS_COLORS[entry.status] ?? "hsl(var(--primary))"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Lead Sources */}
+              <div className="border border-border bg-card p-5">
+                <p className="font-semibold text-sm mb-4">Lead Sources</p>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={chartData?.leadSources ?? []} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                    <YAxis dataKey="source" type="category" tick={{ fontSize: 10 }} className="fill-muted-foreground" width={80} />
+                    <Tooltip
+                      contentStyle={{ fontSize: 12, borderRadius: 6, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }}
+                    />
+                    <Bar dataKey="count" name="Leads" fill="hsl(217, 91%, 60%)" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
 
             {/* Subscription breakdown */}
@@ -412,8 +561,34 @@ function AdminDashboardInner() {
                 })}
               </div>
             </div>
+
+            {/* Recent Signups */}
+            <div className="border border-border bg-card">
+              <div className="px-5 py-3 border-b border-border">
+                <p className="font-semibold text-sm">Recent Signups</p>
+              </div>
+              {recentSignups.length === 0 ? (
+                <p className="px-5 py-6 text-sm text-muted-foreground text-center">No users yet.</p>
+              ) : (
+                <div className="divide-y divide-border">
+                  {recentSignups.map((u) => (
+                    <div key={u.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="text-sm font-medium truncate">{u.name}</p>
+                        {roleBadge(u.role)}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                        {u.email && <span>{u.email}</span>}
+                        <span>{formatDate(u.createdAt)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* ── TAB: Users ─────────────────────────────────────────────── */}
         {activeTab === "users" &&
@@ -677,7 +852,15 @@ function AdminDashboardInner() {
                   >
                     <div className="min-w-0">
                       <p className="font-semibold text-foreground text-sm">
-                        {sub.companyName}
+                        {sub.companyName || "Unnamed Company"}
+                        {(() => {
+                          const u = users.find((u) => u.id === sub.companyId);
+                          return u?.email ? (
+                            <span className="font-normal text-xs text-muted-foreground ml-2">
+                              ({u.email})
+                            </span>
+                          ) : null;
+                        })()}
                       </p>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         {planBadge(sub.plan)}
@@ -903,6 +1086,89 @@ function AdminDashboardInner() {
                   page={leadPage}
                   setPage={setLeadPage}
                   total={leads.length}
+                />
+              </div>
+            );
+          })()}
+
+        {/* ── TAB: Applications ────────────────────────────────────────── */}
+        {activeTab === "applications" &&
+          (() => {
+            const APP_STAGE_BADGE: Record<string, string> = {
+              applied: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+              reviewing: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+              interview: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+              hired: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+              rejected: "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",
+            };
+            const pageApps = applications.slice(
+              appPage * PAGE_SIZE,
+              (appPage + 1) * PAGE_SIZE
+            );
+
+            return (
+              <div>
+                <h2 className="font-display font-semibold text-base mb-4">
+                  All Applications
+                  <span className="text-muted-foreground font-normal text-sm ml-2">
+                    ({applications.length})
+                  </span>
+                </h2>
+
+                {pageApps.length === 0 ? (
+                  <div className="border border-border bg-card">
+                    <EmptyState icon={ClipboardList} heading="No applications yet." />
+                  </div>
+                ) : (
+                  <div className="border border-border bg-card divide-y divide-border">
+                    {pageApps.map((app) => (
+                      <div
+                        key={app.id}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                            <p className="font-semibold text-foreground text-sm">
+                              {app.driverName}
+                            </p>
+                            <span
+                              className={`text-xs px-1.5 py-0.5 font-medium rounded-full ${
+                                APP_STAGE_BADGE[app.pipelineStage] ?? "bg-muted text-muted-foreground"
+                              }`}
+                            >
+                              {app.pipelineStage}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            <span className="font-medium">{app.jobTitle}</span>
+                            {" at "}
+                            {app.companyName}
+                          </p>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
+                            {app.driverEmail && (
+                              <span className="flex items-center gap-1">
+                                <MailIcon className="h-3 w-3" />
+                                {app.driverEmail}
+                              </span>
+                            )}
+                            {app.driverPhone && (
+                              <span className="flex items-center gap-1">
+                                <PhoneIcon className="h-3 w-3" />
+                                {app.driverPhone}
+                              </span>
+                            )}
+                            <span>{formatDate(app.createdAt)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <Pagination
+                  page={appPage}
+                  setPage={setAppPage}
+                  total={applications.length}
                 />
               </div>
             );

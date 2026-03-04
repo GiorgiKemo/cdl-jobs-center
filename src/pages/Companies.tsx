@@ -81,6 +81,8 @@ const Companies = () => {
 
   // Filter companies by state, verified, and search query
   const filtered = companies.filter((c) => {
+    // Hide companies that haven't set up their profile yet
+    if (!c.company_name || !c.company_name.trim()) return false;
     if (stateFilter !== "All" && !c.address?.includes(stateFilter)) return false;
     if (verifiedOnly && !c.is_verified) return false;
     if (searchQuery.trim()) {

@@ -142,11 +142,11 @@ export function useAdminUsers() {
       const [profilesRes, driverRes, companyRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("id, name, role, is_banned, created_at")
+          .select("id, name, role, email, is_banned, created_at")
           .order("created_at", { ascending: false }),
         supabase
-          .from("driver_profiles_safe")
-          .select("id, years_exp, license_state"),
+          .from("driver_profiles")
+          .select("id, years_exp, license_state, phone"),
         supabase
           .from("company_profiles")
           .select("id, company_name, email, phone, is_verified"),
@@ -164,8 +164,8 @@ export function useAdminUsers() {
         const dp = driverMap.get(row.id);
         const cp = companyMap.get(row.id);
         return rowToAdminUser(row, {
-          email: cp?.email ?? null,
-          phone: cp?.phone ?? null,
+          email: cp?.email ?? row.email ?? null,
+          phone: cp?.phone ?? dp?.phone ?? null,
           state: dp?.license_state ?? null,
           yearsExp: dp?.years_exp ?? null,
           companyName: cp?.company_name ?? null,
@@ -351,6 +351,129 @@ export function useAdminDeleteUser() {
       qc.invalidateQueries({ queryKey: ["admin-subscriptions"] });
       qc.invalidateQueries({ queryKey: ["admin-jobs"] });
     },
+  });
+}
+
+/* ── Applications ──────────────────────────────────────────────────── */
+
+export interface AdminApplication {
+  id: string;
+  driverName: string;
+  driverEmail: string | null;
+  driverPhone: string | null;
+  jobTitle: string;
+  companyName: string;
+  pipelineStage: string;
+  createdAt: string;
+}
+
+/** All applications with driver + job info */
+export function useAdminApplications() {
+  return useQuery({
+    queryKey: ["admin-applications"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("applications")
+        .select("id, driver_id, job_id, company_id, pipeline_stage, created_at, first_name, last_name, email, phone")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+
+      // Get job titles + company names
+      const jobIds = [...new Set((data ?? []).map((a) => a.job_id).filter(Boolean))];
+      const companyIds = [...new Set((data ?? []).map((a) => a.company_id).filter(Boolean))];
+
+      const [jobsRes, companiesRes] = await Promise.all([
+        jobIds.length > 0
+          ? supabase.from("jobs").select("id, title").in("id", jobIds)
+          : { data: [] },
+        companyIds.length > 0
+          ? supabase.from("company_profiles").select("id, company_name").in("id", companyIds)
+          : { data: [] },
+      ]);
+
+      const jobMap = new Map((jobsRes.data ?? []).map((j) => [j.id, j.title]));
+      const companyMap = new Map((companiesRes.data ?? []).map((c) => [c.id, c.company_name]));
+
+      return (data ?? []).map((row): AdminApplication => ({
+        id: row.id,
+        driverName: [row.first_name, row.last_name].filter(Boolean).join(" ") || "Unknown",
+        driverEmail: row.email ?? null,
+        driverPhone: row.phone ?? null,
+        jobTitle: jobMap.get(row.job_id) ?? "Unknown Job",
+        companyName: companyMap.get(row.company_id) ?? "Unknown",
+        pipelineStage: row.pipeline_stage ?? "applied",
+        createdAt: row.created_at,
+      }));
+    },
+  });
+}
+
+/* ── Chart data ────────────────────────────────────────────────────── */
+
+export interface AdminChartData {
+  signups: { date: string; role: string }[];
+  applicationStages: { stage: string; count: number }[];
+  jobStatuses: { status: string; count: number }[];
+  leadSources: { source: string; count: number }[];
+}
+
+/** Aggregated data for admin overview charts */
+export function useAdminChartData() {
+  return useQuery({
+    queryKey: ["admin-chart-data"],
+    queryFn: async () => {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      const [signupsRes, appsRes, jobsRes, leadsRes] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("role, created_at")
+          .gte("created_at", thirtyDaysAgo)
+          .order("created_at"),
+        supabase
+          .from("applications")
+          .select("pipeline_stage"),
+        supabase
+          .from("jobs")
+          .select("status"),
+        supabase
+          .from("leads")
+          .select("source"),
+      ]);
+
+      // Signups by date
+      const signups = (signupsRes.data ?? []).map((r) => ({
+        date: r.created_at.slice(0, 10),
+        role: r.role ?? "driver",
+      }));
+
+      // Application pipeline stage counts
+      const stageCounts: Record<string, number> = {};
+      for (const a of appsRes.data ?? []) {
+        const stage = a.pipeline_stage ?? "applied";
+        stageCounts[stage] = (stageCounts[stage] || 0) + 1;
+      }
+      const applicationStages = Object.entries(stageCounts).map(([stage, count]) => ({ stage, count }));
+
+      // Job status counts
+      const jobStatusCounts: Record<string, number> = {};
+      for (const j of jobsRes.data ?? []) {
+        const status = j.status ?? "Active";
+        jobStatusCounts[status] = (jobStatusCounts[status] || 0) + 1;
+      }
+      const jobStatuses = Object.entries(jobStatusCounts).map(([status, count]) => ({ status, count }));
+
+      // Lead source counts
+      const sourceCounts: Record<string, number> = {};
+      for (const l of leadsRes.data ?? []) {
+        const source = l.source ?? "unknown";
+        sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+      }
+      const leadSources = Object.entries(sourceCounts).map(([source, count]) => ({ source, count }));
+
+      return { signups, applicationStages, jobStatuses, leadSources } as AdminChartData;
+    },
+    refetchInterval: 60_000,
   });
 }
 
