@@ -14,5 +14,8 @@ Disallow: /*.html$
 Disallow: /blog/
 Disallow: /*.rss.xml$
 Disallow: /companies/page/
+Disallow: /companies/companies-top-rate/
+Disallow: /drivers-moderation/
+Disallow: /easy-form-moderation/
 
 Sitemap: https://cdljobscenter.com/sitemap.xml
