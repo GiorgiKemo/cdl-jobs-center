@@ -180,8 +180,10 @@ Deno.serve(async (req) => {
     const token = authHeader.replace(/^Bearer\s+/i, "");
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Allow service role key directly (for cron) or admin users
+    // Allow service role key directly (for cron) or admin/company users
     const isServiceRole = token === serviceRoleKey;
+    let callerCompanyId: string | null = null;
+
     if (!isServiceRole) {
       const { data: { user }, error: authError } = await supabase.auth.getUser(token);
       if (authError || !user) {
@@ -198,6 +200,10 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Access denied" }), {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
+      // If company user, tag leads with their company_id
+      if (profile.role === "company") {
+        callerCompanyId = user.id;
       }
     }
 
@@ -251,6 +257,13 @@ Deno.serve(async (req) => {
         JSON.stringify({ synced: 0, new: 0, updated: 0, errors: allErrors, message: "No valid rows found" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    }
+
+    // Tag leads with company_id if called by a company user
+    if (callerCompanyId) {
+      for (const rec of allRecords) {
+        (rec as Record<string, unknown>).company_id = callerCompanyId;
+      }
     }
 
     // Upsert in batches
