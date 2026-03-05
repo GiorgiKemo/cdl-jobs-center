@@ -95,7 +95,7 @@
     --popover: 220 50% 10%;
     --popover-foreground: 0 0% 100%;
 
-    --primary: 350 80% 58%;            /* Bright Old Glory Red for dark bg */
+    --primary: 350 80% 48%;            /* Old Glory Red – WCAG AA on dark bg */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 220 40% 15%;
@@ -104,7 +104,7 @@
     --muted: 220 40% 15%;
     --muted-foreground: 220 20% 65%;
 
-    --accent: 350 80% 58%;             /* Bright Old Glory Red for dark bg */
+    --accent: 350 80% 48%;             /* Old Glory Red – WCAG AA on dark bg */
     --accent-foreground: 0 0% 100%;
 
     --destructive: 350 80% 50%;

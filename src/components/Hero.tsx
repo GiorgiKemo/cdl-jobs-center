@@ -138,7 +138,10 @@ const Hero = () => {
                 loop
                 playsInline
                 preload="metadata"
-              />
+                aria-label="CDL Jobs Center platform walkthrough"
+              >
+                <track kind="captions" default />
+              </video>
             </div>
           </div>
         </div>
