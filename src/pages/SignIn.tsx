@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Loader2, Truck } from "lucide-react";
+import { Loader2, Truck, Briefcase, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,6 +60,8 @@ const PasswordStrengthIndicator = ({ password }: { password: string }) => {
   );
 };
 
+type SignUpRole = "driver" | "company";
+
 const SignIn = () => {
   usePageTitle("Sign In");
   useNoIndex();
@@ -67,6 +69,9 @@ const SignIn = () => {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
+  const [signUpRole, setSignUpRole] = useState<SignUpRole | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
+  const [sentEmail, setSentEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [recovering, setRecovering] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -123,6 +128,10 @@ const SignIn = () => {
       return;
     }
     if (isSignUp) {
+      if (!signUpRole) {
+        toast.error("Please select whether you are a driver or a company.");
+        return;
+      }
       if (!name.trim()) {
         toast.error("Please enter your full name.");
         return;
@@ -133,10 +142,9 @@ const SignIn = () => {
       }
       setLoading(true);
       try {
-        // Register with a placeholder role — onboarding will collect the real role + profile fields
-        await withTimeout(register(name.trim(), email, password, "driver"), 15_000);
-        toast.success("Account created! Complete your profile to get started.");
-        navigate("/onboarding");
+        await withTimeout(register(name.trim(), email, password, signUpRole), 15_000);
+        setSentEmail(email);
+        setEmailSent(true);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Registration failed.");
       } finally {
@@ -155,6 +163,15 @@ const SignIn = () => {
       setLoading(false);
     }
   };
+
+  // Determine page title and breadcrumb
+  const pageLabel = recovering
+    ? "Reset Password"
+    : emailSent
+    ? "Check Your Email"
+    : isSignUp
+    ? "Create Account"
+    : "Sign In";
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -180,162 +197,252 @@ const SignIn = () => {
           {/* Breadcrumb */}
           <p className="text-sm text-muted-foreground mb-6">
             <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
-            <span className="mx-1">»</span>
-            {recovering ? "Reset Password" : isSignUp ? "Create Account" : "Sign In"}
+            <span className="mx-1">&raquo;</span>
+            {pageLabel}
           </p>
 
           <div className="border border-border bg-card">
-            {/* Header */}
-            <div className="border-b border-border px-5 py-4">
-              <div className="border-l-4 border-primary pl-3">
-                <p className="font-display font-bold text-lg">
-                  {recovering ? "Set a New Password" : isSignUp ? "Create Your Account" : "Sign In to Your Account"}
+            {/* ── Email Confirmation Screen ─────────────────────────────── */}
+            {emailSent ? (
+              <div className="px-5 py-10 text-center space-y-4">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                  <Mail className="h-8 w-8 text-primary" />
+                </div>
+                <div>
+                  <p className="font-display font-bold text-lg">Check Your Email</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    We sent a confirmation link to
+                  </p>
+                  <p className="text-sm font-medium mt-1">{sentEmail}</p>
+                </div>
+                <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                  Click the link in the email to verify your account. Once confirmed, you can sign in and complete your profile setup.
                 </p>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  {recovering
-                    ? "Choose a strong password for your account"
-                    : isSignUp
-                    ? "Join CDL Jobs Center as a driver or company"
-                    : "Access your driver profile and saved jobs"}
-                </p>
+                <div className="pt-2 space-y-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => {
+                      setEmailSent(false);
+                      setIsSignUp(false);
+                      setPassword("");
+                    }}
+                  >
+                    Back to Sign In
+                  </Button>
+                </div>
               </div>
-            </div>
-
-            {recovering ? (
-              <form onSubmit={handleResetPassword} className="px-5 py-6 space-y-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="new-password">New password</Label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    placeholder="••••••••••••"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    autoComplete="new-password"
-                  />
-                  <PasswordStrengthIndicator password={newPassword} />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="confirm-password">Confirm password</Label>
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    placeholder="••••••••••••"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    autoComplete="new-password"
-                    aria-invalid={confirmPassword.length > 0 && newPassword !== confirmPassword}
-                    className={confirmPassword.length > 0 && newPassword !== confirmPassword ? "border-destructive focus-visible:ring-destructive" : ""}
-                  />
-                  {confirmPassword.length > 0 && newPassword !== confirmPassword && (
-                    <p className="text-xs text-destructive">Passwords do not match.</p>
-                  )}
-                </div>
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={loading}
-                >
-                  {loading ? "Updating..." : "Update Password"}
-                </Button>
-              </form>
-            ) : (
+            ) : recovering ? (
               <>
-              <div className="px-5 pt-6 space-y-4">
-                <SocialLoginButtons />
-                <OrDivider />
-              </div>
-              <form onSubmit={handleSubmit} className="px-5 pb-6 space-y-4">
-                {isSignUp && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="name">Full name</Label>
-                    <Input
-                      id="name"
-                      type="text"
-                      placeholder="John Smith"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      autoComplete="name"
-                    />
+                {/* Header */}
+                <div className="border-b border-border px-5 py-4">
+                  <div className="border-l-4 border-primary pl-3">
+                    <p className="font-display font-bold text-lg">Set a New Password</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Choose a strong password for your account
+                    </p>
                   </div>
-                )}
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="email">Email address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                  />
                 </div>
+                <form onSubmit={handleResetPassword} className="px-5 py-6 space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="new-password">New password</Label>
+                    <Input
+                      id="new-password"
+                      type="password"
+                      placeholder="••••••••••••"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      autoComplete="new-password"
+                    />
+                    <PasswordStrengthIndicator password={newPassword} />
+                  </div>
 
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
-                    {!isSignUp && (
-                      <button
-                        type="button"
-                        className="text-xs text-primary underline hover:opacity-80"
-                        onClick={async () => {
-                          if (!email) {
-                            toast.error("Enter your email first, then click Forgot password.");
-                            return;
-                          }
-                          try {
-                            const { error } = await withTimeout(supabase.auth.resetPasswordForEmail(email, {
-                              redirectTo: `${window.location.origin}/signin`,
-                            }), 15_000);
-                            if (error) throw error;
-                            toast.success("Password reset email sent! Check your inbox.");
-                          } catch (err) {
-                            toast.error(err instanceof Error ? err.message : "Failed to send reset email.");
-                          }
-                        }}
-                      >
-                        Forgot password?
-                      </button>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="confirm-password">Confirm password</Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      placeholder="••••••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      autoComplete="new-password"
+                      aria-invalid={confirmPassword.length > 0 && newPassword !== confirmPassword}
+                      className={confirmPassword.length > 0 && newPassword !== confirmPassword ? "border-destructive focus-visible:ring-destructive" : ""}
+                    />
+                    {confirmPassword.length > 0 && newPassword !== confirmPassword && (
+                      <p className="text-xs text-destructive">Passwords do not match.</p>
                     )}
                   </div>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder={isSignUp ? "••••••••••••" : "••••••••"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete={isSignUp ? "new-password" : "current-password"}
-                  />
-                  {isSignUp && <PasswordStrengthIndicator password={password} />}
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={loading}
+                  >
+                    {loading ? "Updating..." : "Update Password"}
+                  </Button>
+                </form>
+              </>
+            ) : (
+              <>
+                {/* Header */}
+                <div className="border-b border-border px-5 py-4">
+                  <div className="border-l-4 border-primary pl-3">
+                    <p className="font-display font-bold text-lg">
+                      {isSignUp ? "Create Your Account" : "Sign In to Your Account"}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {isSignUp
+                        ? "Join CDL Jobs Center as a driver or company"
+                        : "Access your driver profile and saved jobs"}
+                    </p>
+                  </div>
                 </div>
 
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={loading}
-                >
-                  {loading ? (
+                <div className="px-5 pt-6 space-y-4">
+                  <SocialLoginButtons />
+                  <OrDivider text={isSignUp ? "or sign up with email" : "or sign in with email"} />
+                </div>
+                <form onSubmit={handleSubmit} className="px-5 pb-6 space-y-4">
+                  {isSignUp && (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      {isSignUp ? "Creating account..." : "Signing in..."}
-                    </>
-                  ) : isSignUp ? "Create Account" : "Sign In"}
-                </Button>
+                      {/* Role selection */}
+                      <div className="space-y-1.5">
+                        <Label>I am a... <span className="text-destructive">*</span></Label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setSignUpRole("driver")}
+                            className={`flex items-center gap-2.5 rounded-lg border-2 p-3 text-left transition-all ${
+                              signUpRole === "driver"
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-muted-foreground/40"
+                            }`}
+                          >
+                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                              signUpRole === "driver" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                            }`}>
+                              <Truck className="h-4.5 w-4.5" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold">Driver</p>
+                              <p className="text-[11px] text-muted-foreground leading-tight">Find CDL jobs</p>
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSignUpRole("company")}
+                            className={`flex items-center gap-2.5 rounded-lg border-2 p-3 text-left transition-all ${
+                              signUpRole === "company"
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-muted-foreground/40"
+                            }`}
+                          >
+                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                              signUpRole === "company" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                            }`}>
+                              <Briefcase className="h-4.5 w-4.5" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold">Company</p>
+                              <p className="text-[11px] text-muted-foreground leading-tight">Hire drivers</p>
+                            </div>
+                          </button>
+                        </div>
+                      </div>
 
-                <p className="text-center text-sm text-muted-foreground pt-2">
-                  {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
-                  <button
-                    type="button"
-                    className="text-primary font-medium hover:underline"
-                    onClick={() => setIsSignUp(!isSignUp)}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="name">Full name <span className="text-destructive">*</span></Label>
+                        <Input
+                          id="name"
+                          type="text"
+                          placeholder="John Smith"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          autoComplete="name"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="email">Email address {isSignUp && <span className="text-destructive">*</span>}</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      autoComplete="email"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="password">Password {isSignUp && <span className="text-destructive">*</span>}</Label>
+                      {!isSignUp && (
+                        <button
+                          type="button"
+                          className="text-xs text-primary underline hover:opacity-80"
+                          onClick={async () => {
+                            if (!email) {
+                              toast.error("Enter your email first, then click Forgot password.");
+                              return;
+                            }
+                            try {
+                              const { error } = await withTimeout(supabase.auth.resetPasswordForEmail(email, {
+                                redirectTo: `${window.location.origin}/signin`,
+                              }), 15_000);
+                              if (error) throw error;
+                              toast.success("Password reset email sent! Check your inbox.");
+                            } catch (err) {
+                              toast.error(err instanceof Error ? err.message : "Failed to send reset email.");
+                            }
+                          }}
+                        >
+                          Forgot password?
+                        </button>
+                      )}
+                    </div>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder={isSignUp ? "Min. 12 characters" : "••••••••"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete={isSignUp ? "new-password" : "current-password"}
+                    />
+                    {isSignUp && <PasswordStrengthIndicator password={password} />}
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={loading}
                   >
-                    {isSignUp ? "Sign In →" : "Create Account →"}
-                  </button>
-                </p>
-              </form>
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        {isSignUp ? "Creating account..." : "Signing in..."}
+                      </>
+                    ) : isSignUp ? "Create Account" : "Sign In"}
+                  </Button>
+
+                  <p className="text-center text-sm text-muted-foreground pt-2">
+                    {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
+                    <button
+                      type="button"
+                      className="text-primary font-medium hover:underline"
+                      onClick={() => {
+                        setIsSignUp(!isSignUp);
+                        setSignUpRole(null);
+                      }}
+                    >
+                      {isSignUp ? "Sign In" : "Create Account"}
+                    </button>
+                  </p>
+                </form>
               </>
             )}
           </div>
