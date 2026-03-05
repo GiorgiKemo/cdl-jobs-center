@@ -338,6 +338,17 @@ Deno.serve(async (req) => {
 
     console.log(`Sync complete: ${totalNew} new, ${totalUpdated} updated, ${allErrors.length} errors`);
 
+    // Send a single summary notification to the company user (if any new leads)
+    if (callerCompanyId && totalNew > 0) {
+      await supabase.rpc("notify_user", {
+        p_user_id: callerCompanyId,
+        p_type: "new_lead",
+        p_title: "New Leads Synced",
+        p_body: `${totalNew} new lead${totalNew === 1 ? "" : "s"} synced from Facebook ads`,
+        p_metadata: { link: "/dashboard?tab=leads", new_count: totalNew },
+      });
+    }
+
     return new Response(
       JSON.stringify({
         synced: totalNew + totalUpdated,
