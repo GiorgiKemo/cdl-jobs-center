@@ -10,7 +10,8 @@
     { "source": "/price.html", "destination": "/pricing", "statusCode": 301 },
     { "source": "/companies/companies-top-rate/", "destination": "/companies", "statusCode": 301 },
     { "source": "/drivers-moderation/", "destination": "/drivers", "statusCode": 301 },
-    { "source": "/easy-form-moderation/", "destination": "/apply", "statusCode": 301 }
+    { "source": "/easy-form-moderation/", "destination": "/apply", "statusCode": 301 },
+    { "source": "/:path(.*)", "has": [{ "type": "host", "value": "www.cdljobscenter.com" }], "destination": "https://cdljobscenter.com/:path", "statusCode": 301 }
   ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }

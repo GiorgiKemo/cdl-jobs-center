@@ -2,7 +2,7 @@ import { useEffect } from "react";
 
 const BASE_TITLE = "CDL Jobs Center";
 const BASE_URL = "https://cdljobscenter.com";
-const BASE_DESC = "Find top CDL trucking jobs — AI-powered matching for drivers across the USA.";
+const BASE_DESC = "Find CDL truck driving jobs matched to your experience. Browse top trucking companies, apply instantly, and get hired faster with AI-powered job matching across the USA.";
 
 export function usePageTitle(title?: string) {
   useEffect(() => {
