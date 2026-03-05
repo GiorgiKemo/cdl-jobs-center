@@ -79,7 +79,7 @@ export function useSyncLeads() {
     mutationFn: async (): Promise<SyncResult> => {
       const { data, error } = await withTimeout(supabase.functions.invoke("sync-leads", {
         body: {},
-      }), 30_000);
+      }), 90_000);
 
       if (error) {
         // Extract actual error message from FunctionsHttpError if available
