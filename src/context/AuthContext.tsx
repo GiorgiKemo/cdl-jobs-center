@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               const { error: upsertErr } = await supabase.from("company_profiles").upsert({
                 id: userId,
                 company_name: meta.company_name || meta.name || "",
-                phone: meta.company_phone || "",
+                phone: meta.company_phone || meta.phone || "",
                 address: meta.company_address || "",
                 email: meta.company_email || userEmail,
                 contact_name: meta.contact_name || "",
@@ -123,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 await supabase.from("company_profiles").upsert({
                   id: userId,
                   company_name: meta.company_name || meta.name || "",
-                  phone: meta.company_phone || "",
+                  phone: meta.company_phone || meta.phone || "",
                   address: meta.company_address || "",
                   email: meta.company_email || userEmail,
                 });
