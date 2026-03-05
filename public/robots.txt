@@ -8,4 +8,11 @@ Disallow: /admin
 Disallow: /signin
 Disallow: /onboarding
 
+# Legacy URLs from old PHP site
+Disallow: /index.php
+Disallow: /*.html$
+Disallow: /blog/
+Disallow: /*.rss.xml$
+Disallow: /companies/page/
+
 Sitemap: https://cdljobscenter.com/sitemap.xml

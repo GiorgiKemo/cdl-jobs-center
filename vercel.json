@@ -1,4 +1,13 @@
 {
+  "redirects": [
+    { "source": "/:id(\\d+)-:slug*.html", "destination": "/companies", "statusCode": 301 },
+    { "source": "/cdljobscenter.html", "destination": "/", "statusCode": 301 },
+    { "source": "/companies/page/:num", "destination": "/companies", "statusCode": 301 },
+    { "source": "/blog/:path*", "destination": "/", "statusCode": 301 },
+    { "source": "/:path*.rss.xml", "destination": "/", "statusCode": 301 },
+    { "source": "/rss.xml", "destination": "/", "statusCode": 301 },
+    { "source": "/index.php", "destination": "/", "statusCode": 301 }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
