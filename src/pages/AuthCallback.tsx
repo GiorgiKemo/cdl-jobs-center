@@ -4,6 +4,7 @@ import { useAuth } from "@/context/auth";
 import { supabase } from "@/lib/supabase";
 import { Spinner } from "@/components/ui/Spinner";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { toast } from "sonner";
 
 /**
  * OAuth redirect landing page.
@@ -25,10 +26,17 @@ const AuthCallback = () => {
   const handled = useRef(false);
   const [sessionReady, setSessionReady] = useState(false);
 
+  // Detect if this is an email confirmation (URL hash contains type=signup)
+  const isEmailConfirmation = useRef(window.location.hash.includes("type=signup") || window.location.hash.includes("type=email"));
+
   // Listen for the auth event that confirms tokens have been exchanged.
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        if (isEmailConfirmation.current) {
+          toast.success("Email confirmed! Welcome to CDL Jobs Center.");
+          isEmailConfirmation.current = false;
+        }
         setSessionReady(true);
       }
     });

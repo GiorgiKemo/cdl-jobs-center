@@ -196,7 +196,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { name, role, ...profileFields } },
+      options: {
+        data: { name, role, ...profileFields },
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
     });
     if (error) throw error;
     // Supabase returns a "fake" user with empty identities when the email

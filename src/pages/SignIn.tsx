@@ -67,9 +67,16 @@ const SignIn = () => {
   useNoIndex();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [signUpRole, setSignUpRole] = useState<SignUpRole | null>(null);
+  // Driver fields
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [driverPhone, setDriverPhone] = useState("");
+  // Company fields
+  const [companyName, setCompanyName] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [companyPhone, setCompanyPhone] = useState("");
   const [emailSent, setEmailSent] = useState(false);
   const [sentEmail, setSentEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -132,9 +139,16 @@ const SignIn = () => {
         toast.error("Please select whether you are a driver or a company.");
         return;
       }
-      if (!name.trim()) {
-        toast.error("Please enter your full name.");
-        return;
+      if (signUpRole === "driver") {
+        if (!firstName.trim() || !lastName.trim() || !driverPhone.trim()) {
+          toast.error("Please fill in all required fields.");
+          return;
+        }
+      } else {
+        if (!companyName.trim() || !contactName.trim() || !companyPhone.trim()) {
+          toast.error("Please fill in all required fields.");
+          return;
+        }
       }
       if (password.length < 12) {
         toast.error("Password must be at least 12 characters.");
@@ -142,7 +156,13 @@ const SignIn = () => {
       }
       setLoading(true);
       try {
-        await withTimeout(register(name.trim(), email, password, signUpRole), 15_000);
+        const displayName = signUpRole === "driver"
+          ? `${firstName.trim()} ${lastName.trim()}`
+          : contactName.trim();
+        const profileFields = signUpRole === "driver"
+          ? { first_name: firstName.trim(), last_name: lastName.trim(), phone: driverPhone.trim() }
+          : { company_name: companyName.trim(), contact_name: contactName.trim(), phone: companyPhone.trim() };
+        await withTimeout(register(displayName, email, password, signUpRole, profileFields), 15_000);
         setSentEmail(email);
         setEmailSent(true);
       } catch (err) {
@@ -352,17 +372,41 @@ const SignIn = () => {
                         </div>
                       </div>
 
-                      <div className="space-y-1.5">
-                        <Label htmlFor="name">Full name <span className="text-destructive">*</span></Label>
-                        <Input
-                          id="name"
-                          type="text"
-                          placeholder="John Smith"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          autoComplete="name"
-                        />
-                      </div>
+                      {/* Role-specific fields */}
+                      {signUpRole === "driver" && (
+                        <>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label htmlFor="first-name">First name <span className="text-destructive">*</span></Label>
+                              <Input id="first-name" placeholder="John" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="given-name" />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="last-name">Last name <span className="text-destructive">*</span></Label>
+                              <Input id="last-name" placeholder="Doe" value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" />
+                            </div>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="driver-phone">Phone number <span className="text-destructive">*</span></Label>
+                            <Input id="driver-phone" type="tel" placeholder="(555) 123-4567" value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} autoComplete="tel" />
+                          </div>
+                        </>
+                      )}
+                      {signUpRole === "company" && (
+                        <>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="company-name">Company name <span className="text-destructive">*</span></Label>
+                            <Input id="company-name" placeholder="Acme Trucking LLC" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="contact-name">Contact name <span className="text-destructive">*</span></Label>
+                            <Input id="contact-name" placeholder="Jane Smith" value={contactName} onChange={(e) => setContactName(e.target.value)} autoComplete="name" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="company-phone">Phone number <span className="text-destructive">*</span></Label>
+                            <Input id="company-phone" type="tel" placeholder="(555) 123-4567" value={companyPhone} onChange={(e) => setCompanyPhone(e.target.value)} autoComplete="tel" />
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
 
