@@ -7,7 +7,7 @@ import { toast } from "sonner";
 
 interface NotificationPreferencesProps {
   userId: string;
-  role: "driver" | "company";
+  role: "driver" | "company" | "admin";
 }
 
 interface PrefItem {
@@ -34,8 +34,13 @@ const DRIVER_PREFS: PrefItem[] = [
   { key: "weekly_digest", label: "Weekly Digest", description: "Weekly summary of activity" },
 ];
 
+const ADMIN_PREFS: PrefItem[] = [
+  { key: "new_registration", label: "New Registrations", description: "When a new driver or company signs up" },
+  { key: "new_application", label: "New Applications", description: "When a driver applies to any job" },
+];
+
 export function NotificationPreferences({ userId, role }: NotificationPreferencesProps) {
-  const prefs = role === "company" ? COMPANY_PREFS : DRIVER_PREFS;
+  const prefs = role === "admin" ? ADMIN_PREFS : role === "company" ? COMPANY_PREFS : DRIVER_PREFS;
   const [values, setValues] = useState<Record<string, boolean>>({});
   const [loaded, setLoaded] = useState(false);
 

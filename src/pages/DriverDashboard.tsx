@@ -786,7 +786,11 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
                       onClick={handleRefreshMatches}
                       disabled={refreshMatchesMutation.isPending}
                     >
-                      <RefreshCw className={`h-4 w-4 ${refreshMatchesMutation.isPending ? "animate-spin" : ""}`} />
+                      {refreshMatchesMutation.isPending ? (
+                        <Spinner size="sm" className="h-4 w-4 border-[1.75px] border-current border-t-transparent" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
                       {refreshMatchesMutation.isPending ? "Refreshing..." : "Refresh Matches"}
                     </Button>
                     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -812,7 +816,12 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
                     <div className="mt-4 flex flex-wrap gap-2 justify-center">
                       <Button variant="outline" onClick={() => switchTab("profile")}>Complete Profile</Button>
                       <Button variant="outline" onClick={handleRefreshMatches} disabled={refreshMatchesMutation.isPending}>
-                        {refreshMatchesMutation.isPending ? "Refreshing..." : "Refresh"}
+                        {refreshMatchesMutation.isPending ? (
+                          <>
+                            <Spinner size="sm" className="h-4 w-4 border-[1.75px] border-current border-t-transparent mr-2" />
+                            Refreshing...
+                          </>
+                        ) : "Refresh"}
                       </Button>
                       <Button asChild>
                         <Link to="/jobs">Browse Jobs</Link>

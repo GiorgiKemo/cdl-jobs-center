@@ -62,11 +62,13 @@ import {
 import { PLANS, type Plan } from "@/hooks/useSubscription";
 import { formatDate } from "@/lib/dateUtils";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Spinner } from "@/components/ui/Spinner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAllVerificationRequests, useReviewVerification, getVerificationDocSignedUrl } from "@/hooks/useVerification";
 import { Textarea } from "@/components/ui/textarea";
 import { useMatchingRollout } from "@/hooks/useMatchScores";
+import { NotificationPreferences } from "@/components/NotificationPreferences";
 import { usePageTitle, useNoIndex } from "@/hooks/usePageTitle";
 import {
   BarChart,
@@ -98,7 +100,15 @@ const AdminDashboard = () => {
     }
   }, [loading, user, navigate]);
 
-  if (loading || !user || user.role !== "admin") return null;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
+
+  if (!user || user.role !== "admin") return null;
   return <AdminDashboardInner />;
 };
 export default AdminDashboard;
@@ -195,7 +205,7 @@ function AdminDashboardInner() {
   /* users tab state */
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState<
-    "all" | "driver" | "company"
+    "all" | "driver" | "company" | "new"
   >("all");
   const [userPage, setUserPage] = useState(0);
 
@@ -589,6 +599,9 @@ function AdminDashboardInner() {
                 </div>
               )}
             </div>
+
+          {/* Admin notification preferences */}
+          <NotificationPreferences userId={user!.id} role="admin" />
           </div>
           );
         })()}
@@ -597,7 +610,10 @@ function AdminDashboardInner() {
         {activeTab === "users" &&
           (() => {
             const filtered = users.filter((u) => {
-              if (userRoleFilter !== "all" && u.role !== userRoleFilter)
+              if (userRoleFilter === "new") {
+                if (Date.now() - new Date(u.createdAt).getTime() >= 48 * 60 * 60 * 1000)
+                  return false;
+              } else if (userRoleFilter !== "all" && u.role !== userRoleFilter)
                 return false;
               if (userSearch) {
                 const q = userSearch.toLowerCase();
@@ -637,7 +653,7 @@ function AdminDashboardInner() {
                       className="w-48 h-8 text-xs"
                     />
                     <div className="flex border border-border rounded-md overflow-hidden">
-                      {(["all", "driver", "company"] as const).map((r) => (
+                      {(["all", "new", "driver", "company"] as const).map((r) => (
                         <button
                           key={r}
                           onClick={() => {
@@ -652,9 +668,11 @@ function AdminDashboardInner() {
                         >
                           {r === "all"
                             ? "All"
-                            : r === "company"
-                              ? "Companies"
-                              : "Drivers"}
+                            : r === "new"
+                              ? "New"
+                              : r === "company"
+                                ? "Companies"
+                                : "Drivers"}
                         </button>
                       ))}
                     </div>
@@ -679,6 +697,11 @@ function AdminDashboardInner() {
                               {u.name}
                             </p>
                             {roleBadge(u.role)}
+                            {Date.now() - new Date(u.createdAt).getTime() < 48 * 60 * 60 * 1000 && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase animate-pulse">
+                                New
+                              </span>
+                            )}
                             {u.isBanned && (
                               <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-500 uppercase">
                                 <Ban className="h-3 w-3" /> Banned

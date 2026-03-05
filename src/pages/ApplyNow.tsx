@@ -19,6 +19,7 @@ import { scoreJobsClientSide, type JobRow } from "@/lib/clientScoring";
 import { SignInModal } from "@/components/SignInModal";
 import { AIGenerationScreen } from "@/components/matching/AIGenerationScreen";
 import { MatchResultsReveal } from "@/components/matching/MatchResultsReveal";
+import { Spinner } from "@/components/ui/Spinner";
 import { Sparkles, ChevronDown, ChevronUp, Check, Clock, User, Briefcase, Settings, CheckCircle2, X, RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { usePageTitle, useMetaDescription, useCanonical } from "@/hooks/usePageTitle";
@@ -378,7 +379,19 @@ const ApplyNow = () => {
   }, [user]);
 
   // Loading guard
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="container mx-auto py-20">
+          <div className="flex justify-center">
+            <Spinner />
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   // Auth gate
   if (!user || user.role === "company") {

@@ -122,6 +122,7 @@ export function getCtaForType(
     verification_update: (metadata.decision as string) === "approved"
       ? "View Your Dashboard"
       : "Resubmit Verification",
+    new_registration: "View in Admin",
   };
 
   return {
@@ -283,6 +284,30 @@ export function buildRichBody(
         divider,
         p("You can submit a new verification request with updated information. Common reasons for rejection include incomplete documentation or mismatched business details."),
         p("If you believe this was a mistake, please update your information and try again."),
+      ].join("");
+    }
+
+    case "new_registration": {
+      const name = escapeHtml((m.member_name as string) || "Someone");
+      const role = (m.member_role as string) || "user";
+      const roleLabel = role === "company" ? "Company" : "Driver";
+      const roleBadgeColor = role === "company" ? BRAND_COLOR : ACCENT_GREEN;
+
+      return [
+        p(`A new ${roleLabel.toLowerCase()} just registered on CDL Jobs Center.`),
+        divider,
+        `<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 0 12px 0;">
+          <tr>
+            <td style="font-size: 13px; color: ${MUTED_COLOR}; padding-right: 8px;">Name:</td>
+            <td style="font-size: 13px; color: ${TEXT_COLOR};">${bold(name)}</td>
+          </tr>
+          <tr>
+            <td style="font-size: 13px; color: ${MUTED_COLOR}; padding-right: 8px; padding-top: 4px;">Role:</td>
+            <td style="padding-top: 4px;">${badge(roleLabel, roleBadgeColor)}</td>
+          </tr>
+        </table>`,
+        divider,
+        p("Head to the admin dashboard to review the new member."),
       ].join("");
     }
 

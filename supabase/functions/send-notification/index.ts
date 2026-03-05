@@ -23,6 +23,7 @@ const EMAIL_ENABLED_TYPES = new Set([
   "new_message",
   "welcome",
   "verification_update",
+  "new_registration",
 ]);
 
 /** Descriptive email subjects per type (overrides the short in-app title) */
@@ -53,6 +54,11 @@ function getEmailSubject(
       return decision === "approved"
         ? "Your Company Has Been Verified - CDL Jobs Center"
         : "Verification Update - CDL Jobs Center";
+    }
+    case "new_registration": {
+      const name = (m.member_name as string) || "Someone";
+      const role = (m.member_role as string) || "user";
+      return `New ${role.charAt(0).toUpperCase() + role.slice(1)} Registration: ${name}`;
     }
     default:
       return "CDL Jobs Center Notification";

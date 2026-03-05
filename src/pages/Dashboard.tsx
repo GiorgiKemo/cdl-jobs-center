@@ -1716,7 +1716,11 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                       });
                     }}
                   >
-                    <RefreshCw className={`h-3.5 w-3.5 ${syncLeads.isPending ? "animate-spin" : ""}`} />
+                    {syncLeads.isPending ? (
+                      <Spinner size="sm" className="h-3.5 w-3.5 border-[1.75px] border-current border-t-transparent" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    )}
                     {syncLeads.isPending ? "Syncing..." : "Sync Now"}
                   </Button>
                   <Select value={leadStateFilter} onValueChange={(v) => { setLeadStateFilter(v); setLeadPage(0); }}>
@@ -1777,7 +1781,11 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                         });
                       }}
                     >
-                      <RefreshCw className={`h-3.5 w-3.5 ${syncLeads.isPending ? "animate-spin" : ""}`} />
+                      {syncLeads.isPending ? (
+                        <Spinner size="sm" className="h-3.5 w-3.5 border-[1.75px] border-current border-t-transparent" />
+                      ) : (
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      )}
                       {syncLeads.isPending ? "Syncing..." : "Sync Now"}
                     </Button>
                   </div>
