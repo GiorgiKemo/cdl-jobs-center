@@ -83,9 +83,9 @@ Deno.serve(async (req) => {
 
     // Server-side allowed price/plan map — prevents arbitrary priceIds from client
     const ALLOWED_PLANS: Record<string, string> = {
-      starter:   "price_1T76c2R2CsQTleMKfl2pvNI5",
-      growth:    "price_1T76c5R2CsQTleMKcZz1LkGO",
-      unlimited: "price_1T76cbR2CsQTleMKZleLxu0c",
+      starter:   Deno.env.get("STRIPE_PRICE_STARTER") ?? "",
+      growth:    Deno.env.get("STRIPE_PRICE_GROWTH") ?? "",
+      unlimited: Deno.env.get("STRIPE_PRICE_UNLIMITED") ?? "",
     };
 
     // Parse request body — only accept plan name, derive priceId server-side

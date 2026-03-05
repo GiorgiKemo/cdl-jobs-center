@@ -4,6 +4,5 @@
 export function hasContactConsent(wantsContact: string | undefined): boolean {
   return wantsContact === "Yes";
 }
-// TODO: Enforce in backend edge functions for email/notification pipelines.
-// Any automated outreach (job alerts, marketing emails) must check this flag
-// before sending to the driver.
+// Backend enforcement: send-scheduled-notifications checks wants_contact
+// before sending profile_reminder outreach emails to drivers.

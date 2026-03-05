@@ -649,6 +649,18 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
 
   const leadLimit = subscription ? PLANS[subscription.plan].leads : 3;
 
+  // Stable set of unlocked lead IDs based on position in unfiltered list.
+  // Prevents paywall bypass via filter manipulation (fix: audit finding #1).
+  const unlockedLeadIds = useMemo(() => {
+    if (leadLimit >= 9999) return null; // unlimited plan
+    const active = leads.filter((l) => l.status !== "dismissed" && l.status !== "hired");
+    const ids = new Set<string>();
+    for (let i = 0; i < Math.min(active.length, leadLimit); i++) {
+      ids.add(active[i].id);
+    }
+    return ids;
+  }, [leads, leadLimit]);
+
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const t = searchParams.get("tab");
@@ -695,8 +707,9 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
     queryFn: async () => {
       const { data } = await supabase
         .from("company_driver_match_scores")
-        .select("candidate_driver_id, candidate_id, candidate_source")
-        .eq("company_id", user!.id);
+        .select("candidate_driver_id, candidate_id, candidate_source, job_id, jobs!inner(status)")
+        .eq("company_id", user!.id)
+        .eq("jobs.status", "Active");
       if (!data || data.length === 0) return 0;
       // Deduplicate by person identity (same logic as useCompanyDriverMatches)
       const seen = new Set<string>();
@@ -1776,9 +1789,8 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
               ) : (
                 <>
                   <div className="space-y-3">
-                    {pageLeads.map((lead, idx) => {
-                      const globalIdx = leadPage * LEAD_PAGE_SIZE + idx;
-                      const isLocked = leadsAllowed !== 9999 && globalIdx >= leadsAllowed;
+                    {pageLeads.map((lead) => {
+                      const isLocked = unlockedLeadIds !== null && !unlockedLeadIds.has(lead.id);
 
                       return (
                       <div key={lead.id} className={`relative border bg-card p-4 transition-colors ${isLocked ? "border-border" : lead.status === "dismissed" ? "border-border opacity-60" : lead.status === "new" ? "border-blue-200 dark:border-blue-800" : "border-border"}`}>

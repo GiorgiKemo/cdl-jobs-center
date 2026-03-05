@@ -414,14 +414,14 @@ function AdminDashboardInner() {
             return days;
           })();
 
-          const PIPELINE_ORDER = ["applied", "reviewing", "interview", "hired", "rejected"];
+          const PIPELINE_ORDER = ["New", "Reviewing", "Interview", "Hired", "Rejected"];
           const pipelineData = PIPELINE_ORDER.map((stage) => ({
-            stage: stage.charAt(0).toUpperCase() + stage.slice(1),
+            stage,
             count: chartData?.applicationStages.find((a) => a.stage === stage)?.count ?? 0,
           }));
 
           const STAGE_COLORS: Record<string, string> = {
-            Applied: "hsl(217, 91%, 60%)",
+            New: "hsl(217, 91%, 60%)",
             Reviewing: "hsl(45, 93%, 47%)",
             Interview: "hsl(280, 67%, 52%)",
             Hired: "hsl(142, 71%, 45%)",
@@ -1097,11 +1097,11 @@ function AdminDashboardInner() {
         {activeTab === "applications" &&
           (() => {
             const APP_STAGE_BADGE: Record<string, string> = {
-              applied: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-              reviewing: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-              interview: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-              hired: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-              rejected: "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",
+              New: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+              Reviewing: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+              Interview: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+              Hired: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+              Rejected: "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",
             };
             const pageApps = applications.slice(
               appPage * PAGE_SIZE,

@@ -172,9 +172,12 @@ Deno.serve(async (req) => {
 
         const { data: driverProfile } = await supabase
           .from("driver_profiles")
-          .select("phone, cdl_number")
+          .select("phone, cdl_number, wants_contact")
           .eq("id", userId)
           .single();
+
+        // Respect contact consent — skip drivers who haven't opted in
+        if (driverProfile?.wants_contact !== "Yes") continue;
 
         if (driverProfile?.phone && driverProfile?.cdl_number) continue;
 

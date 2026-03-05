@@ -388,6 +388,7 @@ export function useAdminApplications() {
       const { data, error } = await supabase
         .from("applications")
         .select("id, driver_id, job_id, company_id, pipeline_stage, created_at, first_name, last_name, email, phone")
+        .not("job_id", "is", null)
         .order("created_at", { ascending: false });
       if (error) throw error;
 
@@ -414,7 +415,7 @@ export function useAdminApplications() {
         driverPhone: row.phone ?? null,
         jobTitle: jobMap.get(row.job_id) ?? "Unknown Job",
         companyName: companyMap.get(row.company_id) ?? "Unknown",
-        pipelineStage: row.pipeline_stage ?? "applied",
+        pipelineStage: row.pipeline_stage ?? "New",
         createdAt: row.created_at,
       }));
     },
@@ -446,7 +447,8 @@ export function useAdminChartData() {
           .order("created_at"),
         supabase
           .from("applications")
-          .select("pipeline_stage"),
+          .select("pipeline_stage")
+          .not("job_id", "is", null),
         supabase
           .from("jobs")
           .select("status"),
@@ -464,7 +466,7 @@ export function useAdminChartData() {
       // Application pipeline stage counts
       const stageCounts: Record<string, number> = {};
       for (const a of appsRes.data ?? []) {
-        const stage = a.pipeline_stage ?? "applied";
+        const stage = a.pipeline_stage ?? "New";
         stageCounts[stage] = (stageCounts[stage] || 0) + 1;
       }
       const applicationStages = Object.entries(stageCounts).map(([stage, count]) => ({ stage, count }));

@@ -537,19 +537,21 @@ const Navbar = () => {
                           AI Matches
                         </Link>
                       )}
-                      <Link
-                        to={`${user.role === "admin" ? "/admin" : user.role === "company" ? "/dashboard" : "/driver-dashboard"}?tab=messages`}
-                        onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary"
-                      >
-                        <MessageSquare className="h-3.5 w-3.5 shrink-0" />
-                        Messages
-                        {unreadMsgCount > 0 && (
-                          <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                            {unreadMsgCount > 99 ? "99+" : unreadMsgCount}
-                          </span>
-                        )}
-                      </Link>
+                      {user.role !== "admin" && (
+                        <Link
+                          to={`${user.role === "company" ? "/dashboard" : "/driver-dashboard"}?tab=messages`}
+                          onClick={() => setProfileOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary"
+                        >
+                          <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                          Messages
+                          {unreadMsgCount > 0 && (
+                            <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                              {unreadMsgCount > 99 ? "99+" : unreadMsgCount}
+                            </span>
+                          )}
+                        </Link>
+                      )}
                       <hr className="border-border my-1" />
                       <button
                         onClick={() => {

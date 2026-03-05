@@ -282,6 +282,12 @@ const SignIn = () => {
                     Apply Now →
                   </Link>
                 </p>
+                <p className="text-center text-sm text-muted-foreground">
+                  Hiring company?{" "}
+                  <Link to="/pricing" className="text-primary font-medium hover:underline">
+                    Post Jobs →
+                  </Link>
+                </p>
               </form>
               </>
             )}

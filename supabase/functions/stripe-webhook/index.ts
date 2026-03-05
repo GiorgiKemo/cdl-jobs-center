@@ -28,6 +28,13 @@ const STATUS_MAP: Record<string, string> = {
   paused: "canceled",
 };
 
+/** Derive plan from Stripe price ID (source of truth) instead of trusting metadata */
+const PRICE_TO_PLAN: Record<string, string> = {
+  [Deno.env.get("STRIPE_PRICE_STARTER") ?? ""]: "starter",
+  [Deno.env.get("STRIPE_PRICE_GROWTH") ?? ""]: "growth",
+  [Deno.env.get("STRIPE_PRICE_UNLIMITED") ?? ""]: "unlimited",
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -128,7 +135,8 @@ Deno.serve(async (req) => {
 
       case "customer.subscription.updated": {
         const sub = event.data.object as Stripe.Subscription;
-        const plan = sub.metadata?.plan ?? "free";
+        const priceId = sub.items?.data?.[0]?.price?.id;
+        const plan = (priceId && PRICE_TO_PLAN[priceId]) || sub.metadata?.plan || "free";
 
         const { error } = await supabase
           .from("subscriptions")

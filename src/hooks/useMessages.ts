@@ -58,7 +58,8 @@ export function useConversations(userId: string | undefined, role: "driver" | "c
       const { data: apps, error: appErr } = await supabase
         .from("applications")
         .select("id, driver_id, company_name, first_name, last_name, job_title")
-        .eq(col, userId!);
+        .eq(col, userId!)
+        .neq("job_title", "AI Match Profile");
       if (appErr) throw appErr;
       if (!apps || apps.length === 0) return [] as ConversationSummary[];
 
@@ -233,7 +234,8 @@ export function useUnreadCount(userId: string | undefined, role: "driver" | "com
       const { data: apps, error: appErr } = await supabase
         .from("applications")
         .select("id")
-        .eq(col, userId!);
+        .eq(col, userId!)
+        .not("job_id", "is", null);
       if (appErr || !apps || apps.length === 0) return 0;
 
       const appIds = apps.map((a) => a.id);
