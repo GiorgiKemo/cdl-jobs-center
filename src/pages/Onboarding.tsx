@@ -57,26 +57,28 @@ const Onboarding = () => {
   const handleChoice = async (role: RoleChoice) => {
     if (!user || saving) return;
     setSaving(role);
+    // Show the "Setting up" screen right away so user sees progress
+    setRedirecting(true);
 
     try {
       // Use SECURITY DEFINER RPC to bypass RLS — updates profiles, creates
       // extended profile row, all in one transaction.
       const { error: rpcErr } = await withTimeout(
         supabase.rpc("complete_onboarding", { chosen_role: role }),
-        15_000
+        30_000
       );
 
       if (rpcErr) throw rpcErr;
 
-      // Update user_metadata in the background (don't await — it can hang).
-      // AuthContext reads the role from profiles table anyway.
-      supabase.auth.updateUser({ data: { role } }).catch(() => {});
-
       toast.success(role === "driver" ? "Welcome, driver!" : "Welcome aboard!");
 
-      // Brief transition screen before navigating
-      setRedirecting(true);
-      await new Promise((r) => setTimeout(r, 800));
+      // Update user_metadata so AuthContext picks up the new role on refresh.
+      // This triggers onAuthStateChange → loadProfile which reads the updated
+      // profiles row and sets the correct role in context.
+      await supabase.auth.updateUser({ data: { role } }).catch(() => {});
+
+      // Small delay to let AuthContext re-run loadProfile
+      await new Promise((r) => setTimeout(r, 1200));
 
       navigate(role === "company" ? "/dashboard" : "/driver-dashboard", { replace: true });
     } catch (err) {
@@ -86,6 +88,7 @@ const Onboarding = () => {
         : "Something went wrong. Please try again.";
       toast.error(msg);
       setSaving(null);
+      setRedirecting(false);
     }
   };
 
