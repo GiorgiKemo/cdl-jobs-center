@@ -11,7 +11,7 @@ import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { useAuth } from "@/context/auth";
 import { useDriverAllJobMatches, useMatchingRollout } from "@/hooks/useMatchScores";
 import { useDriverProfile, type DriverProfile } from "@/hooks/useDriverProfile";
-import { usePageTitle } from "@/hooks/usePageTitle";
+import { usePageTitle, useMetaDescription, useCanonical } from "@/hooks/usePageTitle";
 import type { Job } from "@/data/jobs";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/Spinner";
@@ -49,7 +49,9 @@ function isPreferenceMatch(job: Job, profile: DriverProfile | null): boolean {
 }
 
 const Jobs = () => {
-  usePageTitle("Browse Jobs");
+  usePageTitle("Browse CDL Trucking Jobs");
+  useMetaDescription("Search and filter CDL truck driving jobs by type, location, and pay. Dry van, flatbed, tanker, refrigerated, and more — apply online today.");
+  useCanonical("/jobs");
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { jobs: allActiveJobs, isLoading: jobsLoading, error: jobsError, refetch: refetchJobs } = useActiveJobs();

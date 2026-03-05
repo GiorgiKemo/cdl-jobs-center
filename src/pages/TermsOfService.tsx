@@ -1,7 +1,7 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Link } from "react-router-dom";
-import { usePageTitle } from "@/hooks/usePageTitle";
+import { usePageTitle, useMetaDescription, useCanonical } from "@/hooks/usePageTitle";
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="mb-8">
@@ -16,6 +16,8 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
 
 const TermsOfService = () => {
   usePageTitle("Terms of Service");
+  useMetaDescription("CDL Jobs Center terms of service. Rules for using our CDL job matching platform for drivers and trucking companies.");
+  useCanonical("/terms");
   return (
     <div className="min-h-screen bg-background">
       <Navbar />

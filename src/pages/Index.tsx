@@ -2,7 +2,7 @@ import { lazy, Suspense } from "react";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import Footer from "@/components/Footer";
-import { usePageTitle } from "@/hooks/usePageTitle";
+import { usePageTitle, useMetaDescription, useCanonical } from "@/hooks/usePageTitle";
 
 const HowItWorks = lazy(() => import("@/components/HowItWorks"));
 const JobCategories = lazy(() => import("@/components/JobCategories"));
@@ -13,6 +13,8 @@ const CTA = lazy(() => import("@/components/CTA"));
 
 const Index = () => {
   usePageTitle("CDL Trucking Jobs — AI-Powered Matching");
+  useMetaDescription("Find CDL truck driving jobs matched to your experience. Browse companies, apply instantly, and get hired faster with AI-powered job matching.");
+  useCanonical("/");
   return (
     <div className="min-h-screen bg-background">
       <Navbar />

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { usePageTitle } from "@/hooks/usePageTitle";
+import { usePageTitle, useMetaDescription, useCanonical } from "@/hooks/usePageTitle";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Link, useNavigate } from "react-router-dom";
@@ -58,7 +58,9 @@ type DriverRow = {
 const DRIVER_PAGE_SIZE = 12;
 
 const Drivers = () => {
-  usePageTitle("Browse CDL Drivers");
+  usePageTitle("Browse CDL Drivers — Hire Qualified Truck Drivers");
+  useMetaDescription("Access a directory of qualified CDL drivers looking for work. Filter by license class, experience, and state to find your next hire.");
+  useCanonical("/drivers");
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 

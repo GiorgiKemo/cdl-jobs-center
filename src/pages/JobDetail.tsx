@@ -7,7 +7,7 @@ import { useJobById } from "@/hooks/useJobs";
 import { useAuth } from "@/context/auth";
 import { useDriverJobMatchScore, useMatchingRollout } from "@/hooks/useMatchScores";
 import { useState, useEffect } from "react";
-import { usePageTitle } from "@/hooks/usePageTitle";
+import { usePageTitle, useMetaDescription, useCanonical } from "@/hooks/usePageTitle";
 import { ApplyModal } from "@/components/ApplyModal";
 import { SignInModal } from "@/components/SignInModal";
 import { toast } from "sonner";
@@ -28,6 +28,34 @@ const JobDetail = () => {
   const { data: matchScore } = useDriverJobMatchScore(user?.role === "driver" ? user.id : undefined, id);
   const { data: rollout } = useMatchingRollout();
   usePageTitle(job ? `${job.title} at ${job.company}` : "Job Details");
+  useMetaDescription(job ? `${job.title} at ${job.company}${job.location ? ` in ${job.location}` : ""}. ${job.pay ? `Pay: ${job.pay}. ` : ""}Apply now on CDL Jobs Center.` : "View CDL trucking job details and apply online.");
+  useCanonical(id ? `/jobs/${id}` : "/jobs");
+
+  // Inject JobPosting structured data for SEO
+  useEffect(() => {
+    if (!job) return;
+    const jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "JobPosting",
+      title: job.title,
+      description: job.description,
+      hiringOrganization: {
+        "@type": "Organization",
+        name: job.company,
+        ...(job.logoUrl && { logo: job.logoUrl }),
+      },
+      ...(job.location && { jobLocation: { "@type": "Place", address: job.location } }),
+      ...(job.pay && { baseSalary: { "@type": "MonetaryAmount", currency: "USD", value: { "@type": "QuantitativeValue", value: job.pay } } }),
+      employmentType: "FULL_TIME",
+      industry: "Truck Transportation",
+      directApply: true,
+    };
+    const script = document.createElement("script");
+    script.type = "application/ld+json";
+    script.text = JSON.stringify(jsonLd);
+    document.head.appendChild(script);
+    return () => { script.remove(); };
+  }, [job]);
 
   // Fetch company profile (phone, address, website, logo)
   const { data: companyProfile } = useQuery({

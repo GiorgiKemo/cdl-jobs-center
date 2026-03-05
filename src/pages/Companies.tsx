@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { usePageTitle } from "@/hooks/usePageTitle";
+import { usePageTitle, useMetaDescription, useCanonical } from "@/hooks/usePageTitle";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Link } from "react-router-dom";
@@ -45,7 +45,9 @@ const COMPANY_STATES = [
 const PAGE_SIZE = 12;
 
 const Companies = () => {
-  usePageTitle("Company Directory");
+  usePageTitle("Trucking Companies Hiring CDL Drivers");
+  useMetaDescription("Browse verified trucking companies hiring CDL drivers. Find carriers by state, read company details, and apply directly through CDL Jobs Center.");
+  useCanonical("/companies");
   const [stateFilter, setStateFilter] = useState("All");
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");

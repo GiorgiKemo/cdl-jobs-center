@@ -61,7 +61,7 @@ function MatchCard({
             {match.jobLogoUrl ? (
               <img
                 src={match.jobLogoUrl}
-                alt=""
+                alt={match.jobCompany ?? "Company logo"}
                 loading="lazy"
                 className="w-10 h-10 rounded-md object-cover shrink-0 bg-muted"
               />

@@ -21,7 +21,7 @@ import { AIGenerationScreen } from "@/components/matching/AIGenerationScreen";
 import { MatchResultsReveal } from "@/components/matching/MatchResultsReveal";
 import { Sparkles, ChevronDown, ChevronUp, Check, Clock, User, Briefcase, Settings, CheckCircle2, X, RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { usePageTitle } from "@/hooks/usePageTitle";
+import { usePageTitle, useMetaDescription, useCanonical } from "@/hooks/usePageTitle";
 import { US_STATES } from "@/data/constants";
 
 // ── Inline helpers ──
@@ -108,7 +108,9 @@ const MATCH_STEP_KEY = "cdl-ai-match-step";
 const FALLBACK_MATCHES_KEY = "cdl-ai-fallback-matches";
 
 const ApplyNow = () => {
-  usePageTitle("Apply Now");
+  usePageTitle("Apply Now — CDL Driver Application");
+  useMetaDescription("Apply for CDL trucking jobs in minutes. Fill out one application and get matched with top carriers hiring Class A and Class B drivers nationwide.");
+  useCanonical("/apply");
   const { user, loading } = useAuth();
   const navType = useNavigationType();
   const [signInOpen, setSignInOpen] = useState(false);

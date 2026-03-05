@@ -1,7 +1,7 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Link } from "react-router-dom";
-import { usePageTitle } from "@/hooks/usePageTitle";
+import { usePageTitle, useMetaDescription, useCanonical } from "@/hooks/usePageTitle";
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="mb-8">
@@ -16,6 +16,8 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
 
 const PrivacyPolicy = () => {
   usePageTitle("Privacy Policy");
+  useMetaDescription("CDL Jobs Center privacy policy. Learn how we collect, use, and protect your personal information and CDL credentials.");
+  useCanonical("/privacy");
   return (
     <div className="min-h-screen bg-background">
       <Navbar />

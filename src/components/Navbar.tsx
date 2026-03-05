@@ -472,7 +472,7 @@ const Navbar = () => {
                     {companyLogoUrl ? (
                       <img
                         src={companyLogoUrl}
-                        alt=""
+                        alt={`${user.name} logo`}
                         className="h-8 w-8 shrink-0 rounded-full object-cover"
                       />
                     ) : (

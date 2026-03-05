@@ -7,7 +7,7 @@ import { useAuth } from "@/context/auth";
 import { PLANS, useSubscription, type Plan } from "@/hooks/useSubscription";
 import { supabase } from "@/lib/supabase";
 import { Check, Zap, TrendingUp, Crown } from "lucide-react";
-import { usePageTitle } from "@/hooks/usePageTitle";
+import { usePageTitle, useMetaDescription, useCanonical } from "@/hooks/usePageTitle";
 import { toast } from "sonner";
 import { withTimeout } from "@/lib/withTimeout";
 
@@ -54,7 +54,9 @@ const tierDetails: Array<{
 ];
 
 const Pricing = () => {
-  usePageTitle("Pricing");
+  usePageTitle("Pricing — CDL Driver Lead Plans");
+  useMetaDescription("Affordable plans to connect with CDL drivers. Get 25, 100, or unlimited driver leads per month. Start with 3 free leads.");
+  useCanonical("/pricing");
   const { user } = useAuth();
   const navigate = useNavigate();
   const isCompany = user?.role === "company";
