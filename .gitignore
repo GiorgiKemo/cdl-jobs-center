@@ -44,5 +44,8 @@ smoke-artifacts/
 .claude/
 qa-checklist.html
 
+# Lighthouse
+lighthouse-report.json
+
 # Local Vercel metadata
 .vercel/

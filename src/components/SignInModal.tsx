@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { X, Mail, RotateCw } from "lucide-react";
+import { X, Mail, RotateCw, Loader2, Check, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -87,6 +87,15 @@ const strengthTextByLevel: Record<PasswordStrengthLevel, string> = {
 const formatStrengthLabel = (level: PasswordStrengthLevel) =>
   level.charAt(0).toUpperCase() + level.slice(1);
 
+type SubmitStatus = "idle" | "submitting" | "success" | "error";
+
+function SubmitButtonLabel({ status, idle, working }: { status: SubmitStatus; idle: string; working: string }) {
+  if (status === "submitting") return <><Loader2 className="h-4 w-4 animate-spin mr-2" />{working}</>;
+  if (status === "success") return <><Check className="h-4 w-4 mr-2" />Done!</>;
+  if (status === "error") return <><XCircle className="h-4 w-4 mr-2" />Failed</>;
+  return <>{idle}</>;
+}
+
 const PasswordStrengthIndicator = ({ password }: { password: string }) => {
   if (!password) return null;
 
@@ -123,7 +132,8 @@ const PasswordStrengthIndicator = ({ password }: { password: string }) => {
 
 export function SignInModal({ onClose }: SignInModalProps) {
   const [view, setView] = useState<View>("login");
-  const [submitting, setSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
+  const submitting = submitStatus === "submitting";
   const { signIn, register } = useAuth();
 
   // Login state
@@ -180,21 +190,24 @@ export function SignInModal({ onClose }: SignInModalProps) {
       toast.error("Please enter your email and password.");
       return;
     }
-    setSubmitting(true);
+    setSubmitStatus("submitting");
     const timeout = setTimeout(() => {
-      setSubmitting(false);
+      setSubmitStatus("idle");
       toast.error("Sign in is taking too long. Please try again.");
     }, 15000);
     try {
       await signIn(loginEmail, loginPassword);
       clearTimeout(timeout);
+      setSubmitStatus("success");
       toast.success("Welcome back!");
+      await new Promise((r) => setTimeout(r, 800));
       onClose();
     } catch (err) {
       clearTimeout(timeout);
+      setSubmitStatus("error");
       toast.error(friendlySignInError(err));
-    } finally {
-      setSubmitting(false);
+      await new Promise((r) => setTimeout(r, 800));
+      setSubmitStatus("idle");
     }
   };
 
@@ -231,9 +244,9 @@ export function SignInModal({ onClose }: SignInModalProps) {
       return;
     }
     setZipError("");
-    setSubmitting(true);
+    setSubmitStatus("submitting");
     const timeout = setTimeout(() => {
-      setSubmitting(false);
+      setSubmitStatus("idle");
       toast.error("Registration is taking too long. Please try again.");
     }, 15000);
     try {
@@ -270,18 +283,25 @@ export function SignInModal({ onClose }: SignInModalProps) {
           }
         } catch { /* deferred population in AuthContext handles this */ }
         clearRegDraft();
+        setSubmitStatus("success");
         toast.success("Registration successful!");
+        await new Promise((r) => setTimeout(r, 800));
         onClose();
       } else {
         clearRegDraft();
+        setSubmitStatus("success");
+        await new Promise((r) => setTimeout(r, 800));
+        setSubmitStatus("idle");
         setView("confirm-email");
       }
     } catch (err) {
       console.error("[SignInModal] driver register error:", err);
+      setSubmitStatus("error");
       toast.error(friendlyRegisterError(err));
+      await new Promise((r) => setTimeout(r, 800));
+      setSubmitStatus("idle");
     } finally {
       clearTimeout(timeout);
-      setSubmitting(false);
     }
   };
 
@@ -303,9 +323,9 @@ export function SignInModal({ onClose }: SignInModalProps) {
       toast.error("Passwords do not match.");
       return;
     }
-    setSubmitting(true);
+    setSubmitStatus("submitting");
     const timeout = setTimeout(() => {
-      setSubmitting(false);
+      setSubmitStatus("idle");
       toast.error("Registration is taking too long. Please try again.");
     }, 15000);
     try {
@@ -337,18 +357,25 @@ export function SignInModal({ onClose }: SignInModalProps) {
           });
         } catch { /* deferred population in AuthContext handles this */ }
         clearRegDraft();
+        setSubmitStatus("success");
         toast.success("Registration successful!");
+        await new Promise((r) => setTimeout(r, 800));
         onClose();
       } else {
         clearRegDraft();
+        setSubmitStatus("success");
+        await new Promise((r) => setTimeout(r, 800));
+        setSubmitStatus("idle");
         setView("confirm-email");
       }
     } catch (err) {
       console.error("[SignInModal] company register error:", err);
+      setSubmitStatus("error");
       toast.error(friendlyRegisterError(err));
+      await new Promise((r) => setTimeout(r, 800));
+      setSubmitStatus("idle");
     } finally {
       clearTimeout(timeout);
-      setSubmitting(false);
     }
   };
 
@@ -399,7 +426,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 onChange={(e) => setLoginPassword(e.target.value)}
                 autoComplete="current-password"
               />
-              <Button type="submit" disabled={submitting} className="w-full">{submitting ? "Signing in…" : "Login"}</Button>
+              <Button type="submit" disabled={submitStatus !== "idle"} className="w-full"><SubmitButtonLabel status={submitStatus} idle="Login" working="Signing in…" /></Button>
               <hr className="border-border" />
               <div className="flex gap-3">
                 <Button
@@ -430,7 +457,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
               onSubmit={async (e) => {
                 e.preventDefault();
                 if (!resetEmail) { toast.error("Please enter your email."); return; }
-                setSubmitting(true);
+                setSubmitStatus("submitting");
                 try {
                   const { error } = await withTimeout(supabase.auth.resetPasswordForEmail(resetEmail, {
                     redirectTo: `${window.location.origin}/signin`,
@@ -441,7 +468,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 } catch (err) {
                   toast.error(err instanceof Error ? err.message : "Failed to send reset email.");
                 } finally {
-                  setSubmitting(false);
+                  setSubmitStatus("idle");
                 }
               }}
               className="px-5 py-5 space-y-3"
@@ -459,8 +486,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 onChange={(e) => setResetEmail(e.target.value)}
                 autoComplete="email"
               />
-              <Button type="submit" disabled={submitting} className="w-full">
-                {submitting ? "Sending…" : "Send Reset Link"}
+              <Button type="submit" disabled={submitStatus !== "idle"} className="w-full">
+                <SubmitButtonLabel status={submitStatus} idle="Send Reset Link" working="Sending…" />
               </Button>
               <button
                 type="button"
@@ -651,7 +678,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button type="submit" disabled={submitting} className="w-full">{submitting ? "Submitting…" : "Submit"}</Button>
+                <Button type="submit" disabled={submitStatus !== "idle"} className="w-full"><SubmitButtonLabel status={submitStatus} idle="Submit" working="Submitting…" /></Button>
                 <button type="button" onClick={() => setView("login")} className="w-full text-center text-sm text-primary underline hover:opacity-80">
                   ← Back to login
                 </button>
@@ -773,7 +800,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button type="submit" disabled={submitting} className="w-full">{submitting ? "Submitting…" : "Submit"}</Button>
+                <Button type="submit" disabled={submitStatus !== "idle"} className="w-full"><SubmitButtonLabel status={submitStatus} idle="Submit" working="Submitting…" /></Button>
                 <button type="button" onClick={() => setView("login")} className="w-full text-center text-sm text-primary underline hover:opacity-80">
                   ← Back to login
                 </button>
@@ -803,7 +830,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   className="w-full"
                   disabled={submitting}
                   onClick={async () => {
-                    setSubmitting(true);
+                    setSubmitStatus("submitting");
                     try {
                       const { error } = await supabase.auth.resend({
                         type: "signup",
@@ -814,7 +841,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
                     } catch (err) {
                       toast.error(err instanceof Error ? err.message : "Failed to resend email.");
                     } finally {
-                      setSubmitting(false);
+                      setSubmitStatus("idle");
                     }
                   }}
                 >
