@@ -25,7 +25,7 @@ const Onboarding = () => {
 
   // Guard: redirect away if user already completed onboarding
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || redirecting) return;
     if (!user) {
       navigate("/signin", { replace: true });
       return;
@@ -43,7 +43,8 @@ const Onboarding = () => {
         );
 
         if (!data?.needs_onboarding) {
-          navigate(user.role === "company" ? "/dashboard" : "/driver-dashboard", { replace: true });
+          const dest = user.role === "company" ? "/dashboard" : "/driver-dashboard";
+          navigate(dest, { replace: true });
         }
       } catch {
         // Profile check failed — show role cards so user isn't stuck
@@ -52,17 +53,14 @@ const Onboarding = () => {
     };
 
     check();
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, redirecting]);
 
   const handleChoice = async (role: RoleChoice) => {
     if (!user || saving) return;
     setSaving(role);
-    // Show the "Setting up" screen right away so user sees progress
     setRedirecting(true);
 
     try {
-      // Use SECURITY DEFINER RPC to bypass RLS — updates profiles, creates
-      // extended profile row, all in one transaction.
       const { error: rpcErr } = await withTimeout(
         supabase.rpc("complete_onboarding", { chosen_role: role }),
         30_000
@@ -70,17 +68,14 @@ const Onboarding = () => {
 
       if (rpcErr) throw rpcErr;
 
-      toast.success(role === "driver" ? "Welcome, driver!" : "Welcome aboard!");
+      // Fire-and-forget: DO NOT await — updateUser can hang indefinitely.
+      supabase.auth.updateUser({ data: { role } }).catch(() => {});
 
-      // Update user_metadata so AuthContext picks up the new role on refresh.
-      // This triggers onAuthStateChange → loadProfile which reads the updated
-      // profiles row and sets the correct role in context.
-      await supabase.auth.updateUser({ data: { role } }).catch(() => {});
-
-      // Small delay to let AuthContext re-run loadProfile
-      await new Promise((r) => setTimeout(r, 1200));
-
-      navigate(role === "company" ? "/dashboard" : "/driver-dashboard", { replace: true });
+      // Hard navigate forces a full page load with fresh auth state.
+      // SPA navigate fails because AuthContext still has the stale role
+      // and ProtectedRoute would redirect away.
+      const dest = role === "company" ? "/dashboard" : "/driver-dashboard";
+      window.location.href = dest;
     } catch (err) {
       console.error("[Onboarding] handleChoice failed:", err);
       const msg = err && typeof err === "object" && "message" in err
