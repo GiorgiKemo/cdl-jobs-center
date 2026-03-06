@@ -142,6 +142,7 @@ const CompanyProfile = () => {
   if (!company) return null;
 
   const isOwnProfile = user?.role === "company" && user.id === id;
+  const isAdmin = user?.role === "admin";
 
   const handleApplyClick = () => {
     if (!user) {
@@ -220,6 +221,10 @@ const CompanyProfile = () => {
               {isOwnProfile ? (
                 <Button asChild>
                   <Link to="/dashboard">Edit Profile</Link>
+                </Button>
+              ) : isAdmin ? (
+                <Button asChild variant="outline">
+                  <Link to={`/admin?tab=users&search=${encodeURIComponent(company.company_name || '')}`}>Manage in Admin</Link>
                 </Button>
               ) : hasApplied ? (
                 <Button variant="outline" disabled>

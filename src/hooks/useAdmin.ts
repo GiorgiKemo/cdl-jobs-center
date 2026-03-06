@@ -160,13 +160,16 @@ export function useAdminUsers() {
         supabase
           .from("profiles")
           .select("id, name, role, email, is_banned, created_at")
-          .order("created_at", { ascending: false }),
+          .order("created_at", { ascending: false })
+          .limit(10000),
         supabase
           .from("driver_profiles")
-          .select("id, years_exp, license_state, phone"),
+          .select("id, years_exp, license_state, phone")
+          .limit(10000),
         supabase
           .from("company_profiles")
-          .select("id, company_name, email, phone, is_verified"),
+          .select("id, company_name, email, phone, is_verified")
+          .limit(10000),
       ]);
       if (profilesRes.error) throw profilesRes.error;
 
@@ -407,6 +410,66 @@ export function useAdminDeleteUser() {
       qc.invalidateQueries({ queryKey: ["admin-stats"] });
       qc.invalidateQueries({ queryKey: ["admin-subscriptions"] });
       qc.invalidateQueries({ queryKey: ["admin-jobs"] });
+    },
+  });
+}
+
+/** Admin edits a user's profile fields */
+export function useAdminEditUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { userId: string; fields: Record<string, string | null> }) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Not authenticated");
+      const { data, error } = await withTimeout(supabase.functions.invoke("admin-actions", {
+        body: { action: "edit_user", user_id: params.userId, fields: params.fields },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      }), 15_000);
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      qc.invalidateQueries({ queryKey: ["admin-stats"] });
+      qc.invalidateQueries({ queryKey: ["companies-directory-v2"] });
+    },
+  });
+}
+
+/** Admin creates a new user (company or driver) */
+export function useAdminCreateUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      role: "driver" | "company";
+      email: string;
+      password: string;
+      name: string;
+      profileFields?: Record<string, string | null>;
+    }) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Not authenticated");
+      const { data, error } = await withTimeout(supabase.functions.invoke("admin-actions", {
+        body: {
+          action: "create_user",
+          role: params.role,
+          email: params.email,
+          password: params.password,
+          name: params.name,
+          profile_fields: params.profileFields ?? {},
+        },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      }), 30_000);
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data as { success: boolean; user_id: string; name: string };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      qc.invalidateQueries({ queryKey: ["admin-stats"] });
+      qc.invalidateQueries({ queryKey: ["admin-subscriptions"] });
+      qc.invalidateQueries({ queryKey: ["companies-directory-v2"] });
     },
   });
 }

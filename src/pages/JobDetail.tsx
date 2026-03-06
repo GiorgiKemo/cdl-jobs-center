@@ -210,7 +210,11 @@ const JobDetail = () => {
 
             {/* Apply button */}
             <div className="shrink-0">
-              {hasApplied ? (
+              {user?.role === "admin" ? (
+                <Button asChild variant="outline" size="lg">
+                  <a href={`/admin?tab=users&search=${encodeURIComponent(job.company || '')}`}>Manage in Admin</a>
+                </Button>
+              ) : hasApplied ? (
                 <Button variant="outline" size="lg" disabled>
                   Already Applied
                 </Button>

@@ -50,6 +50,8 @@ import {
   Filter,
   Truck,
   Loader2,
+  Pencil,
+  Plus,
 } from "lucide-react";
 import {
   useAdminStats,
@@ -63,6 +65,8 @@ import {
   useToggleCompanyVerified,
   useAdminBanUser,
   useAdminDeleteUser,
+  useAdminEditUser,
+  useAdminCreateUser,
   useAdminApplications,
   useAdminChartData,
 } from "@/hooks/useAdmin";
@@ -75,6 +79,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAllVerificationRequests, useReviewVerification, getVerificationDocSignedUrl } from "@/hooks/useVerification";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { useMatchingRollout } from "@/hooks/useMatchScores";
 import { NotificationPreferences } from "@/components/NotificationPreferences";
 import { usePageTitle, useNoIndex } from "@/hooks/usePageTitle";
@@ -138,6 +143,8 @@ function AdminDashboardInner() {
   const toggleVerified = useToggleCompanyVerified();
   const banUser = useAdminBanUser();
   const deleteUser = useAdminDeleteUser();
+  const editUser = useAdminEditUser();
+  const createUser = useAdminCreateUser();
   const { data: applications = [] } = useAdminApplications();
   const { data: chartData } = useAdminChartData();
 
@@ -147,6 +154,16 @@ function AdminDashboardInner() {
     userId: string;
     userName: string;
   } | null>(null);
+
+  /* edit user dialog */
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Record<string, string> & { id: string; role: string } | null>(null);
+  const [editFields, setEditFields] = useState<Record<string, string>>({});
+
+  /* create user dialog */
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createRole, setCreateRole] = useState<"driver" | "company">("company");
+  const [createFields, setCreateFields] = useState<Record<string, string>>({});
 
   /* matching diagnostics data */
   const { data: rollout } = useMatchingRollout();
@@ -213,7 +230,7 @@ function AdminDashboardInner() {
   };
 
   /* users tab state */
-  const [userSearch, setUserSearch] = useState("");
+  const [userSearch, setUserSearch] = useState(searchParams.get("search") || "");
   const [userRoleFilter, setUserRoleFilter] = useState<
     "all" | "driver" | "company" | "new"
   >("all");
@@ -647,7 +664,31 @@ function AdminDashboardInner() {
                       ({filtered.length})
                     </span>
                   </h2>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-8 gap-1"
+                      onClick={() => {
+                        setCreateRole("company");
+                        setCreateFields({});
+                        setCreateDialogOpen(true);
+                      }}
+                    >
+                      <Plus className="h-3 w-3" /> Add Company
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-8 gap-1"
+                      onClick={() => {
+                        setCreateRole("driver");
+                        setCreateFields({});
+                        setCreateDialogOpen(true);
+                      }}
+                    >
+                      <Plus className="h-3 w-3" /> Add Driver
+                    </Button>
                     <Input
                       id="admin-userSearch"
                       name="userSearch"
@@ -803,6 +844,51 @@ function AdminDashboardInner() {
                           )}
                           {u.role !== "admin" && (
                             <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs h-7 gap-1"
+                                onClick={async () => {
+                                  const base: Record<string, string> = { id: u.id, role: u.role, name: u.name, email: u.email || "", phone: u.phone || "" };
+                                  if (u.role === "company") {
+                                    const { data: cp } = await supabase.from("company_profiles").select("company_name, email, phone, address, website, contact_name, contact_title, company_goal, about").eq("id", u.id).maybeSingle();
+                                    if (cp) {
+                                      base.companyName = cp.company_name || "";
+                                      base.address = cp.address || "";
+                                      base.website = cp.website || "";
+                                      base.contactName = cp.contact_name || "";
+                                      base.contactTitle = cp.contact_title || "";
+                                      base.companyGoal = cp.company_goal || "";
+                                      base.about = cp.about || "";
+                                      if (cp.phone) base.phone = cp.phone;
+                                      if (cp.email) base.email = cp.email;
+                                    }
+                                  } else if (u.role === "driver") {
+                                    const { data: dp } = await supabase.from("driver_profiles").select("first_name, last_name, phone, license_state, years_exp, license_class, cdl_number, driver_type, zip_code, date_of_birth, home_address, about, has_accidents, wants_contact").eq("id", u.id).maybeSingle();
+                                    if (dp) {
+                                      base.firstName = dp.first_name || "";
+                                      base.lastName = dp.last_name || "";
+                                      base.licenseState = dp.license_state || "";
+                                      base.yearsExp = dp.years_exp || "";
+                                      base.licenseClass = dp.license_class || "";
+                                      base.cdlNumber = dp.cdl_number || "";
+                                      base.driverType = dp.driver_type || "";
+                                      base.zipCode = dp.zip_code || "";
+                                      base.dateOfBirth = dp.date_of_birth || "";
+                                      base.homeAddress = dp.home_address || "";
+                                      base.about = dp.about || "";
+                                      base.hasAccidents = dp.has_accidents || "";
+                                      base.wantsContact = dp.wants_contact || "";
+                                      if (dp.phone) base.phone = dp.phone;
+                                    }
+                                  }
+                                  setEditTarget(base as Record<string, string> & { id: string; role: string });
+                                  setEditFields({ ...base });
+                                  setEditDialogOpen(true);
+                                }}
+                              >
+                                <Pencil className="h-3 w-3" /> Edit
+                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1742,6 +1828,347 @@ function AdminDashboardInner() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        {/* ── Edit User Dialog ─────────────────────────────────────────── */}
+        <Dialog open={editDialogOpen} onOpenChange={(open) => { if (!open) setEditDialogOpen(false); }}>
+          <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit User</DialogTitle>
+              <DialogDescription>
+                Editing {editTarget?.name} ({editTarget?.role})
+              </DialogDescription>
+            </DialogHeader>
+            {editTarget && (
+              <div className="space-y-3 py-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Name</Label>
+                  <Input value={editFields.name || ""} onChange={(e) => setEditFields((f) => ({ ...f, name: e.target.value }))} className="h-9" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Email</Label>
+                  <Input value={editFields.email || ""} onChange={(e) => setEditFields((f) => ({ ...f, email: e.target.value }))} className="h-9" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">New Password (leave blank to keep current)</Label>
+                  <Input type="password" value={editFields.password || ""} onChange={(e) => setEditFields((f) => ({ ...f, password: e.target.value }))} className="h-9" placeholder="Enter new password..." />
+                </div>
+
+                {editTarget.role === "company" && (
+                  <>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Company Name</Label>
+                      <Input value={editFields.companyName || ""} onChange={(e) => setEditFields((f) => ({ ...f, companyName: e.target.value }))} className="h-9" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Contact Name</Label>
+                        <Input value={editFields.contactName || ""} onChange={(e) => setEditFields((f) => ({ ...f, contactName: e.target.value }))} className="h-9" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Contact Title</Label>
+                        <Input value={editFields.contactTitle || ""} onChange={(e) => setEditFields((f) => ({ ...f, contactTitle: e.target.value }))} className="h-9" />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Phone</Label>
+                      <Input value={editFields.phone || ""} onChange={(e) => setEditFields((f) => ({ ...f, phone: e.target.value }))} className="h-9" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Address</Label>
+                      <Input value={editFields.address || ""} onChange={(e) => setEditFields((f) => ({ ...f, address: e.target.value }))} className="h-9" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Website</Label>
+                      <Input value={editFields.website || ""} onChange={(e) => setEditFields((f) => ({ ...f, website: e.target.value }))} className="h-9" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Company Goal</Label>
+                      <Input value={editFields.companyGoal || ""} onChange={(e) => setEditFields((f) => ({ ...f, companyGoal: e.target.value }))} className="h-9" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">About</Label>
+                      <textarea value={editFields.about || ""} onChange={(e) => setEditFields((f) => ({ ...f, about: e.target.value }))} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[60px]" />
+                    </div>
+                  </>
+                )}
+
+                {editTarget.role === "driver" && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">First Name</Label>
+                        <Input value={editFields.firstName || ""} onChange={(e) => setEditFields((f) => ({ ...f, firstName: e.target.value }))} className="h-9" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Last Name</Label>
+                        <Input value={editFields.lastName || ""} onChange={(e) => setEditFields((f) => ({ ...f, lastName: e.target.value }))} className="h-9" />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Phone</Label>
+                      <Input value={editFields.phone || ""} onChange={(e) => setEditFields((f) => ({ ...f, phone: e.target.value }))} className="h-9" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Driver Type</Label>
+                        <Input value={editFields.driverType || ""} onChange={(e) => setEditFields((f) => ({ ...f, driverType: e.target.value }))} className="h-9" placeholder="e.g. Owner Operator, Company Driver" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">CDL Number</Label>
+                        <Input value={editFields.cdlNumber || ""} onChange={(e) => setEditFields((f) => ({ ...f, cdlNumber: e.target.value }))} className="h-9" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">License Class</Label>
+                        <Input value={editFields.licenseClass || ""} onChange={(e) => setEditFields((f) => ({ ...f, licenseClass: e.target.value }))} className="h-9" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">License State</Label>
+                        <Input value={editFields.licenseState || ""} onChange={(e) => setEditFields((f) => ({ ...f, licenseState: e.target.value }))} className="h-9" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Years Experience</Label>
+                        <Input value={editFields.yearsExp || ""} onChange={(e) => setEditFields((f) => ({ ...f, yearsExp: e.target.value }))} className="h-9" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Date of Birth</Label>
+                        <Input type="date" value={editFields.dateOfBirth || ""} onChange={(e) => setEditFields((f) => ({ ...f, dateOfBirth: e.target.value }))} className="h-9" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Zip Code</Label>
+                        <Input value={editFields.zipCode || ""} onChange={(e) => setEditFields((f) => ({ ...f, zipCode: e.target.value }))} className="h-9" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Has Accidents</Label>
+                        <select value={editFields.hasAccidents || ""} onChange={(e) => setEditFields((f) => ({ ...f, hasAccidents: e.target.value }))} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+                          <option value="">Unknown</option>
+                          <option value="true">Yes</option>
+                          <option value="false">No</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Home Address</Label>
+                      <Input value={editFields.homeAddress || ""} onChange={(e) => setEditFields((f) => ({ ...f, homeAddress: e.target.value }))} className="h-9" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Wants Contact</Label>
+                        <select value={editFields.wantsContact || ""} onChange={(e) => setEditFields((f) => ({ ...f, wantsContact: e.target.value }))} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+                          <option value="">Unknown</option>
+                          <option value="true">Yes</option>
+                          <option value="false">No</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">About</Label>
+                      <textarea value={editFields.about || ""} onChange={(e) => setEditFields((f) => ({ ...f, about: e.target.value }))} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[60px]" />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+              <Button
+                disabled={editUser.isPending}
+                onClick={() => {
+                  if (!editTarget) return;
+                  const fields: Record<string, string | null> = {};
+                  if (editFields.name !== editTarget.name) fields.name = editFields.name;
+                  if (editFields.email !== editTarget.email) fields.email = editFields.email;
+                  if (editFields.password) fields.password = editFields.password;
+                  if (editTarget.role === "company") {
+                    if (editFields.companyName !== editTarget.companyName) fields.company_name = editFields.companyName;
+                    if (editFields.phone !== editTarget.phone) fields.phone = editFields.phone;
+                    if (editFields.email !== editTarget.email) fields.company_email = editFields.email;
+                    if (editFields.address !== editTarget.address) fields.address = editFields.address;
+                    if (editFields.website !== editTarget.website) fields.website = editFields.website;
+                    if (editFields.contactName !== editTarget.contactName) fields.contact_name = editFields.contactName;
+                    if (editFields.contactTitle !== editTarget.contactTitle) fields.contact_title = editFields.contactTitle;
+                    if (editFields.companyGoal !== editTarget.companyGoal) fields.company_goal = editFields.companyGoal;
+                    if (editFields.about !== editTarget.about) fields.about = editFields.about;
+                  }
+                  if (editTarget.role === "driver") {
+                    if (editFields.firstName !== editTarget.firstName) fields.first_name = editFields.firstName;
+                    if (editFields.lastName !== editTarget.lastName) fields.last_name = editFields.lastName;
+                    if (editFields.phone !== editTarget.phone) fields.phone = editFields.phone;
+                    if (editFields.licenseState !== editTarget.licenseState) fields.license_state = editFields.licenseState;
+                    if (editFields.yearsExp !== editTarget.yearsExp) fields.years_exp = editFields.yearsExp;
+                    if (editFields.licenseClass !== editTarget.licenseClass) fields.license_class = editFields.licenseClass;
+                    if (editFields.driverType !== editTarget.driverType) fields.driver_type = editFields.driverType;
+                    if (editFields.cdlNumber !== editTarget.cdlNumber) fields.cdl_number = editFields.cdlNumber;
+                    if (editFields.zipCode !== editTarget.zipCode) fields.zip_code = editFields.zipCode;
+                    if (editFields.dateOfBirth !== editTarget.dateOfBirth) fields.date_of_birth = editFields.dateOfBirth;
+                    if (editFields.homeAddress !== editTarget.homeAddress) fields.home_address = editFields.homeAddress;
+                    if (editFields.about !== editTarget.about) fields.about = editFields.about;
+                    if (editFields.hasAccidents !== editTarget.hasAccidents) fields.has_accidents = editFields.hasAccidents;
+                    if (editFields.wantsContact !== editTarget.wantsContact) fields.wants_contact = editFields.wantsContact;
+                  }
+                  if (Object.keys(fields).length === 0) {
+                    toast.info("No changes to save.");
+                    setEditDialogOpen(false);
+                    return;
+                  }
+                  editUser.mutate(
+                    { userId: editTarget.id, fields },
+                    {
+                      onSuccess: () => {
+                        toast.success(`${editFields.name || editTarget.name} updated successfully.`);
+                        setEditDialogOpen(false);
+                      },
+                      onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to update user"),
+                    }
+                  );
+                }}
+              >
+                {editUser.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ── Create User Dialog ──────────────────────────────────────── */}
+        <Dialog open={createDialogOpen} onOpenChange={(open) => { if (!open) setCreateDialogOpen(false); }}>
+          <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Add New {createRole === "company" ? "Company" : "Driver"}</DialogTitle>
+              <DialogDescription>
+                Create a new {createRole} account. The account will be active immediately (no email confirmation needed).
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Email *</Label>
+                <Input value={createFields.email || ""} onChange={(e) => setCreateFields((f) => ({ ...f, email: e.target.value }))} className="h-9" placeholder="user@example.com" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Password *</Label>
+                <Input type="password" value={createFields.password || ""} onChange={(e) => setCreateFields((f) => ({ ...f, password: e.target.value }))} className="h-9" placeholder="Min 8 characters" />
+              </div>
+
+              {createRole === "company" && (
+                <>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Company Name *</Label>
+                    <Input value={createFields.company_name || ""} onChange={(e) => setCreateFields((f) => ({ ...f, company_name: e.target.value }))} className="h-9" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Contact Name</Label>
+                    <Input value={createFields.contact_name || ""} onChange={(e) => setCreateFields((f) => ({ ...f, contact_name: e.target.value }))} className="h-9" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Phone</Label>
+                    <Input value={createFields.phone || ""} onChange={(e) => setCreateFields((f) => ({ ...f, phone: e.target.value }))} className="h-9" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Address</Label>
+                    <Input value={createFields.address || ""} onChange={(e) => setCreateFields((f) => ({ ...f, address: e.target.value }))} className="h-9" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Website</Label>
+                    <Input value={createFields.website || ""} onChange={(e) => setCreateFields((f) => ({ ...f, website: e.target.value }))} className="h-9" />
+                  </div>
+                </>
+              )}
+
+              {createRole === "driver" && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">First Name *</Label>
+                      <Input value={createFields.first_name || ""} onChange={(e) => setCreateFields((f) => ({ ...f, first_name: e.target.value }))} className="h-9" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Last Name *</Label>
+                      <Input value={createFields.last_name || ""} onChange={(e) => setCreateFields((f) => ({ ...f, last_name: e.target.value }))} className="h-9" />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Phone</Label>
+                    <Input value={createFields.phone || ""} onChange={(e) => setCreateFields((f) => ({ ...f, phone: e.target.value }))} className="h-9" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">License State</Label>
+                      <Input value={createFields.license_state || ""} onChange={(e) => setCreateFields((f) => ({ ...f, license_state: e.target.value }))} className="h-9" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Years Experience</Label>
+                      <Input value={createFields.years_exp || ""} onChange={(e) => setCreateFields((f) => ({ ...f, years_exp: e.target.value }))} className="h-9" />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">License Class</Label>
+                    <Input value={createFields.license_class || ""} onChange={(e) => setCreateFields((f) => ({ ...f, license_class: e.target.value }))} className="h-9" />
+                  </div>
+                </>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
+              <Button
+                disabled={createUser.isPending}
+                onClick={() => {
+                  if (!createFields.email || !createFields.password) {
+                    toast.error("Email and password are required.");
+                    return;
+                  }
+                  if (createFields.password.length < 8) {
+                    toast.error("Password must be at least 8 characters.");
+                    return;
+                  }
+                  const name = createRole === "company"
+                    ? createFields.company_name || createFields.email
+                    : [createFields.first_name, createFields.last_name].filter(Boolean).join(" ") || createFields.email;
+
+                  const profileFields: Record<string, string> = {};
+                  if (createRole === "company") {
+                    if (createFields.company_name) profileFields.company_name = createFields.company_name;
+                    if (createFields.contact_name) profileFields.contact_name = createFields.contact_name;
+                    if (createFields.phone) profileFields.phone = createFields.phone;
+                    if (createFields.address) profileFields.address = createFields.address;
+                    if (createFields.website) profileFields.website = createFields.website;
+                    profileFields.company_email = createFields.email;
+                  } else {
+                    if (createFields.first_name) profileFields.first_name = createFields.first_name;
+                    if (createFields.last_name) profileFields.last_name = createFields.last_name;
+                    if (createFields.phone) profileFields.phone = createFields.phone;
+                    if (createFields.license_state) profileFields.license_state = createFields.license_state;
+                    if (createFields.years_exp) profileFields.years_exp = createFields.years_exp;
+                    if (createFields.license_class) profileFields.license_class = createFields.license_class;
+                  }
+
+                  createUser.mutate(
+                    {
+                      role: createRole,
+                      email: createFields.email,
+                      password: createFields.password,
+                      name,
+                      profileFields,
+                    },
+                    {
+                      onSuccess: (data) => {
+                        toast.success(`${data.name} created successfully.`);
+                        setCreateDialogOpen(false);
+                        setCreateFields({});
+                      },
+                      onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to create user"),
+                    }
+                  );
+                }}
+              >
+                {createUser.isPending ? "Creating..." : `Create ${createRole === "company" ? "Company" : "Driver"}`}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </main>
       <Footer />
     </div>

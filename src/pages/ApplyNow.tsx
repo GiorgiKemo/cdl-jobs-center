@@ -840,6 +840,12 @@ const ApplyNow = () => {
                     </p>
                   </div>
 
+                  <p className="text-xs text-muted-foreground leading-relaxed border-t border-border pt-4">
+                    By submitting your profile, you agree to our{" "}
+                    <a href="/terms" target="_blank" className="text-primary underline hover:opacity-80">Terms of Service</a>,
+                    including that your profile information (name, contact details, CDL credentials, driving history, and other details you provide) may be visible to trucking companies with an Unlimited plan subscription for recruitment purposes.
+                  </p>
+
                   <div className="flex justify-between pt-4">
                     <Button type="button" variant="outline" onClick={prevStep}>Back</Button>
                     <Button type="submit" className="px-8" disabled={submitting}>

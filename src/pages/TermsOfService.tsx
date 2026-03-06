@@ -29,7 +29,7 @@ const TermsOfService = () => {
         <div className="border border-border bg-card">
           <div className="border-l-4 border-l-primary border-b border-b-border px-5 py-4">
             <h1 className="font-display font-bold text-xl">Terms of Service</h1>
-            <p className="text-sm text-muted-foreground mt-1">Last updated: February 27, 2026</p>
+            <p className="text-sm text-muted-foreground mt-1">Last updated: March 6, 2026</p>
           </div>
 
           <div className="px-5 py-8">
@@ -37,6 +37,13 @@ const TermsOfService = () => {
             <p className="text-sm text-muted-foreground leading-relaxed mb-8">
               These Terms of Service ("Terms") govern your access to and use of the CDL Jobs Center website and services operated by CDL Jobs Center ("Company," "we," "us," or "our"). By accessing or using our platform, you agree to be bound by these Terms. If you do not agree, do not use our services.
             </p>
+
+            <div className="mb-8 p-4 border border-primary/30 bg-primary/5">
+              <p className="text-sm font-semibold text-foreground mb-2">Important Notice for Drivers</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                By creating a driver profile on CDL Jobs Center, you acknowledge and agree that your profile information — including your name, contact details, CDL credentials, driving history, and other information you provide — may be made visible to trucking companies and carriers that subscribe to our Unlimited plan. Please see Section 5A below for full details.
+              </p>
+            </div>
 
             <Section title="1. Eligibility">
               <p>To use CDL Jobs Center, you must:</p>
@@ -92,6 +99,18 @@ const TermsOfService = () => {
                 <li>Any employment relationship formed is solely between you and the carrier</li>
                 <li>We do not guarantee that submitting an application will result in contact, an interview, or a job offer</li>
               </ul>
+            </Section>
+
+            <Section title="5A. Driver Profile Visibility &amp; Data Sharing">
+              <p>By creating a driver profile on CDL Jobs Center, you understand and agree to the following:</p>
+              <ul className="list-disc pl-5 space-y-1 mt-2">
+                <li><strong className="text-foreground">Profile information shared:</strong> Your full name, phone number, email address, CDL number, license class and state, years of experience, driver type, date of birth, zip code, home address, driving record (including accident history), contact preferences, and any "about" information you provide may be visible to authorized companies.</li>
+                <li><strong className="text-foreground">Who can see your profile:</strong> Trucking companies and carriers that subscribe to the CDL Jobs Center Unlimited plan have access to view complete driver profiles in our driver directory. This access is provided to help companies identify and recruit qualified CDL drivers.</li>
+                <li><strong className="text-foreground">Purpose of sharing:</strong> Your profile information is shared solely for the purpose of facilitating employment opportunities between drivers and carriers. Companies may use your contact information to reach out regarding job opportunities.</li>
+                <li><strong className="text-foreground">No sale of data:</strong> We do not sell your personal information to third parties. Access to driver profiles is provided only to verified companies with an active Unlimited subscription on our platform.</li>
+                <li><strong className="text-foreground">Your control:</strong> You may update or remove your profile information at any time through your account settings. If you wish to have your profile removed entirely, contact us at <a href="mailto:info@cdljobscenter.com" className="text-primary underline hover:opacity-80">info@cdljobscenter.com</a>.</li>
+              </ul>
+              <p className="mt-2">By submitting your driver profile, you expressly consent to the sharing of your profile information as described above. If you do not agree with this data sharing, please do not create a driver profile on our platform.</p>
             </Section>
 
             <Section title="6. Company Listings">

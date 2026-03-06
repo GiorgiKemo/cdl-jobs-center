@@ -48,7 +48,74 @@ Deno.serve(async (req) => {
       return json({ error: "Admin access required" }, 403);
     }
 
-    const { action, user_id } = await req.json();
+    const body = await req.json();
+    const { action } = body;
+
+    // ── Create user (no user_id needed) ─────────────────────────────
+    if (action === "create_user") {
+      const { role, email, password, name, profile_fields } = body;
+      if (!email || !password || !role) {
+        return json({ error: "email, password, and role are required" }, 400);
+      }
+      if (!["driver", "company"].includes(role)) {
+        return json({ error: "role must be driver or company" }, 400);
+      }
+      if (password.length < 8) {
+        return json({ error: "Password must be at least 8 characters" }, 400);
+      }
+
+      // 1. Create auth user (email auto-confirmed)
+      const { data: authData, error: createErr } =
+        await supabase.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { name: name || email, role },
+        });
+      if (createErr) throw createErr;
+      const newUserId = authData.user.id;
+
+      // 2. The handle_new_user trigger creates profiles row.
+      //    Update it with the correct role + name.
+      await supabase
+        .from("profiles")
+        .update({ role, name: name || email })
+        .eq("id", newUserId);
+
+      // 3. Create the extended profile row
+      const pf = profile_fields || {};
+      if (role === "company") {
+        await supabase.from("company_profiles").upsert({
+          id: newUserId,
+          company_name: pf.company_name || name || "",
+          email: pf.company_email || email,
+          phone: pf.phone || null,
+          address: pf.address || null,
+          website: pf.website || null,
+          contact_name: pf.contact_name || name || "",
+        }, { onConflict: "id" });
+      } else {
+        await supabase.from("driver_profiles").upsert({
+          id: newUserId,
+          first_name: pf.first_name || "",
+          last_name: pf.last_name || "",
+          phone: pf.phone || null,
+          license_state: pf.license_state || null,
+          years_exp: pf.years_exp || null,
+          license_class: pf.license_class || null,
+        }, { onConflict: "id" });
+      }
+
+      return json({
+        success: true,
+        action: "created",
+        user_id: newUserId,
+        name: name || email,
+      });
+    }
+
+    // ── All other actions require user_id ───────────────────────────
+    const { user_id } = body;
     if (!user_id) return json({ error: "user_id required" }, 400);
 
     // Prevent admin from acting on themselves
@@ -126,8 +193,95 @@ Deno.serve(async (req) => {
         return json({ success: true, action: "deleted", user: targetProfile.name });
       }
 
+      case "edit_user": {
+        const { fields } = body;
+        if (!fields || typeof fields !== "object") {
+          return json({ error: "fields object required for edit_user" }, 400);
+        }
+
+        // Update profiles.name if provided
+        if (fields.name) {
+          await supabase
+            .from("profiles")
+            .update({ name: fields.name })
+            .eq("id", user_id);
+        }
+
+        // Update auth email if changed
+        if (fields.email) {
+          const { error: emailErr } =
+            await supabase.auth.admin.updateUserById(user_id, {
+              email: fields.email,
+            });
+          if (emailErr) console.error("Email update failed:", emailErr.message);
+          // Also update profiles.email if it exists
+          await supabase
+            .from("profiles")
+            .update({ email: fields.email })
+            .eq("id", user_id);
+        }
+
+        // Update auth password if provided
+        if (fields.password) {
+          const { error: pwErr } =
+            await supabase.auth.admin.updateUserById(user_id, {
+              password: fields.password,
+            });
+          if (pwErr) throw pwErr;
+        }
+
+        // Update company_profiles if user is a company
+        if (targetProfile.role === "company") {
+          const companyUpdate: Record<string, unknown> = {};
+          if (fields.company_name !== undefined) companyUpdate.company_name = fields.company_name;
+          if (fields.phone !== undefined) companyUpdate.phone = fields.phone;
+          if (fields.company_email !== undefined) companyUpdate.email = fields.company_email;
+          if (fields.address !== undefined) companyUpdate.address = fields.address;
+          if (fields.website !== undefined) companyUpdate.website = fields.website;
+          if (fields.contact_name !== undefined) companyUpdate.contact_name = fields.contact_name;
+          if (fields.contact_title !== undefined) companyUpdate.contact_title = fields.contact_title;
+          if (fields.company_goal !== undefined) companyUpdate.company_goal = fields.company_goal;
+          if (fields.about !== undefined) companyUpdate.about = fields.about;
+
+          if (Object.keys(companyUpdate).length > 0) {
+            await supabase
+              .from("company_profiles")
+              .update(companyUpdate)
+              .eq("id", user_id);
+          }
+        }
+
+        // Update driver_profiles if user is a driver
+        if (targetProfile.role === "driver") {
+          const driverUpdate: Record<string, unknown> = {};
+          if (fields.first_name !== undefined) driverUpdate.first_name = fields.first_name;
+          if (fields.last_name !== undefined) driverUpdate.last_name = fields.last_name;
+          if (fields.phone !== undefined) driverUpdate.phone = fields.phone;
+          if (fields.license_state !== undefined) driverUpdate.license_state = fields.license_state;
+          if (fields.years_exp !== undefined) driverUpdate.years_exp = fields.years_exp;
+          if (fields.license_class !== undefined) driverUpdate.license_class = fields.license_class;
+          if (fields.driver_type !== undefined) driverUpdate.driver_type = fields.driver_type;
+          if (fields.cdl_number !== undefined) driverUpdate.cdl_number = fields.cdl_number;
+          if (fields.zip_code !== undefined) driverUpdate.zip_code = fields.zip_code;
+          if (fields.date_of_birth !== undefined) driverUpdate.date_of_birth = fields.date_of_birth;
+          if (fields.home_address !== undefined) driverUpdate.home_address = fields.home_address;
+          if (fields.about !== undefined) driverUpdate.about = fields.about;
+          if (fields.has_accidents !== undefined) driverUpdate.has_accidents = fields.has_accidents === "true";
+          if (fields.wants_contact !== undefined) driverUpdate.wants_contact = fields.wants_contact === "true";
+
+          if (Object.keys(driverUpdate).length > 0) {
+            await supabase
+              .from("driver_profiles")
+              .update(driverUpdate)
+              .eq("id", user_id);
+          }
+        }
+
+        return json({ success: true, action: "edited", user: fields.name || targetProfile.name });
+      }
+
       default:
-        return json({ error: "Invalid action. Use: ban, unban, delete" }, 400);
+        return json({ error: "Invalid action. Use: ban, unban, delete, edit_user, create_user" }, 400);
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal error";

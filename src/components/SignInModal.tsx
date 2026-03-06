@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { X, Mail, RotateCw, Loader2, Check, XCircle } from "lucide-react";
+import { X, Mail, RotateCw, Loader2, Check, XCircle, ChevronDown, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -161,6 +161,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
   const [nextJobWant, setNextJobWant] = useState<string>(draft.nextJobWant || DRIVER_NEXT_JOB[0]);
   const [hasAccidents, setHasAccidents] = useState(draft.hasAccidents || "No");
   const [wantsContact, setWantsContact] = useState(draft.wantsContact || "Yes");
+  const [showOptionalFields, setShowOptionalFields] = useState(false);
 
   // Company-specific
   const [contactName, setContactName] = useState(draft.contactName || "");
@@ -174,11 +175,11 @@ export function SignInModal({ onClose }: SignInModalProps) {
   // Persist registration fields to sessionStorage on change
   const saveDraft = useCallback(() => {
     saveRegDraft({
-      role, regEmail, regUsername, driverName, homeAddress, zipCode,
+      role, regEmail, driverName, homeAddress, zipCode,
       driverPhone, cdlNumber, interestedIn, nextJobWant, hasAccidents, wantsContact,
       contactName, contactTitle, companyName, companyAddress, companyPhone, companyState, companyGoal,
     });
-  }, [role, regEmail, regUsername, driverName, homeAddress, zipCode,
+  }, [role, regEmail, driverName, homeAddress, zipCode,
       driverPhone, cdlNumber, interestedIn, nextJobWant, hasAccidents, wantsContact,
       contactName, contactTitle, companyName, companyAddress, companyPhone, companyState, companyGoal]);
 
@@ -222,7 +223,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
 
   const handleDriverRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regUsername || !regPassword || !regEmail) {
+    if (!regPassword || !regEmail || !driverName.trim() || !driverPhone.trim() || !zipCode.trim()) {
       toast.error("Please fill in all required fields.");
       return;
     }
@@ -238,7 +239,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
       toast.error("Passwords do not match.");
       return;
     }
-    if (zipCode && !ZIP_RE.test(zipCode)) {
+    if (!ZIP_RE.test(zipCode)) {
       setZipError("Enter a valid US zip code (e.g. 33304).");
       toast.error("Enter a valid US zip code.");
       return;
@@ -263,7 +264,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
         has_accidents: hasAccidents || "",
         wants_contact: wantsContact || "",
       };
-      await register(regUsername, regEmail, regPassword, "driver", driverFields);
+      await register(driverName.trim(), regEmail, regPassword, "driver", driverFields);
 
       // Check if session was created (email confirmation not required)
       const { data: { session } } = await withTimeout(supabase.auth.getSession(), 10_000);
@@ -545,15 +546,6 @@ export function SignInModal({ onClose }: SignInModalProps) {
             {role === "driver" && (
               <form onSubmit={handleDriverRegister} className="px-5 py-4 space-y-3 overflow-y-auto flex-1">
                 <Input
-                  id="reg-username"
-                  placeholder="Username *"
-                  name="registerUsername"
-                  aria-label="Username"
-                  value={regUsername}
-                  onChange={(e) => setRegUsername(e.target.value)}
-                  autoComplete="username"
-                />
-                <Input
                   id="reg-email"
                   type="email"
                   placeholder="Your e-mail *"
@@ -593,25 +585,26 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Driver Profile</p>
                 <Input
                   id="reg-driverName"
-                  placeholder="Your name"
+                  placeholder="Full Name *"
                   name="driverName"
-                  aria-label="Your name"
+                  aria-label="Full name"
                   value={driverName}
                   onChange={(e) => setDriverName(e.target.value)}
                   autoComplete="name"
                 />
                 <Input
-                  id="reg-homeAddress"
-                  placeholder="Home Address"
-                  name="homeAddress"
-                  aria-label="Home address"
-                  value={homeAddress}
-                  onChange={(e) => setHomeAddress(e.target.value)}
-                  autoComplete="street-address"
+                  id="reg-driverPhone"
+                  placeholder="Phone Number *"
+                  type="tel"
+                  name="driverPhone"
+                  aria-label="Phone number"
+                  value={driverPhone}
+                  onChange={(e) => setDriverPhone(e.target.value)}
+                  autoComplete="tel"
                 />
                 <Input
                   id="reg-zipCode"
-                  placeholder="Zip Code"
+                  placeholder="Zip Code *"
                   name="zipCode"
                   aria-label="Zip code"
                   value={zipCode}
@@ -621,63 +614,80 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   className={zipError ? "border-destructive focus-visible:ring-destructive" : ""}
                 />
                 {zipError && <p className="text-xs text-destructive -mt-2">{zipError}</p>}
-                <Input
-                  id="reg-driverPhone"
-                  placeholder="Phone Number"
-                  type="tel"
-                  name="driverPhone"
-                  aria-label="Phone number"
-                  value={driverPhone}
-                  onChange={(e) => setDriverPhone(e.target.value)}
-                  autoComplete="tel"
-                />
-                <Input
-                  id="reg-cdlNumber"
-                  placeholder="CDL Number"
-                  name="cdlNumber"
-                  aria-label="CDL number"
-                  value={cdlNumber}
-                  onChange={(e) => setCdlNumber(e.target.value)}
-                  autoComplete="off"
-                />
-                <div>
-                  <label className="text-sm text-primary font-medium block mb-1">I am interested in:</label>
-                  <Select value={interestedIn} onValueChange={setInterestedIn} name="interestedIn">
-                    <SelectTrigger id="reg-interestedIn" className="w-full" aria-label="I am interested in"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {DRIVER_INTERESTS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm text-primary font-medium block mb-1">In my next job I want:</label>
-                  <Select value={nextJobWant} onValueChange={setNextJobWant} name="nextJobWant">
-                    <SelectTrigger id="reg-nextJobWant" className="w-full" aria-label="In my next job I want"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {DRIVER_NEXT_JOB.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm text-primary font-medium block mb-1">Any accidents or violations in the last 2 years?</label>
-                  <Select value={hasAccidents} onValueChange={setHasAccidents} name="hasAccidents">
-                    <SelectTrigger id="reg-hasAccidents" className="w-full" aria-label="Any accidents or violations in the last 2 years"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="No">No</SelectItem>
-                      <SelectItem value="Yes">Yes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm text-primary font-medium block mb-1">I want CDL Jobs Center staff to contact me with employment offers</label>
-                  <Select value={wantsContact} onValueChange={setWantsContact} name="wantsContact">
-                    <SelectTrigger id="reg-wantsContact" className="w-full" aria-label="Contact me with employment offers"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Yes">Yes</SelectItem>
-                      <SelectItem value="No">No</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+
+                {/* Optional fields - collapsible */}
+                <button
+                  type="button"
+                  onClick={() => setShowOptionalFields(!showOptionalFields)}
+                  className="w-full flex items-center justify-between py-2 px-3 border border-border rounded-md text-sm hover:bg-muted/50 transition-colors"
+                >
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    Additional Details
+                    <span className="text-xs text-primary font-medium">(Increases Matches)</span>
+                  </span>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${showOptionalFields ? "rotate-180" : ""}`} />
+                </button>
+                {showOptionalFields && (
+                  <div className="space-y-3 pl-1 border-l-2 border-primary/30 ml-1">
+                    <Input
+                      id="reg-homeAddress"
+                      placeholder="Home Address"
+                      name="homeAddress"
+                      aria-label="Home address"
+                      value={homeAddress}
+                      onChange={(e) => setHomeAddress(e.target.value)}
+                      autoComplete="street-address"
+                    />
+                    <Input
+                      id="reg-cdlNumber"
+                      placeholder="CDL Number"
+                      name="cdlNumber"
+                      aria-label="CDL number"
+                      value={cdlNumber}
+                      onChange={(e) => setCdlNumber(e.target.value)}
+                      autoComplete="off"
+                    />
+                    <div>
+                      <label className="text-sm text-primary font-medium block mb-1">I am interested in:</label>
+                      <Select value={interestedIn} onValueChange={setInterestedIn} name="interestedIn">
+                        <SelectTrigger id="reg-interestedIn" className="w-full" aria-label="I am interested in"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {DRIVER_INTERESTS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-sm text-primary font-medium block mb-1">In my next job I want:</label>
+                      <Select value={nextJobWant} onValueChange={setNextJobWant} name="nextJobWant">
+                        <SelectTrigger id="reg-nextJobWant" className="w-full" aria-label="In my next job I want"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {DRIVER_NEXT_JOB.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-sm text-primary font-medium block mb-1">Any accidents or violations in the last 2 years?</label>
+                      <Select value={hasAccidents} onValueChange={setHasAccidents} name="hasAccidents">
+                        <SelectTrigger id="reg-hasAccidents" className="w-full" aria-label="Any accidents or violations in the last 2 years"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="No">No</SelectItem>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-sm text-primary font-medium block mb-1">I want CDL Jobs Center staff to contact me with employment offers</label>
+                      <Select value={wantsContact} onValueChange={setWantsContact} name="wantsContact">
+                        <SelectTrigger id="reg-wantsContact" className="w-full" aria-label="Contact me with employment offers"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
                 <Button type="submit" disabled={submitStatus !== "idle"} className="w-full"><SubmitButtonLabel status={submitStatus} idle="Submit" working="Submitting…" /></Button>
                 <button type="button" onClick={() => setView("login")} className="w-full text-center text-sm text-primary underline hover:opacity-80">
                   ← Back to login
