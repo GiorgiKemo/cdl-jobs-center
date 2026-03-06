@@ -6,6 +6,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Eye, Heart, Lock, Users } from "lucide-react";
+import { PageBreadcrumb } from "@/components/ui/PageBreadcrumb";
 import { useAuth } from "@/context/auth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -173,13 +174,7 @@ const Drivers = () => {
       <div className="min-h-screen bg-background">
         <Navbar />
         <main className="container mx-auto py-8 max-w-3xl">
-          <p className="text-sm text-muted-foreground mb-6">
-            <Link to="/" className="text-primary underline hover:opacity-80">
-              Main
-            </Link>
-            <span className="mx-1">»</span>
-            Drivers
-          </p>
+          <PageBreadcrumb items={[{ label: "Main", to: "/" }, { label: "Drivers" }]} />
           <div className="border border-border bg-card">
             <div className="border-l-4 border-l-primary border-b border-b-border px-5 py-4">
               <h1 className="font-display font-bold text-xl">Driver Directory</h1>
@@ -224,13 +219,7 @@ const Drivers = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="container mx-auto py-8">
-        <p className="text-sm text-muted-foreground mb-4">
-          <Link to="/" className="text-primary underline hover:opacity-80">
-            Main
-          </Link>
-          <span className="mx-1">»</span>
-          Drivers
-        </p>
+        <PageBreadcrumb items={[{ label: "Main", to: "/" }, { label: "Drivers" }]} />
 
         <div className="flex items-center gap-3 border-l-4 border-primary pl-3 mb-6">
           <h1 className="font-display text-2xl font-bold">Driver Directory</h1>

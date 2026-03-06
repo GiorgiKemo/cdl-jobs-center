@@ -40,8 +40,10 @@ const SignInModal = lazy(() =>
         return new Promise<never>(() => {});
       }
       sessionStorage.removeItem("chunk_reload");
-      return import("@/components/SignInModal").then((m) => ({ default: m.SignInModal }));
-    })
+      return import("@/components/SignInModal").then((m) => ({
+        default: m.SignInModal,
+      }));
+    }),
 );
 const NotificationCenter = lazy(() =>
   import("@/components/NotificationCenter")
@@ -53,8 +55,10 @@ const NotificationCenter = lazy(() =>
         return new Promise<never>(() => {});
       }
       sessionStorage.removeItem("chunk_reload");
-      return import("@/components/NotificationCenter").then((m) => ({ default: m.NotificationCenter }));
-    })
+      return import("@/components/NotificationCenter").then((m) => ({
+        default: m.NotificationCenter,
+      }));
+    }),
 );
 
 const jobDropdownItems = [
@@ -237,12 +241,19 @@ const Navbar = () => {
 
   // Use cached role during auth loading so nav links don't flash
   const cachedRole = authLoading
-    ? (localStorage.getItem("cdl-cached-role") as "driver" | "company" | "admin" | null)
+    ? (localStorage.getItem("cdl-cached-role") as
+        | "driver"
+        | "company"
+        | "admin"
+        | null)
     : null;
   const effectiveRole = user?.role ?? cachedRole;
 
   // Notification counts
-  const { data: unreadMsgCount = 0 } = useUnreadCount(user?.id, user?.role as "driver" | "company" | undefined);
+  const { data: unreadMsgCount = 0 } = useUnreadCount(
+    user?.id,
+    user?.role as "driver" | "company" | undefined,
+  );
   const { data: notifCount = 0 } = useUnreadNotificationCount(user?.id);
 
   // Company logo + verification status for navbar
@@ -255,7 +266,10 @@ const Navbar = () => {
         .select("logo_url, is_verified")
         .eq("id", user!.id)
         .maybeSingle();
-      return { logoUrl: (data?.logo_url as string) || null, isVerified: !!data?.is_verified };
+      return {
+        logoUrl: (data?.logo_url as string) || null,
+        isVerified: !!data?.is_verified,
+      };
     },
     enabled: !!user && user.role === "company",
     staleTime: 5 * 60_000,
@@ -280,7 +294,10 @@ const Navbar = () => {
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: MouseEvent) => {
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(e.target as Node)
+      ) {
         setIsOpen(false);
         setJobsMobileOpen(false);
       }
@@ -329,21 +346,21 @@ const Navbar = () => {
       </div>
 
       {/* Main nav */}
-      <nav ref={mobileMenuRef} className="sticky top-0 z-50 glass border-b border-border/50">
+      <nav
+        ref={mobileMenuRef}
+        className="sticky top-0 z-50 glass border-b border-border/50"
+      >
         <div className="container mx-auto flex items-center justify-between py-4">
           <Link
             to="/"
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
             className="flex items-center gap-3"
           >
-            <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
-              <Truck className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div className="font-display">
-              <span className="text-xl font-bold">CDL</span>
-              <span className="text-xl font-bold text-primary"> Jobs</span>
-              <span className="text-xl font-light">Center</span>
-            </div>
+            <img
+              src={isDark ? "/logo-dark.svg" : "/logo.svg"}
+              alt="CDL Jobs Center"
+              className="h-16 object-contain"
+            />
           </Link>
 
           {/* Desktop links */}
@@ -458,7 +475,10 @@ const Navbar = () => {
             ) : user ? (
               <>
                 <Suspense fallback={null}>
-                  <NotificationCenter userId={user.id} role={user.role as "driver" | "company" | "admin"} />
+                  <NotificationCenter
+                    userId={user.id}
+                    role={user.role as "driver" | "company" | "admin"}
+                  />
                 </Suspense>
                 {/* Profile dropdown */}
                 <div className="relative" ref={profileRef}>
@@ -484,7 +504,10 @@ const Navbar = () => {
                       <span className="flex items-center gap-1 truncate text-sm font-semibold text-foreground">
                         {user.name}
                         {companyIsVerified && (
-                          <CheckCircle className="h-3.5 w-3.5 shrink-0 text-green-500" aria-label="Verified company" />
+                          <CheckCircle
+                            className="h-3.5 w-3.5 shrink-0 text-green-500"
+                            aria-label="Verified company"
+                          />
                         )}
                       </span>
                       <span className="block text-[11px] text-muted-foreground">
@@ -506,8 +529,12 @@ const Navbar = () => {
                       aria-label="Account menu"
                     >
                       <div className="px-4 py-2 border-b border-border mb-1">
-                        <p className="text-sm font-medium truncate">{user.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                        <p className="text-sm font-medium truncate">
+                          {user.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {user.email}
+                        </p>
                       </div>
                       <Link
                         to={
@@ -666,7 +693,10 @@ const Navbar = () => {
                                 <div className="border-t border-border my-1" />
                                 <Link
                                   to="/driver-dashboard?tab=saved"
-                                  onClick={() => { setIsOpen(false); setJobsMobileOpen(false); }}
+                                  onClick={() => {
+                                    setIsOpen(false);
+                                    setJobsMobileOpen(false);
+                                  }}
                                   className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
                                 >
                                   Saved Jobs
@@ -678,7 +708,10 @@ const Navbar = () => {
                                 <div className="border-t border-border my-1" />
                                 <Link
                                   to="/dashboard?tab=jobs"
-                                  onClick={() => { setIsOpen(false); setJobsMobileOpen(false); }}
+                                  onClick={() => {
+                                    setIsOpen(false);
+                                    setJobsMobileOpen(false);
+                                  }}
                                   className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
                                 >
                                   Post a Job
@@ -758,9 +791,7 @@ const Navbar = () => {
                   <div className="flex gap-2 pt-2 items-center border-t border-border/50 mt-1">
                     <div className="flex items-center gap-2 px-3 py-1.5 text-sm flex-1 text-muted-foreground">
                       <User className="h-3.5 w-3.5 text-primary shrink-0" />
-                      <span className="font-medium truncate">
-                        {user.name}
-                      </span>
+                      <span className="font-medium truncate">{user.name}</span>
                     </div>
                     <Button
                       variant="outline"

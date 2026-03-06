@@ -1,6 +1,9 @@
+import { useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { withTimeout } from "@/lib/withTimeout";
+
+const AUTO_SYNC_INTERVAL = 15 * 60 * 1000; // 15 minutes
 
 export interface Lead {
   id: string;
@@ -70,8 +73,31 @@ export function useLeads(companyId?: string) {
       }
       return all.map(rowToLead);
     },
-    refetchInterval: 60_000,
+    refetchInterval: AUTO_SYNC_INTERVAL,
   });
+}
+
+/**
+ * Auto-sync leads from Google Sheets on first visit and every 15 minutes.
+ * Call this hook in the component that renders the Leads tab.
+ */
+export function useAutoSyncLeads() {
+  const { mutate: syncLeads } = useSyncLeads();
+  const didInitialSync = useRef(false);
+
+  useEffect(() => {
+    // Always sync on first mount (page load / first visit)
+    if (!didInitialSync.current) {
+      didInitialSync.current = true;
+      syncLeads();
+    }
+
+    const interval = setInterval(() => {
+      syncLeads();
+    }, AUTO_SYNC_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [syncLeads]);
 }
 
 export interface SyncResult {

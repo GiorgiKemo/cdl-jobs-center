@@ -12,6 +12,7 @@ import { friendlySignInError } from "@/lib/authErrorMessages";
 import { getPasswordStrength, type PasswordStrengthLevel } from "@/lib/passwordStrength";
 import { SocialLoginButtons, OrDivider } from "@/components/SocialLoginButtons";
 import { withTimeout } from "@/lib/withTimeout";
+import { PageBreadcrumb } from "@/components/ui/PageBreadcrumb";
 
 const strengthGradientByLevel: Record<PasswordStrengthLevel, string> = {
   weak: "from-rose-600 to-red-500",
@@ -215,11 +216,7 @@ const SignIn = () => {
       <main className="flex-1 flex items-center justify-center py-12 px-4">
         <div className="w-full max-w-md">
           {/* Breadcrumb */}
-          <p className="text-sm text-muted-foreground mb-6">
-            <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
-            <span className="mx-1">&raquo;</span>
-            {pageLabel}
-          </p>
+          <PageBreadcrumb items={[{ label: "Main", to: "/" }, { label: pageLabel }]} />
 
           <div className="border border-border bg-card">
             {/* ── Email Confirmation Screen ─────────────────────────────── */}

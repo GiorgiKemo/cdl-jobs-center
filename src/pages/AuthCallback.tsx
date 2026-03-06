@@ -31,11 +31,15 @@ const AuthCallback = () => {
 
   // Listen for the auth event that confirms tokens have been exchanged.
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         if (isEmailConfirmation.current) {
           toast.success("Email confirmed! Welcome to CDL Jobs Center.");
           isEmailConfirmation.current = false;
+
+          // Send the deferred welcome notification for email/password users.
+          // handle_new_user() skips it when email_confirmed_at is NULL at signup.
+          supabase.rpc("send_welcome_notification").catch(() => {}); // non-fatal
         }
         setSessionReady(true);
       }

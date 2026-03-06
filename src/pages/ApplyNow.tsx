@@ -9,7 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Link, useNavigationType } from "react-router-dom";
+import { useNavigationType } from "react-router-dom";
+import { PageBreadcrumb } from "@/components/ui/PageBreadcrumb";
 import { useApplication } from "@/hooks/useApplication";
 import { useAuth } from "@/context/auth";
 import { useDriverProfile } from "@/hooks/useDriverProfile";
@@ -399,11 +400,7 @@ const ApplyNow = () => {
       <div className="min-h-screen bg-background">
         <Navbar />
         <main className="container mx-auto py-16 max-w-xl text-center">
-          <p className="text-sm text-muted-foreground mb-6">
-            <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
-            <span className="mx-1">&raquo;</span>
-            AI Job Matching
-          </p>
+          <PageBreadcrumb items={[{ label: "Main", to: "/" }, { label: "AI Job Matching" }]} />
           <div className="border border-border bg-card p-12">
             <Sparkles className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
             {!user ? (
@@ -579,11 +576,7 @@ const ApplyNow = () => {
 
       <main className="container mx-auto py-8 max-w-3xl">
         {/* Breadcrumb */}
-        <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
-          <span className="mx-1">&raquo;</span>
-          AI Job Matching
-        </p>
+        <PageBreadcrumb items={[{ label: "Main", to: "/" }, { label: "AI Job Matching" }]} />
 
         <div className="bg-card border border-border shadow-sm">
           <div className="px-6 pt-6 pb-8">

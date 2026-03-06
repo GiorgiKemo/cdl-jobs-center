@@ -16,6 +16,7 @@ import type { Job } from "@/data/jobs";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/Spinner";
 import { ListPagination } from "@/components/ListPagination";
+import { PageBreadcrumb } from "@/components/ui/PageBreadcrumb";
 
 const urlTypeMap: Record<string, string> = {
   "dry-van": "Dry Van",
@@ -170,17 +171,11 @@ const Jobs = () => {
 
       <main className="container mx-auto py-6">
         {/* Breadcrumb */}
-        <p className="text-sm text-muted-foreground mb-4">
-          <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
-          <span className="mx-1">»</span>
-          <Link to="/jobs" className="text-primary underline hover:opacity-80">jobs</Link>
-          {freightType !== "all" && (
-            <>
-              <span className="mx-1">»</span>
-              <span>{freightType}</span>
-            </>
-          )}
-        </p>
+        <PageBreadcrumb items={[
+          { label: "Main", to: "/" },
+          { label: "Jobs", to: "/jobs" },
+          ...(freightType !== "all" ? [{ label: freightType }] : []),
+        ]} />
 
         {/* Page title + sort */}
         <div className="flex items-center justify-between mb-6">

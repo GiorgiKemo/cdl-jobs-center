@@ -1,7 +1,7 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Link } from "react-router-dom";
 import { usePageTitle, useMetaDescription, useCanonical } from "@/hooks/usePageTitle";
+import { PageBreadcrumb } from "@/components/ui/PageBreadcrumb";
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="mb-8">
@@ -24,11 +24,7 @@ const TermsOfService = () => {
 
       <main className="container mx-auto py-8 max-w-3xl">
         {/* Breadcrumb */}
-        <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
-          <span className="mx-1">»</span>
-          Terms of Service
-        </p>
+        <PageBreadcrumb items={[{ label: "Main", to: "/" }, { label: "Terms of Service" }]} />
 
         <div className="border border-border bg-card">
           <div className="border-l-4 border-l-primary border-b border-b-border px-5 py-4">

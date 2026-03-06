@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { PageBreadcrumb } from "@/components/ui/PageBreadcrumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +26,7 @@ import {
 import { ChatPanel } from "@/components/ChatPanel";
 import { NotificationPreferences } from "@/components/NotificationPreferences";
 import { useUnreadCount } from "@/hooks/useMessages";
-import { useLeads, useUpdateLeadStatus, useSyncLeads } from "@/hooks/useLeads";
+import { useLeads, useUpdateLeadStatus, useSyncLeads, useAutoSyncLeads } from "@/hooks/useLeads";
 import { useSubscription, useCancelSubscription, PLANS, type Plan } from "@/hooks/useSubscription";
 import { useCompanyDriverMatches, useMatchingRollout } from "@/hooks/useMatchScores";
 import {
@@ -599,6 +600,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
   } = useLeads(user!.id);
   const updateLeadStatus = useUpdateLeadStatus();
   const syncLeads = useSyncLeads();
+  useAutoSyncLeads();
   const { data: subscription } = useSubscription(user!.id);
   const cancelSubscription = useCancelSubscription();
   const rollout = useMatchingRollout();
@@ -1071,11 +1073,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
       <Navbar />
       <main className="container mx-auto py-8 max-w-[1400px]">
         {/* Breadcrumb */}
-        <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
-          <span className="mx-1">»</span>
-          Dashboard
-        </p>
+        <PageBreadcrumb items={[{ label: "Main", to: "/" }, { label: "Dashboard" }]} />
 
         {/* Welcome header */}
         <div className="bg-foreground text-background dark:bg-muted dark:text-foreground border border-border px-5 py-4 mb-6 flex items-center justify-between">

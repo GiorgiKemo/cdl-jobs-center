@@ -2,7 +2,8 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Button } from "@/components/ui/button";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { PageBreadcrumb } from "@/components/ui/PageBreadcrumb";
 import { User, MapPin, Award, Truck, MessageSquare } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { useQuery } from "@tanstack/react-query";
@@ -152,17 +153,7 @@ const DriverProfile = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="container mx-auto py-6 max-w-3xl">
-        <p className="text-sm text-muted-foreground mb-4">
-          <Link to="/" className="text-primary underline hover:opacity-80">
-            Main
-          </Link>
-          <span className="mx-1">»</span>
-          <Link to="/drivers" className="text-primary underline hover:opacity-80">
-            Drivers
-          </Link>
-          <span className="mx-1">»</span>
-          {driver.name}
-        </p>
+        <PageBreadcrumb items={[{ label: "Main", to: "/" }, { label: "Drivers", to: "/drivers" }, { label: driver.name }]} />
 
         <div className="border border-border bg-card mb-4">
           <div className="bg-foreground text-background dark:bg-muted dark:text-foreground px-6 py-5 flex items-center gap-4">

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "@/components/Navbar";
+import { PageBreadcrumb } from "@/components/ui/PageBreadcrumb";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,6 +66,7 @@ import {
   useAdminApplications,
   useAdminChartData,
 } from "@/hooks/useAdmin";
+import { useAutoSyncLeads } from "@/hooks/useLeads";
 import { PLANS, type Plan } from "@/hooks/useSubscription";
 import { formatDate } from "@/lib/dateUtils";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -130,6 +132,7 @@ function AdminDashboardInner() {
   const { data: jobs = [] } = useAdminJobs();
   const { data: leads = [] } = useAdminLeads();
   const syncLeads = useSyncLeads();
+  useAutoSyncLeads();
   const updateJobStatus = useAdminUpdateJobStatus();
   const changePlan = useChangeSubscriptionPlan();
   const toggleVerified = useToggleCompanyVerified();
@@ -353,13 +356,7 @@ function AdminDashboardInner() {
       <Navbar />
       <main className="container mx-auto py-8 max-w-[1400px]">
         {/* Breadcrumb */}
-        <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary underline hover:opacity-80">
-            Main
-          </Link>
-          <span className="mx-1">»</span>
-          Admin Dashboard
-        </p>
+        <PageBreadcrumb items={[{ label: "Main", to: "/" }, { label: "Admin Dashboard" }]} />
 
         {/* Welcome header */}
         <div className="bg-foreground text-background dark:bg-muted dark:text-foreground border border-border px-5 py-4 mb-6">

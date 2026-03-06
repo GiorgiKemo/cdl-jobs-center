@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Spinner } from "@/components/ui/Spinner";
+import { PageBreadcrumb } from "@/components/ui/PageBreadcrumb";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -148,13 +149,7 @@ const JobDetail = () => {
       <main className="container mx-auto py-8 max-w-4xl">
         {/* Breadcrumb + Back */}
         <div className="flex items-center justify-between mb-6">
-          <p className="text-sm text-muted-foreground">
-            <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
-            <span className="mx-1">»</span>
-            <Link to="/jobs" className="text-primary underline hover:opacity-80">jobs</Link>
-            <span className="mx-1">»</span>
-            {job.title}
-          </p>
+          <PageBreadcrumb items={[{ label: "Main", to: "/" }, { label: "Jobs", to: "/jobs" }, { label: job.title }]} />
           <button
             type="button"
             onClick={() => { if (window.history.length > 1) navigate(-1); else navigate("/jobs"); }}

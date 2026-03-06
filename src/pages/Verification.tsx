@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { ShieldCheck, CheckCircle, Clock, XCircle, FileText, X, Upload } from "l
 import { formatDate } from "@/lib/dateUtils";
 import { Spinner } from "@/components/ui/Spinner";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { PageBreadcrumb } from "@/components/ui/PageBreadcrumb";
 
 const Verification = () => {
   usePageTitle("Company Verification");
@@ -112,13 +113,7 @@ const Verification = () => {
       <Navbar />
       <main className="container mx-auto py-8 max-w-2xl">
         {/* Breadcrumb */}
-        <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
-          <span className="mx-1">&raquo;</span>
-          <Link to="/dashboard" className="text-primary underline hover:opacity-80">Dashboard</Link>
-          <span className="mx-1">&raquo;</span>
-          Verification
-        </p>
+        <PageBreadcrumb items={[{ label: "Main", to: "/" }, { label: "Dashboard", to: "/dashboard" }, { label: "Verification" }]} />
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6 border-l-4 border-primary pl-3">

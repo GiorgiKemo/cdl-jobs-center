@@ -3,6 +3,7 @@ import { usePageTitle, useMetaDescription, useCanonical } from "@/hooks/usePageT
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Link } from "react-router-dom";
+import { PageBreadcrumb } from "@/components/ui/PageBreadcrumb";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -102,13 +103,7 @@ const Companies = () => {
       <Navbar />
       <main className="container mx-auto py-8">
         {/* Breadcrumb */}
-        <p className="text-sm text-muted-foreground mb-4">
-          <Link to="/" className="text-primary underline hover:opacity-80">
-            Main
-          </Link>
-          <span className="mx-1">»</span>
-          Companies
-        </p>
+        <PageBreadcrumb items={[{ label: "Main", to: "/" }, { label: "Companies" }]} />
 
         {/* Page heading */}
         <div className="flex items-center gap-3 border-l-4 border-primary pl-3 mb-6">

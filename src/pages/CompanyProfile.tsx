@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
+import { PageBreadcrumb } from "@/components/ui/PageBreadcrumb";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Phone, MapPin, CheckCircle, ExternalLink, Mail, Building2, Briefcase, MapPinned, DollarSign } from "lucide-react";
@@ -157,13 +158,7 @@ const CompanyProfile = () => {
       <Navbar />
       <main className="container mx-auto py-8 max-w-4xl">
         {/* Breadcrumb */}
-        <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
-          <span className="mx-1">»</span>
-          <Link to="/companies" className="text-primary underline hover:opacity-80">Companies</Link>
-          <span className="mx-1">»</span>
-          {company.company_name}
-        </p>
+        <PageBreadcrumb items={[{ label: "Main", to: "/" }, { label: "Companies", to: "/companies" }, { label: company.company_name }]} />
 
         {/* Hero header */}
         <div className="border border-border bg-card mb-6">

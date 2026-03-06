@@ -25,6 +25,7 @@ import { formatRelativeDate } from "@/lib/dateUtils";
 import { usePageTitle, useNoIndex } from "@/hooks/usePageTitle";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { PageBreadcrumb } from "@/components/ui/PageBreadcrumb";
 import {
   useDriverJobMatches,
   useDriverFeedbackMap,
@@ -497,11 +498,7 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
       <Navbar />
       <main className="container mx-auto py-8 max-w-[1400px]">
         {/* Breadcrumb */}
-        <p className="text-sm text-muted-foreground mb-6">
-          <Link to="/" className="text-primary underline hover:opacity-80">Main</Link>
-          <span className="mx-1">»</span>
-          My Dashboard
-        </p>
+        <PageBreadcrumb items={[{ label: "Main", to: "/" }, { label: "My Dashboard" }]} />
 
         {/* Welcome header */}
         <div className="bg-foreground text-background dark:bg-muted dark:text-foreground border-l-4 border-primary px-5 py-4 mb-6">
