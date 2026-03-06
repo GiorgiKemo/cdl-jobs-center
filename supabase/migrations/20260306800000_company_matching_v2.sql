@@ -34,6 +34,7 @@ CREATE INDEX IF NOT EXISTS idx_cmf_company
 
 ALTER TABLE company_match_feedback ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Companies manage own feedback" ON company_match_feedback;
 CREATE POLICY "Companies manage own feedback"
   ON company_match_feedback FOR ALL
   USING (company_id = auth.uid())
@@ -58,6 +59,7 @@ CREATE INDEX IF NOT EXISTS idx_cme_candidate
 
 ALTER TABLE company_match_events ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Companies manage own events" ON company_match_events;
 CREATE POLICY "Companies manage own events"
   ON company_match_events FOR ALL
   USING (company_id = auth.uid())
@@ -81,6 +83,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS trg_company_feedback_recompute ON company_match_feedback;
 CREATE TRIGGER trg_company_feedback_recompute
   AFTER INSERT OR UPDATE ON company_match_feedback
   FOR EACH ROW EXECUTE FUNCTION enqueue_company_feedback_recompute();

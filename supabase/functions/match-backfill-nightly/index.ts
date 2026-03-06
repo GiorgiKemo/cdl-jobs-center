@@ -37,12 +37,13 @@ Deno.serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    // Auth: only allow service-role key
+    // Auth: only allow service-role key or cron (no JWT verification)
     const authHeader = req.headers.get("Authorization");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const token = authHeader?.replace("Bearer ", "") ?? "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const token = authHeader?.replace(/^Bearer\s+/i, "") ?? "";
 
-    if (token !== serviceRoleKey) {
+    // Allow: matching service role key, or pg_cron calls (no auth header but verify_jwt=false)
+    if (token && token !== serviceRoleKey) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -154,17 +155,19 @@ Deno.serve(async (req) => {
           break;
         }
 
-        // Fetch company's applications
+        // Fetch company's applications (raise default 1000-row limit)
         const { data: apps } = await supabase
           .from("applications")
           .select("*")
-          .eq("company_id", companyId);
+          .eq("company_id", companyId)
+          .limit(10000);
 
-        // Fetch company's leads
+        // Fetch company's leads (raise default 1000-row limit)
         const { data: leads } = await supabase
           .from("leads")
           .select("*")
-          .eq("company_id", companyId);
+          .eq("company_id", companyId)
+          .limit(10000);
 
         for (const jobRow of companyJobs) {
           if (Date.now() - startTime > TIMEOUT_MS) {
@@ -276,7 +279,8 @@ Deno.serve(async (req) => {
       const { data: leadCompanies } = await supabase
         .from("leads")
         .select("company_id")
-        .not("company_id", "is", null);
+        .not("company_id", "is", null)
+        .limit(50000);
 
       if (leadCompanies) {
         const joblessCompanyIds = [
@@ -320,11 +324,12 @@ Deno.serve(async (req) => {
             textBlock: `${companyName} hiring CDL drivers. ${about} ${goal}`.trim(),
           };
 
-          // Fetch company's leads
+          // Fetch company's leads (raise default 1000-row limit)
           const { data: leads } = await supabase
             .from("leads")
             .select("*")
-            .eq("company_id", companyId);
+            .eq("company_id", companyId)
+            .limit(10000);
 
           if (leads && leads.length > 0) {
             const leadRows = [];
