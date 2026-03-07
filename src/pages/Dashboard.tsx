@@ -887,16 +887,27 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
     enabled: !!user,
     refetchOnMount: "always",
     queryFn: async () => {
-      const { data } = await supabase
-        .from("company_driver_match_scores")
-        .select("candidate_driver_id, candidate_id, candidate_source, job_id, jobs!inner(status)")
-        .eq("company_id", user!.id)
-        .eq("jobs.status", "Active");
-      if (!data || data.length === 0) return 0;
+      // Fetch job-linked (active jobs) + jobless (profile-based, null job_id) in parallel
+      const [jobLinked, jobless] = await Promise.all([
+        supabase
+          .from("company_driver_match_scores")
+          .select("candidate_driver_id, candidate_id, candidate_source, job_id, jobs!inner(status)")
+          .eq("company_id", user!.id)
+          .eq("jobs.status", "Active")
+          .limit(50000),
+        supabase
+          .from("company_driver_match_scores")
+          .select("candidate_driver_id, candidate_id, candidate_source")
+          .eq("company_id", user!.id)
+          .is("job_id", null)
+          .limit(50000),
+      ]);
+      const data = [...(jobLinked.data ?? []), ...(jobless.data ?? [])];
+      if (data.length === 0) return 0;
       // Deduplicate by person identity (same logic as useCompanyDriverMatches)
       const seen = new Set<string>();
       for (const row of data) {
-        seen.add(`${row.candidate_driver_id ?? row.candidate_id}:${row.candidate_source}`);
+        seen.add(`${(row as Record<string, unknown>).candidate_driver_id ?? (row as Record<string, unknown>).candidate_id}:${(row as Record<string, unknown>).candidate_source}`);
       }
       return Math.min(seen.size, aiMatchLimit);
     },

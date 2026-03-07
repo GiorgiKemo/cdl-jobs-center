@@ -492,13 +492,15 @@ export function useCompanyDriverMatches(
             .eq("company_id", companyId!)
             .eq("jobs.status", "Active")
             .not("job_id", "is", null)
-            .order("overall_score", { ascending: false }),
+            .order("overall_score", { ascending: false })
+            .limit(50000),
           supabase
             .from("company_driver_match_scores")
             .select("*")
             .eq("company_id", companyId!)
             .is("job_id", null)
-            .order("overall_score", { ascending: false }),
+            .order("overall_score", { ascending: false })
+            .limit(50000),
         ]);
         if (jobLinked.error) throw jobLinked.error;
         if (jobless.error) throw jobless.error;
