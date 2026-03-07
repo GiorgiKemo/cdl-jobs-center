@@ -194,7 +194,7 @@ function scoreRecencyActivity(
   const daysSince = Math.floor((Date.now() - new Date(candidate.createdAt).getTime()) / 86_400_000);
 
   if (daysSince <= 7) {
-    reasons.push({ text: "Applied/submitted recently", positive: true });
+    reasons.push({ text: "Active in the last 7 days", positive: true });
     return { cs: { score: 5, maxScore: 5, detail: `${daysSince}d ago` }, reasons };
   }
   if (daysSince <= 30) {

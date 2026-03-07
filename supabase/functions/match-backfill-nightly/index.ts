@@ -275,14 +275,23 @@ Deno.serve(async (req) => {
       // Find companies that have leads but NO active jobs (not already scored above)
       const companiesWithJobs = jobs ? new Set(jobs.map((j: Record<string, any>) => j.company_id as string)) : new Set<string>();
 
-      // Get distinct company_ids from leads that were NOT scored in Phase B
-      const { data: leadCompanies } = await supabase
-        .from("leads")
-        .select("company_id")
-        .not("company_id", "is", null)
-        .limit(50000);
+      // Get distinct company_ids from leads — paginate to bypass max_rows=1000
+      const leadCompanies: Record<string, any>[] = [];
+      {
+        const PAGE = 1000;
+        for (let page = 0; ; page++) {
+          const { data: batch } = await supabase
+            .from("leads")
+            .select("company_id")
+            .not("company_id", "is", null)
+            .range(page * PAGE, (page + 1) * PAGE - 1);
+          if (!batch || batch.length === 0) break;
+          leadCompanies.push(...batch);
+          if (batch.length < PAGE) break;
+        }
+      }
 
-      if (leadCompanies) {
+      if (leadCompanies.length > 0) {
         const joblessCompanyIds = [
           ...new Set(
             leadCompanies
@@ -324,12 +333,19 @@ Deno.serve(async (req) => {
             textBlock: `${companyName} hiring CDL drivers. ${about} ${goal}`.trim(),
           };
 
-          // Fetch company's leads (raise default 1000-row limit)
-          const { data: leads } = await supabase
-            .from("leads")
-            .select("*")
-            .eq("company_id", companyId)
-            .limit(10000);
+          // Fetch ALL leads for company — paginate to bypass Supabase max_rows=1000
+          const leads: Record<string, any>[] = [];
+          const PAGE = 1000;
+          for (let page = 0; ; page++) {
+            const { data: batch } = await supabase
+              .from("leads")
+              .select("*")
+              .eq("company_id", companyId)
+              .range(page * PAGE, (page + 1) * PAGE - 1);
+            if (!batch || batch.length === 0) break;
+            leads.push(...batch);
+            if (batch.length < PAGE) break;
+          }
 
           if (leads && leads.length > 0) {
             const leadRows = [];

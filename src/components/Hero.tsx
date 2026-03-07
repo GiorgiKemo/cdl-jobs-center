@@ -1,7 +1,9 @@
 import { ArrowRight, Shield, Zap, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import { useAuth } from "@/context/auth";
+import { RegistrationModal } from "@/components/HeroSignUpCard";
 
 const heroVideo = "/hero-bg.mp4";
 
@@ -9,7 +11,9 @@ const Hero = () => {
   const { user } = useAuth();
   const isCompany = user?.role === "company";
   const isDriver = user?.role === "driver";
+  const [regOpen, setRegOpen] = useState(false);
   return (
+    <>
     <section className="relative overflow-hidden bg-secondary min-h-[90vh] flex items-center">
       {/* Background image */}
       <div className="absolute inset-0">
@@ -77,16 +81,27 @@ const Hero = () => {
               className="animate-hero-fade-up flex flex-col sm:flex-row gap-4"
               style={{ animationDelay: "0.3s" }}
             >
-              <Button
-                size="lg"
-                className="text-lg px-8 glow-orange group"
-                asChild
-              >
-                <Link to={isCompany ? "/dashboard" : "/apply"}>
-                  {isCompany ? "Post a Job" : isDriver ? "Find My Matches" : "Apply Now"}
+              {!user ? (
+                <Button
+                  size="lg"
+                  className="text-lg px-8 glow-orange group"
+                  onClick={() => setRegOpen(true)}
+                >
+                  Apply Now
                   <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </Button>
+                </Button>
+              ) : (
+                <Button
+                  size="lg"
+                  className="text-lg px-8 glow-orange group"
+                  asChild
+                >
+                  <Link to={isCompany ? "/dashboard" : "/apply"}>
+                    {isCompany ? "Post a Job" : "Find My Matches"}
+                    <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </Button>
+              )}
               <Button
                 size="lg"
                 variant="outline"
@@ -147,6 +162,9 @@ const Hero = () => {
         </div>
       </div>
     </section>
+
+    <RegistrationModal open={regOpen} onOpenChange={setRegOpen} />
+  </>
   );
 };
 

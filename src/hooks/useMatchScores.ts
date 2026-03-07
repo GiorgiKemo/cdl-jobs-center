@@ -465,14 +465,79 @@ export function useCompanyDriverMatches(
     limit?: number;
   } = {},
 ) {
+  const qc = useQueryClient();
+  const queryKey = ["company-matches", companyId, opts.jobId, opts.source, opts.limit];
+
   return useQuery({
-    queryKey: ["company-matches", companyId, opts.jobId, opts.source, opts.limit],
+    queryKey,
     queryFn: async () => {
-      // Fetch scores — job-linked rows require active job, jobless rows (profile-based) are always included
-      let scores: Record<string, unknown>[] = [];
+      const PAGE = 1000;
+      const BATCH = 200;
+
+      // Batch-fetch candidate details (max 200 IDs per request to avoid URL-too-long)
+      const fetchBatched = async (table: string, select: string, ids: string[]) => {
+        const chunks = Array.from({ length: Math.ceil(ids.length / BATCH) }, (_, i) =>
+          ids.slice(i * BATCH, (i + 1) * BATCH),
+        );
+        const results = await Promise.all(
+          chunks.map((chunk) => supabase.from(table).select(select).in("id", chunk)),
+        );
+        const all: Record<string, unknown>[] = [];
+        for (const { data, error } of results) {
+          if (error) throw new Error(error.message || `Failed to load ${table}`);
+          if (data) all.push(...(data as Record<string, unknown>[]));
+        }
+        return all;
+      };
+
+      // Build CompanyDriverMatch[] from score rows (fetches candidate details)
+      const processScores = async (scores: Record<string, unknown>[]): Promise<CompanyDriverMatch[]> => {
+        let filtered = opts.source
+          ? scores.filter((s) => s.candidate_source === opts.source)
+          : scores;
+        if (filtered.length === 0) return [];
+
+        const appIds = [
+          ...new Set(filtered.filter((s) => s.candidate_source === "application").map((s) => s.candidate_id as string)),
+        ];
+        const leadIds = [
+          ...new Set(filtered.filter((s) => s.candidate_source === "lead").map((s) => s.candidate_id as string)),
+        ];
+
+        const candidateMap = new Map<string, Record<string, unknown>>();
+        const [appsData, leadsData] = await Promise.all([
+          appIds.length > 0
+            ? fetchBatched("applications", "id, first_name, last_name, phone, email, license_state, years_exp, driver_type, license_class", appIds)
+            : Promise.resolve([]),
+          leadIds.length > 0
+            ? fetchBatched("leads", "id, full_name, phone, email, state, years_exp, is_owner_op", leadIds)
+            : Promise.resolve([]),
+        ]);
+        for (const row of appsData) candidateMap.set(row.id as string, row);
+        for (const row of leadsData) candidateMap.set(row.id as string, row);
+
+        const allMatches = filtered.map((row) =>
+          rowToCompanyDriverMatch(row, candidateMap.get(row.candidate_id as string)),
+        );
+
+        if (!opts.jobId) {
+          // Deduplicate by person identity, keeping highest score
+          const seen = new Map<string, (typeof allMatches)[number]>();
+          for (const m of allMatches) {
+            const key = `${m.candidateDriverId ?? m.candidateId}:${m.candidateSource}`;
+            const existing = seen.get(key);
+            if (!existing || m.overallScore > existing.overallScore) seen.set(key, m);
+          }
+          const deduped = Array.from(seen.values()).sort((a, b) => b.overallScore - a.overallScore);
+          if (opts.limit) return deduped.slice(0, opts.limit);
+          return deduped;
+        }
+
+        return allMatches;
+      };
 
       if (opts.jobId) {
-        // Specific job filter — only job-linked rows
+        // Specific job filter — single query, no pagination needed
         const { data, error } = await supabase
           .from("company_driver_match_scores")
           .select("*, jobs!inner(status)")
@@ -482,129 +547,105 @@ export function useCompanyDriverMatches(
           .order("overall_score", { ascending: false })
           .limit(opts.limit ?? 10000);
         if (error) throw error;
-        scores = (data ?? []) as Record<string, unknown>[];
-      } else {
-        // All matches: fetch job-linked (active only) + jobless (profile-based) in parallel
-        const [jobLinked, jobless] = await Promise.all([
-          supabase
-            .from("company_driver_match_scores")
-            .select("*, jobs!inner(status)")
-            .eq("company_id", companyId!)
-            .eq("jobs.status", "Active")
-            .not("job_id", "is", null)
-            .order("overall_score", { ascending: false })
-            .limit(50000),
-          supabase
-            .from("company_driver_match_scores")
-            .select("*")
-            .eq("company_id", companyId!)
-            .is("job_id", null)
-            .order("overall_score", { ascending: false })
-            .limit(50000),
-        ]);
-        if (jobLinked.error) throw jobLinked.error;
-        if (jobless.error) throw jobless.error;
-        scores = [
-          ...((jobLinked.data ?? []) as Record<string, unknown>[]),
-          ...((jobless.data ?? []) as Record<string, unknown>[]),
-        ];
+        return processScores((data ?? []) as Record<string, unknown>[]);
       }
 
-      if (opts.source) {
-        scores = scores.filter((s) => s.candidate_source === opts.source);
-      }
-      if (!scores || scores.length === 0) return [];
-
-      const appIds = [
-        ...new Set(
-          scores
-            .filter((s) => s.candidate_source === "application")
-            .map((s) => s.candidate_id),
-        ),
-      ];
-      const leadIds = [
-        ...new Set(
-          scores
-            .filter((s) => s.candidate_source === "lead")
-            .map((s) => s.candidate_id),
-        ),
-      ];
-
-      const candidateMap = new Map<string, Record<string, unknown>>();
-
-      // Batch fetches to avoid URL-too-long errors (PostgREST 414/400)
-      const BATCH = 200;
-      const fetchBatched = async (
-        table: string,
-        select: string,
-        ids: string[],
-      ) => {
-        const all: Record<string, unknown>[] = [];
-        for (let i = 0; i < ids.length; i += BATCH) {
-          const chunk = ids.slice(i, i + BATCH);
-          const { data, error } = await supabase
-            .from(table)
-            .select(select)
-            .in("id", chunk);
-          if (error) throw new Error(error.message || `Failed to load ${table}`);
-          if (data) all.push(...(data as Record<string, unknown>[]));
-        }
-        return all;
-      };
-
-      const [appsData, leadsData] = await Promise.all([
-        appIds.length > 0
-          ? fetchBatched(
-              "applications",
-              "id, first_name, last_name, phone, email, license_state, years_exp, driver_type, license_class",
-              appIds as string[],
-            )
-          : Promise.resolve([]),
-        leadIds.length > 0
-          ? fetchBatched(
-              "leads",
-              "id, full_name, phone, email, state, years_exp, is_owner_op",
-              leadIds as string[],
-            )
-          : Promise.resolve([]),
+      // Progressive loading: fetch first pages + counts simultaneously,
+      // return first-page results immediately, then background-load remaining pages.
+      const [joblessFirst, joblessCountRes, jobLinkedFirst, jobLinkedCountRes] = await Promise.all([
+        supabase
+          .from("company_driver_match_scores")
+          .select("*")
+          .eq("company_id", companyId!)
+          .is("job_id", null)
+          .order("overall_score", { ascending: false })
+          .range(0, PAGE - 1),
+        supabase
+          .from("company_driver_match_scores")
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .select("*", { count: "exact", head: true } as any)
+          .eq("company_id", companyId!)
+          .is("job_id", null),
+        supabase
+          .from("company_driver_match_scores")
+          .select("*, jobs!inner(status)")
+          .eq("company_id", companyId!)
+          .eq("jobs.status", "Active")
+          .not("job_id", "is", null)
+          .order("overall_score", { ascending: false })
+          .range(0, PAGE - 1),
+        supabase
+          .from("company_driver_match_scores")
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .select("*, jobs!inner(status)", { count: "exact", head: true } as any)
+          .eq("company_id", companyId!)
+          .eq("jobs.status", "Active")
+          .not("job_id", "is", null),
       ]);
 
-      for (const row of appsData) {
-        candidateMap.set((row as Record<string, unknown>).id as string, row);
-      }
-      for (const row of leadsData) {
-        candidateMap.set((row as Record<string, unknown>).id as string, row);
-      }
+      if (joblessFirst.error) throw joblessFirst.error;
+      if (jobLinkedFirst.error) throw jobLinkedFirst.error;
 
-      const allMatches = (scores as Record<string, unknown>[]).map((row) =>
-        rowToCompanyDriverMatch(
-          row,
-          candidateMap.get(row.candidate_id as string) as
-            | Record<string, unknown>
-            | undefined,
-        ),
-      );
+      const firstPageScores = [
+        ...((joblessFirst.data ?? []) as Record<string, unknown>[]),
+        ...((jobLinkedFirst.data ?? []) as Record<string, unknown>[]),
+      ];
 
-      // When showing "All Jobs", the same candidate can appear once per job.
-      // Deduplicate by actual person identity, keeping the highest score.
-      // For applications: candidateDriverId is the real driver user ID (candidateId is just the application row ID).
-      // For leads: candidateDriverId is null, so fall back to candidateId (lead ID, unique per person).
-      if (!opts.jobId) {
-        const seen = new Map<string, typeof allMatches[number]>();
-        for (const m of allMatches) {
-          const personKey = `${m.candidateDriverId ?? m.candidateId}:${m.candidateSource}`;
-          const existing = seen.get(personKey);
-          if (!existing || m.overallScore > existing.overallScore) {
-            seen.set(personKey, m);
+      const totalJobless = joblessCountRes.count ?? 0;
+      const totalJobLinked = jobLinkedCountRes.count ?? 0;
+      const hasMore = totalJobless > PAGE || totalJobLinked > PAGE;
+
+      if (hasMore) {
+        // Background: fetch remaining pages, then update cache with full results
+        void (async () => {
+          const remaining: Record<string, unknown>[] = [];
+
+          const jlPageCount = Math.ceil(totalJobless / PAGE);
+          const jlkPageCount = Math.ceil(totalJobLinked / PAGE);
+
+          const [jlPages, jlkPages] = await Promise.all([
+            jlPageCount > 1
+              ? Promise.all(
+                  Array.from({ length: jlPageCount - 1 }, (_, i) =>
+                    supabase
+                      .from("company_driver_match_scores")
+                      .select("*")
+                      .eq("company_id", companyId!)
+                      .is("job_id", null)
+                      .order("overall_score", { ascending: false })
+                      .range((i + 1) * PAGE, (i + 2) * PAGE - 1),
+                  ),
+                )
+              : Promise.resolve([]),
+            jlkPageCount > 1
+              ? Promise.all(
+                  Array.from({ length: jlkPageCount - 1 }, (_, i) =>
+                    supabase
+                      .from("company_driver_match_scores")
+                      .select("*, jobs!inner(status)")
+                      .eq("company_id", companyId!)
+                      .eq("jobs.status", "Active")
+                      .not("job_id", "is", null)
+                      .order("overall_score", { ascending: false })
+                      .range((i + 1) * PAGE, (i + 2) * PAGE - 1),
+                  ),
+                )
+              : Promise.resolve([]),
+          ]);
+
+          for (const p of [...jlPages, ...jlkPages]) {
+            if (p.data) remaining.push(...(p.data as Record<string, unknown>[]));
           }
-        }
-        const deduped = Array.from(seen.values()).sort((a, b) => b.overallScore - a.overallScore);
-        // Apply the subscription limit AFTER dedup so it counts unique people, not duplicate rows
-        if (opts.limit) return deduped.slice(0, opts.limit);
-        return deduped;
+
+          if (remaining.length === 0) return;
+
+          const full = await processScores([...firstPageScores, ...remaining]);
+          qc.setQueryData(queryKey, full);
+        })();
       }
 
-      return allMatches;
+      // Return first-page results immediately so the UI renders right away
+      return processScores(firstPageScores);
     },
     enabled: !!companyId,
   });

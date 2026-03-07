@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { X, Mail, RotateCw, Loader2, Check, XCircle, ChevronDown, Sparkles } from "lucide-react";
+import { X, Mail, RotateCw, Loader2, Check, XCircle, ChevronDown, Sparkles, Truck, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -151,8 +152,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
   const [zipError, setZipError] = useState("");
 
   // Driver-specific
-  const [regUsername, setRegUsername] = useState(draft.regUsername || "");
-  const [driverName, setDriverName] = useState(draft.driverName || "");
+  const [firstName, setFirstName] = useState(draft.firstName || "");
+  const [lastName, setLastName] = useState(draft.lastName || "");
   const [homeAddress, setHomeAddress] = useState(draft.homeAddress || "");
   const [zipCode, setZipCode] = useState(draft.zipCode || "");
   const [driverPhone, setDriverPhone] = useState(draft.driverPhone || "");
@@ -175,11 +176,11 @@ export function SignInModal({ onClose }: SignInModalProps) {
   // Persist registration fields to sessionStorage on change
   const saveDraft = useCallback(() => {
     saveRegDraft({
-      role, regEmail, driverName, homeAddress, zipCode,
+      role, regEmail, firstName, lastName, homeAddress, zipCode,
       driverPhone, cdlNumber, interestedIn, nextJobWant, hasAccidents, wantsContact,
       contactName, contactTitle, companyName, companyAddress, companyPhone, companyState, companyGoal,
     });
-  }, [role, regEmail, driverName, homeAddress, zipCode,
+  }, [role, regEmail, firstName, lastName, homeAddress, zipCode,
       driverPhone, cdlNumber, interestedIn, nextJobWant, hasAccidents, wantsContact,
       contactName, contactTitle, companyName, companyAddress, companyPhone, companyState, companyGoal]);
 
@@ -223,7 +224,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
 
   const handleDriverRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regPassword || !regEmail || !driverName.trim() || !driverPhone.trim() || !zipCode.trim()) {
+    if (!regPassword || !regEmail || !firstName.trim() || !lastName.trim() || !driverPhone.trim()) {
       toast.error("Please fill in all required fields.");
       return;
     }
@@ -235,11 +236,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
       toast.error("Password must be at least 12 characters.");
       return;
     }
-    if (regPassword !== regConfirm) {
-      toast.error("Passwords do not match.");
-      return;
-    }
-    if (!ZIP_RE.test(zipCode)) {
+    if (zipCode && !ZIP_RE.test(zipCode)) {
       setZipError("Enter a valid US zip code (e.g. 33304).");
       toast.error("Enter a valid US zip code.");
       return;
@@ -251,10 +248,10 @@ export function SignInModal({ onClose }: SignInModalProps) {
       toast.error("Registration is taking too long. Please try again.");
     }, 15000);
     try {
-      const [first, ...rest] = driverName.trim().split(/\s+/);
+      const displayName = `${firstName.trim()} ${lastName.trim()}`;
       const driverFields = {
-        first_name: first || "",
-        last_name: rest.join(" ") || "",
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
         phone: driverPhone || "",
         cdl_number: cdlNumber || "",
         zip_code: zipCode || "",
@@ -264,7 +261,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
         has_accidents: hasAccidents || "",
         wants_contact: wantsContact || "",
       };
-      await register(driverName.trim(), regEmail, regPassword, "driver", driverFields);
+      await register(displayName, regEmail, regPassword, "driver", driverFields);
 
       // Check if session was created (email confirmation not required)
       const { data: { session } } = await withTimeout(supabase.auth.getSession(), 10_000);
@@ -308,7 +305,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
 
   const handleCompanyRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contactName || !companyName || !regEmail || !regPassword) {
+    if (!contactName || !companyName || !companyPhone || !regEmail || !regPassword) {
       toast.error("Please fill in all required fields.");
       return;
     }
@@ -318,10 +315,6 @@ export function SignInModal({ onClose }: SignInModalProps) {
     }
     if (regPassword.length < 12) {
       toast.error("Password must be at least 12 characters.");
-      return;
-    }
-    if (regPassword !== regConfirm) {
-      toast.error("Passwords do not match.");
       return;
     }
     setSubmitStatus("submitting");
@@ -523,299 +516,219 @@ export function SignInModal({ onClose }: SignInModalProps) {
           </>
         )}
 
-        {/* ── REGISTER VIEW ── */}
+        {/* ── REGISTER VIEW — matches /signin page layout ── */}
         {view === "register" && (
           <>
-            <ModalHeader title="New user registration" onClose={onClose} />
+            <ModalHeader title="Create Your Account" onClose={onClose} />
 
-            {/* Role selector — always visible at top */}
-            <div className="px-5 pt-4 pb-2 border-b border-border shrink-0">
-              <label className="text-sm text-primary font-medium block mb-1">Who are you?</label>
-              <Select value={role} onValueChange={(v) => setRole(v as "driver" | "company")} name="role">
-                <SelectTrigger id="reg-role" className="w-full" aria-label="Who are you?">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="driver">Driver</SelectItem>
-                  <SelectItem value="company">Company</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="px-5 pt-5 space-y-4">
+              <SocialLoginButtons />
+              <OrDivider text="or sign up with email" />
             </div>
 
-            {/* ── DRIVER FORM ── */}
-            {role === "driver" && (
-              <form onSubmit={handleDriverRegister} className="px-5 py-4 space-y-3 overflow-y-auto flex-1">
-                <Input
-                  id="reg-email"
-                  type="email"
-                  placeholder="Your e-mail *"
-                  name="registerEmail"
-                  aria-label="Email address"
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                  autoComplete="email"
-                />
-                <Input
-                  id="reg-password"
-                  type="password"
-                  placeholder="Password *"
-                  name="registerPassword"
-                  aria-label="Password"
-                  value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
-                  autoComplete="new-password"
-                />
-                <PasswordStrengthIndicator password={regPassword} />
-                <Input
-                  id="reg-confirmPassword"
-                  type="password"
-                  placeholder="Confirm password *"
-                  name="registerConfirmPassword"
-                  aria-label="Confirm password"
-                  value={regConfirm}
-                  onChange={(e) => setRegConfirm(e.target.value)}
-                  autoComplete="new-password"
-                  aria-invalid={passwordsDoNotMatch}
-                  className={passwordsDoNotMatch ? "border-destructive focus-visible:ring-destructive" : ""}
-                />
-                {passwordsDoNotMatch && (
-                  <p className="text-xs text-destructive">Passwords do not match.</p>
-                )}
-                <hr className="border-border" />
-                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Driver Profile</p>
-                <Input
-                  id="reg-driverName"
-                  placeholder="Full Name *"
-                  name="driverName"
-                  aria-label="Full name"
-                  value={driverName}
-                  onChange={(e) => setDriverName(e.target.value)}
-                  autoComplete="name"
-                />
-                <Input
-                  id="reg-driverPhone"
-                  placeholder="Phone Number *"
-                  type="tel"
-                  name="driverPhone"
-                  aria-label="Phone number"
-                  value={driverPhone}
-                  onChange={(e) => setDriverPhone(e.target.value)}
-                  autoComplete="tel"
-                />
-                <Input
-                  id="reg-zipCode"
-                  placeholder="Zip Code *"
-                  name="zipCode"
-                  aria-label="Zip code"
-                  value={zipCode}
-                  onChange={(e) => { setZipCode(e.target.value); setZipError(""); }}
-                  autoComplete="postal-code"
-                  aria-invalid={!!zipError}
-                  className={zipError ? "border-destructive focus-visible:ring-destructive" : ""}
-                />
-                {zipError && <p className="text-xs text-destructive -mt-2">{zipError}</p>}
+            <form
+              onSubmit={role === "driver" ? handleDriverRegister : handleCompanyRegister}
+              className="px-5 pb-5 space-y-4 overflow-y-auto flex-1"
+            >
+              {/* Role selector — card buttons like /signin */}
+              <div className="space-y-1.5">
+                <Label>I am a... <span className="text-destructive">*</span></Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setRole("driver")}
+                    className={`flex items-center gap-2.5 rounded-lg border-2 p-3 text-left transition-all ${
+                      role === "driver" ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/40"
+                    }`}
+                  >
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                      role === "driver" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                    }`}>
+                      <Truck className="h-4.5 w-4.5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold">Driver</p>
+                      <p className="text-[11px] text-muted-foreground leading-tight">Find CDL jobs</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRole("company")}
+                    className={`flex items-center gap-2.5 rounded-lg border-2 p-3 text-left transition-all ${
+                      role === "company" ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/40"
+                    }`}
+                  >
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                      role === "company" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                    }`}>
+                      <Briefcase className="h-4.5 w-4.5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold">Company</p>
+                      <p className="text-[11px] text-muted-foreground leading-tight">Hire drivers</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
 
-                {/* Optional fields - collapsible */}
-                <button
-                  type="button"
-                  onClick={() => setShowOptionalFields(!showOptionalFields)}
-                  className="w-full flex items-center justify-between py-2 px-3 border border-border rounded-md text-sm hover:bg-muted/50 transition-colors"
-                >
-                  <span className="flex items-center gap-2 text-muted-foreground">
-                    <Sparkles className="h-3.5 w-3.5 text-primary" />
-                    Additional Details
-                    <span className="text-xs text-primary font-medium">(Increases Matches)</span>
-                  </span>
-                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${showOptionalFields ? "rotate-180" : ""}`} />
-                </button>
-                {showOptionalFields && (
-                  <div className="space-y-3 pl-1 border-l-2 border-primary/30 ml-1">
-                    <Input
-                      id="reg-homeAddress"
-                      placeholder="Home Address"
-                      name="homeAddress"
-                      aria-label="Home address"
-                      value={homeAddress}
-                      onChange={(e) => setHomeAddress(e.target.value)}
-                      autoComplete="street-address"
-                    />
-                    <Input
-                      id="reg-cdlNumber"
-                      placeholder="CDL Number"
-                      name="cdlNumber"
-                      aria-label="CDL number"
-                      value={cdlNumber}
-                      onChange={(e) => setCdlNumber(e.target.value)}
-                      autoComplete="off"
-                    />
-                    <div>
-                      <label className="text-sm text-primary font-medium block mb-1">I am interested in:</label>
-                      <Select value={interestedIn} onValueChange={setInterestedIn} name="interestedIn">
-                        <SelectTrigger id="reg-interestedIn" className="w-full" aria-label="I am interested in"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {DRIVER_INTERESTS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+              {/* Driver required fields — same as /signin */}
+              {role === "driver" && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="reg-firstName">First name <span className="text-destructive">*</span></Label>
+                      <Input id="reg-firstName" placeholder="John" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="given-name" />
                     </div>
-                    <div>
-                      <label className="text-sm text-primary font-medium block mb-1">In my next job I want:</label>
-                      <Select value={nextJobWant} onValueChange={setNextJobWant} name="nextJobWant">
-                        <SelectTrigger id="reg-nextJobWant" className="w-full" aria-label="In my next job I want"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {DRIVER_NEXT_JOB.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="text-sm text-primary font-medium block mb-1">Any accidents or violations in the last 2 years?</label>
-                      <Select value={hasAccidents} onValueChange={setHasAccidents} name="hasAccidents">
-                        <SelectTrigger id="reg-hasAccidents" className="w-full" aria-label="Any accidents or violations in the last 2 years"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="No">No</SelectItem>
-                          <SelectItem value="Yes">Yes</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="text-sm text-primary font-medium block mb-1">I want CDL Jobs Center staff to contact me with employment offers</label>
-                      <Select value={wantsContact} onValueChange={setWantsContact} name="wantsContact">
-                        <SelectTrigger id="reg-wantsContact" className="w-full" aria-label="Contact me with employment offers"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Yes">Yes</SelectItem>
-                          <SelectItem value="No">No</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="reg-lastName">Last name <span className="text-destructive">*</span></Label>
+                      <Input id="reg-lastName" placeholder="Doe" value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" />
                     </div>
                   </div>
-                )}
-                <Button type="submit" disabled={submitStatus !== "idle"} className="w-full"><SubmitButtonLabel status={submitStatus} idle="Submit" working="Submitting…" /></Button>
-                <button type="button" onClick={() => setView("login")} className="w-full text-center text-sm text-primary underline hover:opacity-80">
-                  ← Back to login
-                </button>
-              </form>
-            )}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reg-driverPhone">Phone number <span className="text-destructive">*</span></Label>
+                    <Input id="reg-driverPhone" type="tel" placeholder="(555) 123-4567" value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} autoComplete="tel" />
+                  </div>
+                </>
+              )}
 
-            {/* ── COMPANY FORM ── */}
-            {role === "company" && (
-              <form onSubmit={handleCompanyRegister} className="px-5 py-4 space-y-3 overflow-y-auto flex-1">
-                <Input
-                  id="co-email"
-                  type="email"
-                  placeholder="Your e-mail *"
-                  name="companyEmail"
-                  aria-label="Company email"
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                  autoComplete="email"
-                />
-                <Input
-                  id="co-password"
-                  type="password"
-                  placeholder="Password *"
-                  name="companyPassword"
-                  aria-label="Company password"
-                  value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
-                  autoComplete="new-password"
-                />
+              {/* Company required fields — same as /signin */}
+              {role === "company" && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="co-companyName">Company name <span className="text-destructive">*</span></Label>
+                    <Input id="co-companyName" placeholder="Acme Trucking LLC" value={companyName} onChange={(e) => setCompanyName(e.target.value)} autoComplete="organization" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="co-contactName">Contact name <span className="text-destructive">*</span></Label>
+                    <Input id="co-contactName" placeholder="Jane Smith" value={contactName} onChange={(e) => setContactName(e.target.value)} autoComplete="name" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="co-companyPhone">Phone number <span className="text-destructive">*</span></Label>
+                    <Input id="co-companyPhone" type="tel" placeholder="(555) 123-4567" value={companyPhone} onChange={(e) => setCompanyPhone(e.target.value)} autoComplete="tel" />
+                  </div>
+                </>
+              )}
+
+              {/* Email — same as /signin */}
+              <div className="space-y-1.5">
+                <Label htmlFor="reg-email">Email address <span className="text-destructive">*</span></Label>
+                <Input id="reg-email" type="email" placeholder="you@example.com" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} autoComplete="email" />
+              </div>
+
+              {/* Password — same as /signin */}
+              <div className="space-y-1.5">
+                <Label htmlFor="reg-password">Password <span className="text-destructive">*</span></Label>
+                <Input id="reg-password" type="password" placeholder="Min. 12 characters" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} autoComplete="new-password" />
                 <PasswordStrengthIndicator password={regPassword} />
-                <Input
-                  id="co-confirmPassword"
-                  type="password"
-                  placeholder="Confirm password *"
-                  name="companyConfirmPassword"
-                  aria-label="Confirm company password"
-                  value={regConfirm}
-                  onChange={(e) => setRegConfirm(e.target.value)}
-                  autoComplete="new-password"
-                  aria-invalid={passwordsDoNotMatch}
-                  className={passwordsDoNotMatch ? "border-destructive focus-visible:ring-destructive" : ""}
-                />
-                {passwordsDoNotMatch && (
-                  <p className="text-xs text-destructive">Passwords do not match.</p>
-                )}
-                <hr className="border-border" />
-                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Company Profile</p>
-                <Input
-                  id="co-contactName"
-                  placeholder="Your name *"
-                  name="contactName"
-                  aria-label="Contact name"
-                  value={contactName}
-                  onChange={(e) => setContactName(e.target.value)}
-                  autoComplete="name"
-                />
-                <Input
-                  id="co-contactTitle"
-                  placeholder="Your title"
-                  name="contactTitle"
-                  aria-label="Contact title"
-                  value={contactTitle}
-                  onChange={(e) => setContactTitle(e.target.value)}
-                  autoComplete="organization-title"
-                />
-                <Input
-                  id="co-companyName"
-                  placeholder="Company Name *"
-                  name="companyName"
-                  aria-label="Company name"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  autoComplete="organization"
-                />
-                <Input
-                  id="co-companyAddress"
-                  placeholder="Company Address"
-                  name="companyAddress"
-                  aria-label="Company address"
-                  value={companyAddress}
-                  onChange={(e) => setCompanyAddress(e.target.value)}
-                  autoComplete="street-address"
-                />
-                <div>
-                  <label className="text-sm text-primary font-medium block mb-1">State</label>
-                  <Select value={companyState} onValueChange={setCompanyState} name="companyState">
-                    <SelectTrigger id="co-companyState" className="w-full" aria-label="Company state">
-                      <SelectValue placeholder="Select state" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {US_STATES.map((s) => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              </div>
+
+              {/* Additional Details — optional fields not on /signin */}
+              <button
+                type="button"
+                onClick={() => setShowOptionalFields(!showOptionalFields)}
+                className="w-full flex items-center justify-between py-2.5 px-3 border border-border rounded-md text-sm hover:bg-muted/50 transition-colors"
+              >
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                  Additional Details
+                  <span className="text-xs text-primary font-medium">(Increases Matches)</span>
+                </span>
+                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${showOptionalFields ? "rotate-180" : ""}`} />
+              </button>
+
+              {showOptionalFields && role === "driver" && (
+                <div className="space-y-3 pl-1 border-l-2 border-primary/30 ml-1">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reg-zipCode">Zip Code</Label>
+                    <Input
+                      id="reg-zipCode" placeholder="33304" value={zipCode}
+                      onChange={(e) => { setZipCode(e.target.value); setZipError(""); }}
+                      autoComplete="postal-code"
+                      className={zipError ? "border-destructive" : ""}
+                    />
+                    {zipError && <p className="text-xs text-destructive">{zipError}</p>}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reg-homeAddress">Home Address</Label>
+                    <Input id="reg-homeAddress" placeholder="123 Main St" value={homeAddress} onChange={(e) => setHomeAddress(e.target.value)} autoComplete="street-address" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reg-cdlNumber">CDL Number</Label>
+                    <Input id="reg-cdlNumber" placeholder="CDL number" value={cdlNumber} onChange={(e) => setCdlNumber(e.target.value)} autoComplete="off" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>I am interested in</Label>
+                    <Select value={interestedIn} onValueChange={setInterestedIn} name="interestedIn">
+                      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {DRIVER_INTERESTS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>In my next job I want</Label>
+                    <Select value={nextJobWant} onValueChange={setNextJobWant} name="nextJobWant">
+                      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {DRIVER_NEXT_JOB.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Any accidents or violations in last 2 years?</Label>
+                    <Select value={hasAccidents} onValueChange={setHasAccidents} name="hasAccidents">
+                      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="No">No</SelectItem>
+                        <SelectItem value="Yes">Yes</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <Input
-                  id="co-companyPhone"
-                  placeholder="Company phone number"
-                  type="tel"
-                  name="companyPhone"
-                  aria-label="Company phone number"
-                  value={companyPhone}
-                  onChange={(e) => setCompanyPhone(e.target.value)}
-                  autoComplete="tel"
-                />
-                <div>
-                  <label className="text-sm text-primary font-medium block mb-1">
-                    What do you want to accomplish by using CDL Jobs Center?
-                  </label>
-                  <Select value={companyGoal} onValueChange={setCompanyGoal} name="companyGoal">
-                    <SelectTrigger id="co-companyGoal" className="w-full" aria-label="Company goal">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COMPANY_GOALS.map((g) => (
-                        <SelectItem key={g} value={g}>{g}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              )}
+
+              {showOptionalFields && role === "company" && (
+                <div className="space-y-3 pl-1 border-l-2 border-primary/30 ml-1">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="co-contactTitle">Your title</Label>
+                    <Input id="co-contactTitle" placeholder="e.g. Fleet Manager" value={contactTitle} onChange={(e) => setContactTitle(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="co-companyAddress">Company Address</Label>
+                    <Input id="co-companyAddress" placeholder="123 Main St, Chicago, IL" value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} autoComplete="street-address" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>State</Label>
+                    <Select value={companyState} onValueChange={setCompanyState} name="companyState">
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Select state" /></SelectTrigger>
+                      <SelectContent>
+                        {US_STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>What do you want to accomplish?</Label>
+                    <Select value={companyGoal} onValueChange={setCompanyGoal} name="companyGoal">
+                      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {COMPANY_GOALS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <Button type="submit" disabled={submitStatus !== "idle"} className="w-full"><SubmitButtonLabel status={submitStatus} idle="Submit" working="Submitting…" /></Button>
-                <button type="button" onClick={() => setView("login")} className="w-full text-center text-sm text-primary underline hover:opacity-80">
-                  ← Back to login
+              )}
+
+              <Button type="submit" disabled={submitStatus !== "idle"} className="w-full">
+                <SubmitButtonLabel status={submitStatus} idle="Create Account" working="Creating account…" />
+              </Button>
+
+              <p className="text-center text-sm text-muted-foreground pt-1">
+                Already have an account?{" "}
+                <button type="button" onClick={() => setView("login")} className="text-primary font-medium hover:underline">
+                  Sign In
                 </button>
-              </form>
-            )}
+              </p>
+            </form>
           </>
         )}
 

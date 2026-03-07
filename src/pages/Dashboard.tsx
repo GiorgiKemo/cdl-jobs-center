@@ -5,6 +5,7 @@ import Footer from "@/components/Footer";
 import { PageBreadcrumb } from "@/components/ui/PageBreadcrumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -560,7 +561,9 @@ const AiMatchesContent = ({
                 m.rankTier === "hot" ? "border-red-500/30" : m.rankTier === "warm" ? "border-amber-500/20" : "border-border"
               }`}
               onClick={() => {
-                trackEvent({ jobId: aiJobFilter !== "all" ? aiJobFilter : "", candidateSource: m.candidateSource, candidateId: m.candidateId, eventType: "view" });
+                if (aiJobFilter !== "all") {
+                  trackEvent({ jobId: aiJobFilter, candidateSource: m.candidateSource, candidateId: m.candidateId, eventType: "view" });
+                }
               }}
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -887,27 +890,44 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
     enabled: !!user,
     refetchOnMount: "always",
     queryFn: async () => {
-      // Fetch job-linked (active jobs) + jobless (profile-based, null job_id) in parallel
-      const [jobLinked, jobless] = await Promise.all([
-        supabase
-          .from("company_driver_match_scores")
-          .select("candidate_driver_id, candidate_id, candidate_source, job_id, jobs!inner(status)")
-          .eq("company_id", user!.id)
-          .eq("jobs.status", "Active")
-          .limit(50000),
-        supabase
-          .from("company_driver_match_scores")
-          .select("candidate_driver_id, candidate_id, candidate_source")
-          .eq("company_id", user!.id)
-          .is("job_id", null)
-          .limit(50000),
+      // Bypass max_rows=1000: get count then fetch all pages in parallel
+      const PAGE = 1000;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fetchAllParallel = async (select: string, filters: (q: any) => any) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { count, error: countErr } = await filters(supabase.from("company_driver_match_scores").select(select, { count: "exact", head: true }) as any);
+        if (countErr) throw countErr;
+        if (!count || count === 0) return [] as Record<string, unknown>[];
+        const pages = await Promise.all(
+          Array.from({ length: Math.ceil(count / PAGE) }, (_, i) =>
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            filters(supabase.from("company_driver_match_scores").select(select) as any)
+              .range(i * PAGE, (i + 1) * PAGE - 1),
+          ),
+        );
+        const all: Record<string, unknown>[] = [];
+        for (const p of pages) {
+          if (p.error) throw p.error;
+          if (p.data) all.push(...(p.data as Record<string, unknown>[]));
+        }
+        return all;
+      };
+      const [jobLinkedRows, joblessRows] = await Promise.all([
+        fetchAllParallel(
+          "candidate_driver_id, candidate_id, candidate_source, rank_tier, job_id, jobs!inner(status)",
+          (q) => q.eq("company_id", user!.id).eq("jobs.status", "Active"),
+        ),
+        fetchAllParallel(
+          "candidate_driver_id, candidate_id, candidate_source, rank_tier",
+          (q) => q.eq("company_id", user!.id).is("job_id", null),
+        ),
       ]);
-      const data = [...(jobLinked.data ?? []), ...(jobless.data ?? [])];
+      // Exclude blocked (same as list filter) so badge count matches visible rows
+      const data = [...jobLinkedRows, ...joblessRows].filter((r) => r.rank_tier !== "blocked");
       if (data.length === 0) return 0;
-      // Deduplicate by person identity (same logic as useCompanyDriverMatches)
       const seen = new Set<string>();
       for (const row of data) {
-        seen.add(`${(row as Record<string, unknown>).candidate_driver_id ?? (row as Record<string, unknown>).candidate_id}:${(row as Record<string, unknown>).candidate_source}`);
+        seen.add(`${row.candidate_driver_id ?? row.candidate_id}:${row.candidate_source}`);
       }
       return seen.size;
     },
@@ -1451,8 +1471,8 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="job-location" className="text-xs text-muted-foreground">Location</Label>
-                    <Input id="job-location" name="location" placeholder="e.g. Illinois or Nationwide" value={form.location}
-                      onChange={(e) => handleFormChange("location", e.target.value)} />
+                    <LocationAutocomplete id="job-location" placeholder="e.g. Illinois or Nationwide" value={form.location}
+                      onChange={(v) => handleFormChange("location", v)} />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="job-pay" className="text-xs text-muted-foreground">Pay</Label>

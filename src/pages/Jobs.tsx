@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link, useSearchParams } from "react-router-dom";
-import { Truck, Bookmark, BookmarkCheck, Search, MapPin, DollarSign } from "lucide-react";
+import { Truck, Bookmark, BookmarkCheck, Search, MapPin, DollarSign, PlusCircle } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { useActiveJobs } from "@/hooks/useJobs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
@@ -184,6 +184,14 @@ const Jobs = () => {
             <span className="text-sm text-muted-foreground">({filtered.length} jobs)</span>
           </div>
           <div className="flex items-center gap-2">
+            {user?.role === "company" && (
+              <Button asChild size="sm" className="gap-1.5">
+                <Link to="/dashboard?tab=jobs">
+                  <PlusCircle className="h-4 w-4" />
+                  Post a Job
+                </Link>
+              </Button>
+            )}
             <span className="text-sm text-muted-foreground hidden sm:block">Sort:</span>
             <Select value={sortBy} onValueChange={(v) => { setSortBy(v); setPage(0); }} name="sortBy">
               <SelectTrigger id="jobs-sortBy" aria-label="Sort jobs" className="w-44 h-8 text-xs">
