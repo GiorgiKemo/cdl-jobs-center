@@ -624,3 +624,20 @@ export function useToggleCompanyVerified() {
     },
   });
 }
+
+export function useDeclineCompany() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { companyId: string; reason: string }) => {
+      const { error } = await withTimeout(supabase
+        .from("company_profiles")
+        .update({ decline_reason: params.reason })
+        .eq("id", params.companyId), 15_000);
+      if (error) throw error;
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["admin-unverified-companies"] });
+      qc.invalidateQueries({ queryKey: ["company-profile", vars.companyId] });
+    },
+  });
+}

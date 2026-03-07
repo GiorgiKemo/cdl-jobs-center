@@ -14,7 +14,7 @@ import { useJobs } from "@/hooks/useJobs";
 import { Job } from "@/data/jobs";
 import { COMPANY_GOALS } from "@/data/constants";
 import { toast } from "sonner";
-import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload, Bell, MessageSquare, Users, Phone as PhoneIcon, Mail as MailIcon, MapPin, Truck as TruckIcon, Lock, RefreshCw, CreditCard, Send, Briefcase, Check, Sparkles, CheckCircle, ShieldCheck, FileText, Search } from "lucide-react";
+import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload, Bell, MessageSquare, Users, Phone as PhoneIcon, Mail as MailIcon, MapPin, Truck as TruckIcon, Lock, RefreshCw, CreditCard, Send, Briefcase, Check, Sparkles, CheckCircle, ShieldCheck, FileText, Search, XCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -1155,6 +1155,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
   const [contactName, setContactName] = useState("");
   const [contactTitle, setContactTitle] = useState("");
   const [isVerified, setIsVerified] = useState<boolean | null>(null);
+  const [declineReason, setDeclineReason] = useState<string | null>(null);
   const [verifiedBannerHidden, setVerifiedBannerHidden] = useState(() => localStorage.getItem("verified-banner-dismissed") === "1");
   const [companyGoal, setCompanyGoal] = useState("");
   const [profileSaveStatus, setProfileSaveStatus] = useState<SaveStatus>("idle");
@@ -1245,6 +1246,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
         setContactTitle(loadedProfile.contactTitle);
         setCompanyGoal(loadedProfile.companyGoal);
         setIsVerified(data?.is_verified ?? false);
+        setDeclineReason(data?.decline_reason ?? null);
         setLastSavedSnapshot(snapshotCompanyProfile(loadedProfile));
       })
       .catch((err: unknown) => { console.error("Failed to load company profile:", err); });
@@ -1502,7 +1504,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
             </button>
           </div>
         )}
-        {isVerified === false && (
+        {isVerified === false && !declineReason && (
           <div className="flex items-center gap-4 px-5 py-3.5 mb-6 bg-amber-500/10 border border-amber-500/30">
             <ShieldCheck className="h-6 w-6 text-amber-500 shrink-0" />
             <div className="flex-1 min-w-0">
@@ -1511,6 +1513,26 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
             </div>
           </div>
         )}
+
+        {declineReason ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center px-4">
+            <XCircle className="h-14 w-14 text-destructive mb-4" />
+            <h2 className="font-display font-bold text-xl mb-2">Account Verification Declined</h2>
+            <p className="text-muted-foreground mb-6 max-w-md">
+              Your company account has been reviewed and was not approved at this time.
+            </p>
+            <div className="border border-destructive/30 bg-destructive/5 rounded-lg p-4 text-left text-sm max-w-md w-full mb-6">
+              <p className="font-medium mb-1">Reason:</p>
+              <p className="text-muted-foreground">{declineReason}</p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Questions? Contact us at{" "}
+              <a href="mailto:support@cdljobscenter.com" className="text-primary underline">
+                support@cdljobscenter.com
+              </a>
+            </p>
+          </div>
+        ) : <>
 
         {/* New applications banner */}
         {(() => {
@@ -3004,6 +3026,8 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
             </div>
           );
         })()}
+        </>}
+
       </main>
       <Footer />
 

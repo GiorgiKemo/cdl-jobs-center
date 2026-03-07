@@ -63,6 +63,7 @@ import {
   useAdminUpdateJobStatus,
   useChangeSubscriptionPlan,
   useToggleCompanyVerified,
+  useDeclineCompany,
   useAdminBanUser,
   useAdminDeleteUser,
   useAdminEditUser,
@@ -218,6 +219,9 @@ function AdminDashboardInner() {
   const [rejectReason, setRejectReason] = useState("");
   const [rejectDialogRequestId, setRejectDialogRequestId] = useState<string | null>(null);
   const [verificationSearch, setVerificationSearch] = useState("");
+  const [declineDialogCompany, setDeclineDialogCompany] = useState<{ id: string; name: string } | null>(null);
+  const [declineReasonText, setDeclineReasonText] = useState("");
+  const declineCompany = useDeclineCompany();
   const pendingVerifications = verificationRequests.filter((r) => r.status === "pending");
 
   /* unverified new companies */
@@ -228,11 +232,12 @@ function AdminDashboardInner() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("company_profiles")
-        .select("id, company_name, phone, email, address, website, created_at")
+        .select("id, company_name, phone, email, address, website, created_at, decline_reason")
         .or("is_verified.is.null,is_verified.eq.false")
+        .is("decline_reason", null)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as { id: string; company_name: string | null; phone: string | null; email: string | null; address: string | null; website: string | null; created_at: string }[];
+      return (data ?? []) as { id: string; company_name: string | null; phone: string | null; email: string | null; address: string | null; website: string | null; created_at: string; decline_reason: string | null }[];
     },
   });
 
@@ -1635,6 +1640,15 @@ function AdminDashboardInner() {
                         >
                           View Profile
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-destructive border-destructive/40 hover:bg-destructive/10"
+                          onClick={() => { setDeclineDialogCompany({ id: c.id, name: c.company_name || "This company" }); setDeclineReasonText(""); }}
+                        >
+                          <XCircle className="h-3.5 w-3.5 mr-1.5" />
+                          Decline
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -1769,6 +1783,51 @@ function AdminDashboardInner() {
           </div>
           );
         })()}
+
+        {/* Decline New Registration Dialog */}
+        <Dialog open={!!declineDialogCompany} onOpenChange={(open) => { if (!open) setDeclineDialogCompany(null); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Decline Company Registration</DialogTitle>
+              <DialogDescription>
+                Provide a reason for declining <strong>{declineDialogCompany?.name}</strong>. They will see this message on their dashboard.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-1.5 py-2">
+              <Label htmlFor="decline-reason">Reason</Label>
+              <Textarea
+                id="decline-reason"
+                placeholder="e.g. Could not verify business registration..."
+                rows={3}
+                value={declineReasonText}
+                onChange={(e) => setDeclineReasonText(e.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeclineDialogCompany(null)}>Cancel</Button>
+              <Button
+                variant="destructive"
+                disabled={!declineReasonText.trim() || declineCompany.isPending}
+                onClick={() => {
+                  if (!declineDialogCompany) return;
+                  declineCompany.mutate(
+                    { companyId: declineDialogCompany.id, reason: declineReasonText.trim() },
+                    {
+                      onSuccess: () => {
+                        toast.success(`${declineDialogCompany.name} has been declined.`);
+                        setDeclineDialogCompany(null);
+                      },
+                      onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to decline."),
+                    }
+                  );
+                }}
+              >
+                {declineCompany.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Confirm Decline
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Reject Verification Dialog */}
         <Dialog open={!!rejectDialogRequestId} onOpenChange={(open) => { if (!open) setRejectDialogRequestId(null); }}>
