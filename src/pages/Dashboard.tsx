@@ -1504,16 +1504,6 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
             </button>
           </div>
         )}
-        {isVerified === false && !declineReason && (
-          <div className="flex items-center gap-4 px-5 py-3.5 mb-6 bg-amber-500/10 border border-amber-500/30">
-            <ShieldCheck className="h-6 w-6 text-amber-500 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm">Verification pending</p>
-              <p className="text-xs text-muted-foreground">Your company is being reviewed by our team. You'll be notified once approved.</p>
-            </div>
-          </div>
-        )}
-
         {declineReason ? (
           <div className="flex flex-col items-center justify-center py-24 text-center px-4">
             <XCircle className="h-14 w-14 text-destructive mb-4" />
@@ -1525,6 +1515,20 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
               <p className="font-medium mb-1">Reason:</p>
               <p className="text-muted-foreground">{declineReason}</p>
             </div>
+            <p className="text-sm text-muted-foreground">
+              Questions? Contact us at{" "}
+              <a href="mailto:support@cdljobscenter.com" className="text-primary underline">
+                support@cdljobscenter.com
+              </a>
+            </p>
+          </div>
+        ) : isVerified === false ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center px-4">
+            <ShieldCheck className="h-14 w-14 text-amber-500 mb-4" />
+            <h2 className="font-display font-bold text-xl mb-2">Verification Pending</h2>
+            <p className="text-muted-foreground mb-6 max-w-md">
+              Your company account is being reviewed by our team. You'll receive access once approved.
+            </p>
             <p className="text-sm text-muted-foreground">
               Questions? Contact us at{" "}
               <a href="mailto:support@cdljobscenter.com" className="text-primary underline">
