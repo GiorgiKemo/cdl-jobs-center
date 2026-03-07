@@ -33,7 +33,7 @@ import { useUnreadCount } from "@/hooks/useMessages";
 import { useLeads, useUpdateLeadStatus, useSyncLeads, useAutoSyncLeads } from "@/hooks/useLeads";
 import { usePipelineLeads, useAddToPipeline, useUpdatePipelineStage, useRemoveFromPipeline } from "@/hooks/usePipelineLeads";
 import { useSubscription, useCancelSubscription, useIncrementLeadsUsed, PLANS, type Plan } from "@/hooks/useSubscription";
-import { useCompanyDriverMatches, useMatchingRollout, useCompanyFeedbackMap, useRecordCompanyMatchFeedback, useTrackCompanyMatchEvent, useLeadMatchScores, type CompanyFeedback, type RankTier } from "@/hooks/useMatchScores";
+import { useCompanyDriverMatches, useMatchingRollout, useCompanyFeedbackMap, useRecordCompanyMatchFeedback, useTrackCompanyMatchEvent, useLeadMatchScores, useRefreshCompanyMatches, type CompanyFeedback, type RankTier } from "@/hooks/useMatchScores";
 import {
   Dialog,
   DialogContent,
@@ -529,6 +529,7 @@ const AiMatchesContent = ({
   const [aiSearch, setAiSearch] = useState("");
   const [aiTierFilter, setAiTierFilter] = useState<string>("all");
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
+  const [autoRefreshDone, setAutoRefreshDone] = useState(false);
   const {
     data: matches = [],
     isLoading: matchesLoading,
@@ -541,6 +542,15 @@ const AiMatchesContent = ({
   const { data: feedbackMap = new Map() } = useCompanyFeedbackMap(userId);
   const { mutate: recordFeedback, isPending: feedbackPending } = useRecordCompanyMatchFeedback(userId);
   const { mutate: trackEvent } = useTrackCompanyMatchEvent(userId);
+  const { mutate: refreshMatches, isPending: refreshing } = useRefreshCompanyMatches(userId);
+
+  // Auto-trigger once when the tab opens with no matches
+  useEffect(() => {
+    if (!matchesLoading && !matchesError && matches.length === 0 && !autoRefreshDone && !refreshing) {
+      setAutoRefreshDone(true);
+      refreshMatches();
+    }
+  }, [matchesLoading, matchesError, matches.length, autoRefreshDone, refreshing, refreshMatches]);
 
   // Client-side filters
   const filteredMatches = matches.filter((m) => {
@@ -592,9 +602,19 @@ const AiMatchesContent = ({
 
   return (
     <div>
-      <h2 className="font-display font-semibold text-base mb-4">
-        AI-Matched Candidates
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-display font-semibold text-base">AI-Matched Candidates</h2>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 text-xs gap-1.5"
+          onClick={() => refreshMatches()}
+          disabled={refreshing || matchesLoading}
+        >
+          {refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+          {refreshing ? "Computing…" : "Refresh"}
+        </Button>
+      </div>
 
       {/* Tier filter tabs */}
       <div className="flex gap-2 mb-4 flex-wrap">
@@ -656,9 +676,12 @@ const AiMatchesContent = ({
       </div>
 
       {/* Results */}
-      {matchesLoading && !matchesError ? (
-        <div className="flex justify-center py-12">
-          <Spinner />
+      {(matchesLoading || refreshing) && !matchesError ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
+          <p className="text-sm text-muted-foreground">
+            {refreshing && !matchesLoading ? "Computing your AI matches…" : "Loading matches…"}
+          </p>
         </div>
       ) : matchesError ? (
         <div className="border border-border bg-card p-8 text-center">
@@ -669,7 +692,7 @@ const AiMatchesContent = ({
         <EmptyState
           icon={Sparkles}
           heading={aiSearch.trim() || aiTierFilter !== "all" ? "No candidates match your filters." : "No matches found"}
-          description={aiSearch.trim() || aiTierFilter !== "all" ? "Try adjusting your filters." : "Matches are computed automatically. Check back soon or post a job for more targeted results."}
+          description={aiSearch.trim() || aiTierFilter !== "all" ? "Try adjusting your filters." : "No leads to match yet. Leads sync every 30 minutes — click Refresh to compute now."}
         />
       ) : (() => {
         const pageMatches = filteredMatches.slice(aiPage * AI_MATCH_PAGE_SIZE, (aiPage + 1) * AI_MATCH_PAGE_SIZE);
@@ -2425,9 +2448,12 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                                 size="sm"
                                 variant="outline"
                                 className="text-xs h-7 px-3"
+                                disabled={addToPipeline.isPending && addToPipeline.variables?.leadId === lead.id}
                                 onClick={() => addToPipeline.mutate({ companyId: user!.id, leadId: lead.id })}
                               >
-                                + Pipeline
+                                {addToPipeline.isPending && addToPipeline.variables?.leadId === lead.id
+                                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                                  : "+ Pipeline"}
                               </Button>
                             ) : (
                               <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium px-1">In Pipeline</span>

@@ -399,6 +399,10 @@ verify_jwt = false
 # Auth verified internally via getUser()
 verify_jwt = false
 
+[functions.refresh-company-matches]
+# Auth verified internally via getUser()
+verify_jwt = false
+
 [functions.send-notification]
 # Internal — called by other functions/triggers
 verify_jwt = false

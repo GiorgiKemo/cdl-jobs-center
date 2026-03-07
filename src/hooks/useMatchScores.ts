@@ -754,6 +754,23 @@ export function useRefreshMyMatches(driverId: string | undefined) {
   });
 }
 
+export function useRefreshCompanyMatches(companyId: string | undefined) {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      return await invokeAuthedFunction<{ ok: boolean; computed: number }>(
+        "refresh-company-matches",
+        {},
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["company-matches", companyId] });
+      qc.invalidateQueries({ queryKey: ["lead-match-scores", companyId] });
+    },
+  });
+}
+
 // ── Company feedback & events ──────────────────────────────
 
 export function useCompanyFeedbackMap(companyId: string | undefined) {

@@ -8,10 +8,10 @@ const corsHeaders = {
 
 /** Sheet config — stored in LEAD_SHEETS secret as JSON array */
 interface SheetConfig {
-  id: string;           // Google Sheets spreadsheet ID
-  tab: string;          // Tab/sheet name within the spreadsheet
+  id: string;
+  tab: string;
   lead_type: "owner_operator" | "company_driver";
-  label: string;        // Human-readable label
+  label: string;
 }
 
 interface LeadRecord {
@@ -33,12 +33,25 @@ interface LeadRecord {
   availability: string | null;
   notes: string | null;
   synced_at: string;
+  deleted_at: null; // Always null on sync — reactivates any previously soft-deleted rows
 }
 
 /**
- * Map a header name (lowercased, trimmed) to a known field.
- * This handles all 3 sheet layouts automatically.
+ * Stable content-hash row ID — immune to Google Sheets row insertion/deletion.
+ * Uses two independent FNV-1a 32-bit hashes for 64-bit coverage.
  */
+function contentRowId(name: string, phone: string | null, email: string | null): string {
+  const s = `${name.toLowerCase().trim()}|${(phone ?? "").replace(/\D/g, "")}|${(email ?? "").toLowerCase().trim()}`;
+  let h1 = 0x811c9dc5 >>> 0;
+  let h2 = 0x45237987 >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ (c << 1 | c >> 7), 0x01000193) >>> 0;
+  }
+  return `h${h1.toString(16).padStart(8, "0")}${h2.toString(16).padStart(8, "0")}`;
+}
+
 function headerToField(h: string): string | null {
   const lc = h.toLowerCase().trim();
   if (lc === "name" || lc === "full name") return "full_name";
@@ -68,23 +81,23 @@ function parseISODate(val: string): string | null {
 async function fetchSheet(
   apiKey: string,
   config: SheetConfig,
-): Promise<{ records: LeadRecord[]; errors: string[] }> {
+  now: string,
+): Promise<{ records: LeadRecord[]; errors: string[]; fetchOk: boolean }> {
   const range = encodeURIComponent(`${config.tab}!A1:Z`);
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${config.id}/values/${range}?key=${apiKey}`;
 
   const res = await fetch(url);
   if (!res.ok) {
     const errText = await res.text();
-    return { records: [], errors: [`${config.label}: Sheets API ${res.status} — ${errText}`] };
+    return { records: [], errors: [`${config.label}: Sheets API ${res.status} — ${errText}`], fetchOk: false };
   }
 
   const data = await res.json();
   const rows: string[][] = data.values ?? [];
   if (rows.length < 2) {
-    return { records: [], errors: [] }; // Just header or empty
+    return { records: [], errors: [], fetchOk: true };
   }
 
-  // Build column mapping from header row
   const headers = rows[0];
   const colMap: Record<number, string> = {};
   for (let i = 0; i < headers.length; i++) {
@@ -95,9 +108,7 @@ async function fetchSheet(
   const sourceSheet = `${config.id}::${config.tab}`;
   const records: LeadRecord[] = [];
   const errors: string[] = [];
-  const now = new Date().toISOString();
 
-  // Find which column index is mapped to full_name and date_submitted
   const nameColIdx = Number(Object.entries(colMap).find(([, f]) => f === "full_name")?.[0] ?? -1);
   const dateColIdx = Number(Object.entries(colMap).find(([, f]) => f === "date_submitted")?.[0] ?? -1);
   const hasDateCol = dateColIdx >= 0 && dateColIdx < nameColIdx;
@@ -105,31 +116,24 @@ async function fetchSheet(
   for (let r = 1; r < rows.length; r++) {
     let vals = rows[r];
 
-    // Detect shifted rows: if header has a date column before name,
-    // but this row's first cell doesn't look like a date/timestamp,
-    // the date was omitted and all values shifted left by 1.
     if (hasDateCol && vals.length > 0) {
       const firstCell = (vals[dateColIdx] ?? "").trim();
       const looksLikeDate = /^\d{4}-\d{2}-\d{2}|^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(firstCell);
       if (!looksLikeDate && firstCell) {
-        // Shift: insert empty string at the date column position
         vals = [...vals];
         vals.splice(dateColIdx, 0, "");
       }
     }
 
-    // Build a map of field -> value for this row
     const fields: Record<string, string> = {};
     for (const [colIdx, fieldName] of Object.entries(colMap)) {
       const v = (vals[Number(colIdx)] ?? "").trim();
       if (v) fields[fieldName] = v;
     }
 
-    // Skip rows with no name
     const fullName = fields.full_name;
     if (!fullName) continue;
 
-    // Skip "month divider" rows (e.g. "January 2026")
     if (/^(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}$/i.test(fullName)) {
       continue;
     }
@@ -139,7 +143,7 @@ async function fetchSheet(
       ownerOpRaw === "yes" || ownerOpRaw === "true" || ownerOpRaw === "1";
 
     records.push({
-      sheet_row_id: `row-${r + 1}`,
+      sheet_row_id: contentRowId(fullName, fields.phone || null, fields.email || null),
       source_sheet: sourceSheet,
       source: "google-sheets",
       lead_type: config.lead_type,
@@ -157,10 +161,11 @@ async function fetchSheet(
       availability: fields.availability || null,
       notes: fields.notes || null,
       synced_at: now,
+      deleted_at: null,
     });
   }
 
-  return { records, errors };
+  return { records, errors, fetchOk: true };
 }
 
 Deno.serve(async (req) => {
@@ -179,7 +184,7 @@ Deno.serve(async (req) => {
     const sheetsApiKey = Deno.env.get("GOOGLE_SHEETS_API_KEY");
     const leadSheetsRaw = Deno.env.get("LEAD_SHEETS");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
     if (!sheetsApiKey || !supabaseUrl || !serviceRoleKey) {
       return new Response(
@@ -188,22 +193,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Auth: require admin or service role
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing auth header" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const token = authHeader.replace(/^Bearer\s+/i, "");
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Allow service role key directly (for cron) or admin/company users
-    const isServiceRole = token === serviceRoleKey;
+    // Auth: allow service role key, pg_cron (no header), or valid company/admin user
+    const authHeader = req.headers.get("Authorization");
+    const token = authHeader?.replace(/^Bearer\s+/i, "") ?? "";
     let callerCompanyId: string | null = null;
 
-    if (!isServiceRole) {
+    if (token && token !== serviceRoleKey) {
+      // Token provided but not service role — validate as user JWT
       const { data: { user }, error: authError } = await supabase.auth.getUser(token);
       if (authError || !user) {
         return new Response(JSON.stringify({ error: "Invalid token" }), {
@@ -220,11 +218,11 @@ Deno.serve(async (req) => {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      // If company user, tag leads with their company_id
       if (profile.role === "company") {
         callerCompanyId = user.id;
       }
     }
+    // else: service role key or no auth header (pg_cron) → full access
 
     // Parse sheet configs
     let sheetConfigs: SheetConfig[] = [];
@@ -239,7 +237,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fallback: use legacy single-sheet env var
     if (sheetConfigs.length === 0) {
       const legacyId = Deno.env.get("GOOGLE_SHEET_ID");
       if (legacyId) {
@@ -259,19 +256,27 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch all sheets in parallel
+    // Record sync start time — rows with synced_at < syncStart after upserts are stale (deleted from sheet)
+    const syncStart = new Date().toISOString();
+
     const results = await Promise.all(
-      sheetConfigs.map((cfg) => fetchSheet(sheetsApiKey, cfg))
+      sheetConfigs.map((cfg) => fetchSheet(sheetsApiKey, cfg, syncStart))
     );
 
     const allRecords: LeadRecord[] = [];
     const allErrors: string[] = [];
-    for (const r of results) {
+    const successfulSheets = new Set<string>();
+
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
       allRecords.push(...r.records);
       allErrors.push(...r.errors);
+      if (r.fetchOk) {
+        successfulSheets.add(`${sheetConfigs[i].id}::${sheetConfigs[i].tab}`);
+      }
     }
 
-    if (allRecords.length === 0) {
+    if (allRecords.length === 0 && successfulSheets.size === 0) {
       return new Response(
         JSON.stringify({ synced: 0, new: 0, updated: 0, errors: allErrors, message: "No valid rows found" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -285,18 +290,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Upsert in batches
+    // Count existing records for new vs updated tracking
     const BATCH_SIZE = 50;
+    const BATCH_QUERY = 200;
     let totalNew = 0;
     let totalUpdated = 0;
 
-    // Check existing rows for counting
-    const allKeys = allRecords.map((r) => `${r.source_sheet}||${r.sheet_row_id}`);
     const existingKeys = new Set<string>();
-
-    // Query existing in chunks to stay within query limits
-    for (let i = 0; i < allRecords.length; i += 200) {
-      const batch = allRecords.slice(i, i + 200);
+    for (let i = 0; i < allRecords.length; i += BATCH_QUERY) {
+      const batch = allRecords.slice(i, i + BATCH_QUERY);
       const sourceSheets = [...new Set(batch.map((r) => r.source_sheet))];
       const rowIds = batch.map((r) => r.sheet_row_id);
 
@@ -304,7 +306,8 @@ Deno.serve(async (req) => {
         .from("leads")
         .select("source_sheet, sheet_row_id")
         .in("source_sheet", sourceSheets)
-        .in("sheet_row_id", rowIds);
+        .in("sheet_row_id", rowIds)
+        .is("deleted_at", null);
 
       if (existing) {
         for (const row of existing) {
@@ -313,6 +316,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Upsert in batches — ignoreDuplicates:false updates existing rows (incl. resets deleted_at to null)
     for (let i = 0; i < allRecords.length; i += BATCH_SIZE) {
       const batch = allRecords.slice(i, i + BATCH_SIZE);
 
@@ -336,9 +340,28 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Sync complete: ${totalNew} new, ${totalUpdated} updated, ${allErrors.length} errors`);
+    // Soft-delete leads that were not present in this sync (removed from Google Sheets)
+    // Only for sheets that fetched without errors, and only if we got records from them
+    let totalDeleted = 0;
+    for (const sourceSheet of successfulSheets) {
+      const sheetRecords = allRecords.filter((r) => r.source_sheet === sourceSheet);
+      // Safety: don't mass-delete if the sheet returned 0 records (might be a fetch fluke)
+      if (sheetRecords.length === 0) continue;
 
-    // Send a single summary notification to the company user (if any new leads)
+      const { data: deletedRows } = await supabase
+        .from("leads")
+        .update({ deleted_at: syncStart })
+        .eq("source_sheet", sourceSheet)
+        .is("deleted_at", null)
+        .lt("synced_at", syncStart)
+        .select("id");
+
+      totalDeleted += (deletedRows?.length ?? 0);
+    }
+
+    console.log(`Sync complete: ${totalNew} new, ${totalUpdated} updated, ${totalDeleted} soft-deleted, ${allErrors.length} errors`);
+
+    // Notify company user if they triggered the sync manually and got new leads
     if (callerCompanyId && totalNew > 0) {
       await supabase.rpc("notify_user", {
         p_user_id: callerCompanyId,
@@ -354,6 +377,7 @@ Deno.serve(async (req) => {
         synced: totalNew + totalUpdated,
         new: totalNew,
         updated: totalUpdated,
+        deleted: totalDeleted,
         errors: allErrors,
         sheets: sheetConfigs.length,
       }),
