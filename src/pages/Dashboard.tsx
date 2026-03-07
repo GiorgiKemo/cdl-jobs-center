@@ -779,7 +779,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
     isError: leadsIsError,
     error: leadsError,
     refetch: refetchLeads,
-  } = useLeads(user!.id);
+  } = useLeads();
   const updateLeadStatus = useUpdateLeadStatus();
   const syncLeads = useSyncLeads();
   useAutoSyncLeads();

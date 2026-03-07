@@ -42,10 +42,10 @@ function rowToLead(row: Record<string, any>): Lead {
   };
 }
 
-/** Fetch leads for a company — paginated to bypass 1000-row default */
-export function useLeads(companyId?: string) {
+/** Fetch ALL leads — paginated to bypass 1000-row default */
+export function useLeads() {
   return useQuery({
-    queryKey: ["leads", companyId ?? "all"],
+    queryKey: ["leads", "all"],
     refetchOnMount: "always",
     queryFn: async () => {
       const PAGE = 1000;
@@ -53,18 +53,12 @@ export function useLeads(companyId?: string) {
       const all: Record<string, any>[] = [];
       let from = 0;
       while (true) {
-        let query = supabase
+        const { data, error } = await supabase
           .from("leads")
           .select("*")
           .order("created_at", { ascending: false })
           .order("id", { ascending: true })
           .range(from, from + PAGE - 1);
-
-        if (companyId) {
-          query = query.eq("company_id", companyId);
-        }
-
-        const { data, error } = await query;
         if (error) throw error;
         if (!data || data.length === 0) break;
         all.push(...data);
