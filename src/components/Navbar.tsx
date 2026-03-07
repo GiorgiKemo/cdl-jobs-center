@@ -388,7 +388,7 @@ const Navbar = () => {
                   >
                     {/* Trigger */}
                     <button
-                      aria-haspopup="true"
+                      aria-haspopup="menu"
                       aria-expanded={jobsDropdownOpen}
                       onClick={() => setJobsDropdownOpen((prev) => !prev)}
                       onKeyDown={(e) => {

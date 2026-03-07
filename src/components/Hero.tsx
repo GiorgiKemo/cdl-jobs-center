@@ -155,7 +155,7 @@ const Hero = () => {
                 preload="metadata"
                 aria-label="CDL Jobs Center platform walkthrough"
               >
-                <track kind="captions" default />
+                <track kind="captions" />
               </video>
             </div>
           </div>

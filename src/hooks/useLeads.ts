@@ -56,6 +56,7 @@ export function useLeads() {
         const { data, error } = await supabase
           .from("leads")
           .select("*")
+          .is("deleted_at", null)
           .order("created_at", { ascending: false })
           .order("id", { ascending: true })
           .range(from, from + PAGE - 1);

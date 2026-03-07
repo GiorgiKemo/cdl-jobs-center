@@ -286,6 +286,7 @@ export function useAdminLeads() {
         const { data, error } = await supabase
           .from("leads")
           .select("*")
+          .is("deleted_at", null)
           .order("created_at", { ascending: false })
           .range(from, from + PAGE - 1);
         if (error) break;
