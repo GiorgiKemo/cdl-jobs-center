@@ -986,6 +986,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
   const [contactName, setContactName] = useState("");
   const [contactTitle, setContactTitle] = useState("");
   const [isVerified, setIsVerified] = useState<boolean | null>(null);
+  const [verifiedBannerHidden, setVerifiedBannerHidden] = useState(() => localStorage.getItem("verified-banner-dismissed") === "1");
   const [companyGoal, setCompanyGoal] = useState("");
   const [profileSaveStatus, setProfileSaveStatus] = useState<SaveStatus>("idle");
   const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string | null>(null);
@@ -1316,13 +1317,20 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
         </div>
 
         {/* Verification status banner */}
-        {isVerified === true && (
+        {isVerified === true && !verifiedBannerHidden && (
           <div className="flex items-center gap-4 px-5 py-3.5 mb-6 bg-green-500/10 border border-green-500/30">
             <CheckCircle className="h-6 w-6 text-green-500 shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm text-green-700 dark:text-green-400">Your company is verified</p>
               <p className="text-xs text-muted-foreground">Drivers can see the verified badge on your profile and job listings.</p>
             </div>
+            <button
+              onClick={() => { localStorage.setItem("verified-banner-dismissed", "1"); setVerifiedBannerHidden(true); }}
+              className="shrink-0 p-1 text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200 transition-colors"
+              aria-label="Dismiss"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         )}
         {isVerified === false && (
