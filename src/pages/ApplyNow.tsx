@@ -21,7 +21,8 @@ import { SignInModal } from "@/components/SignInModal";
 import { AIGenerationScreen } from "@/components/matching/AIGenerationScreen";
 import { MatchResultsReveal } from "@/components/matching/MatchResultsReveal";
 import { Spinner } from "@/components/ui/Spinner";
-import { Sparkles, ChevronDown, ChevronUp, Check, Clock, User, Briefcase, Settings, CheckCircle2, X, RefreshCw } from "lucide-react";
+import { Sparkles, ChevronDown, ChevronUp, Check, Clock, User, Briefcase, Settings, CheckCircle2, X, RefreshCw, ShieldCheck, ClipboardList, BadgeCheck } from "lucide-react";
+import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { usePageTitle, useMetaDescription, useCanonical } from "@/hooks/usePageTitle";
 import { US_STATES } from "@/data/constants";
@@ -402,28 +403,99 @@ const ApplyNow = () => {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <main className="container mx-auto py-16 max-w-xl text-center">
-          <PageBreadcrumb items={[{ label: "Main", to: "/" }, { label: "AI Job Matching" }]} />
-          <div className="border border-border bg-card p-12">
-            <Sparkles className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-            {!user ? (
-              <>
-                <h2 className="font-display font-bold text-lg mb-2">Sign in to find your matches</h2>
-                <p className="text-sm text-muted-foreground mb-6">
-                  You need a driver account to use AI job matching.
-                </p>
-                <Button onClick={() => setSignInOpen(true)}>Sign In / Register</Button>
-              </>
-            ) : (
-              <>
-                <h2 className="font-display font-bold text-lg mb-2">Not available</h2>
-                <p className="text-sm text-muted-foreground">
-                  Company accounts cannot use driver job matching.
-                </p>
-              </>
-            )}
+        <main className="container mx-auto py-16 px-4 text-center">
+          <div className="max-w-xl mx-auto">
+            <PageBreadcrumb items={[{ label: "Main", to: "/" }, { label: "AI Job Matching" }]} />
+            <div className="border border-border bg-card p-12">
+              <Sparkles className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+              {!user ? (
+                <>
+                  <h2 className="font-display font-bold text-lg mb-2">Sign in to find your matches</h2>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    You need a driver account to use AI job matching.
+                  </p>
+                  <Button onClick={() => setSignInOpen(true)}>Sign In / Register</Button>
+                </>
+              ) : (
+                <>
+                  <h2 className="font-display font-bold text-lg mb-2">Not available</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Company accounts cannot use driver job matching.
+                  </p>
+                </>
+              )}
+            </div>
           </div>
         </main>
+
+        {!user && (
+          <section className="py-24 bg-background relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-b from-secondary/5 to-transparent" />
+            <div className="container mx-auto relative z-10">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="text-center mb-16"
+              >
+                <span className="text-primary font-medium text-sm uppercase tracking-widest">Verified Employers Only</span>
+                <h2 className="font-display text-4xl md:text-5xl font-bold mt-3">
+                  Why Drivers Trust <span className="text-gradient">Verified Employers</span>
+                </h2>
+                <p className="text-muted-foreground mt-4 max-w-md mx-auto">
+                  Drivers are burned by ghost companies every day. Our 3-step process is why they reach out with confidence.
+                </p>
+              </motion.div>
+
+              <div className="grid md:grid-cols-3 gap-8">
+                {[
+                  {
+                    num: "01",
+                    Icon: ShieldCheck,
+                    title: "DOT / MC Number Check",
+                    body: "We cross-reference your DOT and MC numbers against federal FMCSA records to confirm your operating authority is active and in good standing before your account goes live.",
+                  },
+                  {
+                    num: "02",
+                    Icon: ClipboardList,
+                    title: "Manual Team Review",
+                    body: "Our team personally reviews every employer application. No automated rubber-stamping — real humans check business details, public presence, and flag anything that doesn't add up.",
+                  },
+                  {
+                    num: "03",
+                    Icon: BadgeCheck,
+                    title: "Background & Reputation Check",
+                    body: "We review driver feedback, complaint history, and public reputation signals. Only companies with a clean record earn the Verified badge — and we re-check annually.",
+                  },
+                ].map(({ num, Icon, title, body }, i) => (
+                  <motion.div
+                    key={num}
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.15 }}
+                    className="relative group"
+                  >
+                    <div className="glass rounded-2xl p-8 h-full hover:border-primary/30 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5">
+                      <span className="font-display text-6xl font-bold text-primary/10 dark:text-primary/25 absolute top-4 right-6">
+                        {num}
+                      </span>
+                      <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
+                        <Icon className="h-7 w-7 text-primary" />
+                      </div>
+                      <h3 className="font-display text-xl font-semibold mb-3">{title}</h3>
+                      <p className="text-muted-foreground leading-relaxed">{body}</p>
+                    </div>
+                    {i < 2 && (
+                      <div className="hidden md:block absolute top-1/2 -right-4 w-8 border-t-2 border-dashed border-primary/20" />
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
         <Footer />
         {signInOpen && <SignInModal onClose={() => setSignInOpen(false)} />}
       </div>
