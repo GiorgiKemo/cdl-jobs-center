@@ -36,14 +36,22 @@ async function mailgunSend(
 ): Promise<string> {
   const body = new URLSearchParams({ from, to, subject, html });
   body.set("h:Reply-To", replyTo);
-  const res = await fetch(`https://api.mailgun.net/v3/${domain}/messages`, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${btoa("api:" + apiKey)}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body,
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  let res: Response;
+  try {
+    res = await fetch(`https://api.mailgun.net/v3/${domain}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${btoa("api:" + apiKey)}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Mailgun ${res.status}: ${err}`);

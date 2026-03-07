@@ -62,25 +62,35 @@ export function useSendLeadEmail() {
       const session = refreshed.session ?? (await supabase.auth.getSession()).data.session;
       if (!session) throw new Error("Not authenticated");
 
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-lead-email`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30_000);
+      let res: Response;
+      try {
+        res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-lead-email`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              lead_id: params.leadId,
+              subject: params.subject,
+              body:    params.body,
+            }),
+            signal: controller.signal,
           },
-          body: JSON.stringify({
-            lead_id: params.leadId,
-            subject: params.subject,
-            body:    params.body,
-          }),
-        },
-      );
+        );
+      } catch (e) {
+        throw new Error(e instanceof Error && e.name === "AbortError" ? "Request timed out — check Supabase function logs" : String(e));
+      } finally {
+        clearTimeout(timeout);
+      }
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Failed to send email" }));
-        throw new Error((err as { error?: string }).error ?? "Failed to send email");
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
       }
 
       return res.json();
