@@ -762,12 +762,18 @@ export function useCompanyFeedbackMap(companyId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("company_match_feedback")
-        .select("candidate_source, candidate_id, feedback")
+        .select("job_id, candidate_source, candidate_id, feedback")
         .eq("company_id", companyId!);
       if (error) throw error;
+      // Key includes job_id so feedback is job-scoped (matching the write path)
       const map = new Map<string, CompanyFeedback>();
       for (const row of data ?? []) {
-        map.set(`${row.candidate_source}:${row.candidate_id}`, row.feedback as CompanyFeedback);
+        // Job-scoped key
+        map.set(`${row.job_id}:${row.candidate_source}:${row.candidate_id}`, row.feedback as CompanyFeedback);
+        // Also set a candidate-only fallback for "All Jobs" view
+        if (!map.has(`*:${row.candidate_source}:${row.candidate_id}`)) {
+          map.set(`*:${row.candidate_source}:${row.candidate_id}`, row.feedback as CompanyFeedback);
+        }
       }
       return map;
     },

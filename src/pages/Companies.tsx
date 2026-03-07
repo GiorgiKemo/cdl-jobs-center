@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Phone, MapPin, CheckCircle, Building2, ExternalLink, Search, Filter, ShieldCheck, X } from "lucide-react";
+import { Phone, MapPin, CheckCircle, Building2, ExternalLink, Search, Filter, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Spinner } from "@/components/ui/Spinner";
@@ -50,7 +50,6 @@ const Companies = () => {
   useMetaDescription("Browse verified trucking companies hiring CDL drivers. Find carriers by state, read company details, and apply directly through CDL Jobs Center.");
   useCanonical("/companies");
   const [stateFilter, setStateFilter] = useState("All");
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(0);
 
@@ -75,11 +74,10 @@ const Companies = () => {
     },
   });
 
-  const hasActiveFilters = stateFilter !== "All" || verifiedOnly || searchQuery.trim() !== "";
+  const hasActiveFilters = stateFilter !== "All" || searchQuery.trim() !== "";
 
   const handleClear = () => {
     setStateFilter("All");
-    setVerifiedOnly(false);
     setSearchQuery("");
     setPage(0);
   };
@@ -89,7 +87,6 @@ const Companies = () => {
     // Hide companies that haven't set up their profile yet
     if (!c.company_name || !c.company_name.trim()) return false;
     if (stateFilter !== "All" && !c.address?.includes(stateFilter)) return false;
-    if (verifiedOnly && !c.is_verified) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchesName = c.company_name?.toLowerCase().includes(q);
@@ -154,22 +151,6 @@ const Companies = () => {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              {/* Verified toggle */}
-              <div className="space-y-1">
-                <span className="text-xs font-medium text-muted-foreground block">Verified</span>
-                <Button
-                  variant={verifiedOnly ? "default" : "outline"}
-                  onClick={() => { setVerifiedOnly((v) => !v); setPage(0); }}
-                  className={verifiedOnly
-                    ? "gap-1.5 h-10 bg-green-600 hover:bg-green-700 text-white"
-                    : "gap-1.5 h-10"
-                  }
-                >
-                  <ShieldCheck className="h-4 w-4" />
-                  Verified only
-                </Button>
               </div>
 
               {/* Clear */}

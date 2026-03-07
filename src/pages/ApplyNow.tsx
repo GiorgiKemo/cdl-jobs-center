@@ -306,8 +306,11 @@ const ApplyNow = () => {
   useEffect(() => {
     if (step !== 4 || !animationComplete || !matchesStartedAt) return;
 
-    // If we have any matches (fresh or stale), show them immediately
-    if (matches.length > 0) {
+    // Only show matches that were computed after the current run started (not stale)
+    const hasFreshMatches = matches.some(
+      (m) => new Date(m.computedAt).getTime() >= matchesStartedAt.getTime() - 60_000,
+    );
+    if (hasFreshMatches) {
       setStep(5);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;

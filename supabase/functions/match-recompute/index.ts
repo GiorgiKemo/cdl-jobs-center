@@ -633,10 +633,11 @@ async function purgeCompanyJobMatches(
   supabase: SupabaseClient,
   jobId: string,
 ) {
-  await supabase
+  const { error } = await supabase
     .from("company_driver_match_scores")
     .delete()
     .eq("job_id", jobId);
+  if (error) throw error;
 }
 
 async function purgeCompanyCandidateMatches(
@@ -655,7 +656,8 @@ async function purgeCompanyCandidateMatches(
     query = query.eq("company_id", companyId);
   }
 
-  await query;
+  const { error } = await query;
+  if (error) throw error;
 }
 
 async function processDriverProfile(
@@ -795,17 +797,19 @@ async function processDriverProfile(
   }
 
   if (upsertRows.length > 0) {
-    await supabase
+    const { error: upsErr } = await supabase
       .from("driver_job_match_scores")
       .upsert(upsertRows, { onConflict: "driver_id,job_id" });
+    if (upsErr) throw upsErr;
   }
 
   if (behaviorContext.hiddenJobIds.size > 0) {
-    await supabase
+    const { error: delErr } = await supabase
       .from("driver_job_match_scores")
       .delete()
       .eq("driver_id", driverId)
       .in("job_id", Array.from(behaviorContext.hiddenJobIds));
+    if (delErr) throw delErr;
   }
 }
 
@@ -1006,10 +1010,11 @@ async function processApplication(
     const score = computeCompanyV2Score(candidate, jobFeatures, candEmb, jobEmb, behaviorCtx);
     if (score.hidden) continue;
 
-    await supabase.from("company_driver_match_scores").upsert(
+    const { error: upsErr } = await supabase.from("company_driver_match_scores").upsert(
       buildCompanyUpsertRow(effectiveCompanyId, jobRow.id, "application", applicationId, app.driver_id ?? null, score, embeddingProvider),
       { onConflict: "company_id,job_id,candidate_source,candidate_id" },
     );
+    if (upsErr) throw upsErr;
   }
 }
 
@@ -1051,10 +1056,11 @@ async function processLead(
     const profileJob = await buildCompanyProfileJob(supabase, effectiveCompanyId);
     const score = computeCompanyV2Score(candidate, profileJob, candEmb, null, behaviorCtx);
     if (!score.hidden) {
-      await supabase.from("company_driver_match_scores").upsert(
+      const { error: upsErr } = await supabase.from("company_driver_match_scores").upsert(
         buildCompanyUpsertRow(effectiveCompanyId, null, "lead", leadId, null, score, embeddingProvider),
         { onConflict: "company_id,job_id,candidate_source,candidate_id" },
       );
+      if (upsErr) throw upsErr;
     }
     return;
   }
@@ -1068,10 +1074,11 @@ async function processLead(
     const score = computeCompanyV2Score(candidate, jobFeatures, candEmb, jobEmb, behaviorCtx);
     if (score.hidden) continue;
 
-    await supabase.from("company_driver_match_scores").upsert(
+    const { error: upsErr } = await supabase.from("company_driver_match_scores").upsert(
       buildCompanyUpsertRow(effectiveCompanyId, jobRow.id, "lead", leadId, null, score, embeddingProvider),
       { onConflict: "company_id,job_id,candidate_source,candidate_id" },
     );
+    if (upsErr) throw upsErr;
   }
 }
 
@@ -1103,10 +1110,11 @@ async function scoreCompanyCandidatesForJob(
       const score = computeCompanyV2Score(candidate, jobFeatures, candEmb, jobEmbedding, behaviorCtx);
       if (score.hidden) continue;
 
-      await supabase.from("company_driver_match_scores").upsert(
+      const { error: upsErr } = await supabase.from("company_driver_match_scores").upsert(
         buildCompanyUpsertRow(companyId, jobId, "application", app.id, app.driver_id ?? null, score, embeddingProvider),
         { onConflict: "company_id,job_id,candidate_source,candidate_id" },
       );
+      if (upsErr) throw upsErr;
     }
   }
 
@@ -1126,10 +1134,11 @@ async function scoreCompanyCandidatesForJob(
       const score = computeCompanyV2Score(candidate, jobFeatures, candEmb, jobEmbedding, behaviorCtx);
       if (score.hidden) continue;
 
-      await supabase.from("company_driver_match_scores").upsert(
+      const { error: upsErr } = await supabase.from("company_driver_match_scores").upsert(
         buildCompanyUpsertRow(companyId, jobId, "lead", lead.id, null, score, embeddingProvider),
         { onConflict: "company_id,job_id,candidate_source,candidate_id" },
       );
+      if (upsErr) throw upsErr;
     }
   }
 }

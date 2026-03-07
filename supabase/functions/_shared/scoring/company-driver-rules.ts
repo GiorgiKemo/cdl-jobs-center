@@ -61,7 +61,7 @@ function scoreLicenseClassFit(
   const reasons: MatchReason[] = [];
 
   if (!lic) {
-    return { cs: { score: 0, maxScore: 20, detail: "License class unknown" }, reasons };
+    return { cs: { score: 10, maxScore: 20, detail: "License class unknown — scored as neutral" }, reasons };
   }
 
   if (lic === "a") {
@@ -86,7 +86,7 @@ function scoreExperienceFit(
   const reasons: MatchReason[] = [];
 
   if (ord < 0) {
-    return { cs: { score: 0, maxScore: 15, detail: "Experience data unavailable" }, reasons };
+    return { cs: { score: 7, maxScore: 15, detail: "Experience data unavailable — scored as neutral" }, reasons };
   }
 
   // none=2, less-1=4, 1-3=7, 3-5=11, 5+=15

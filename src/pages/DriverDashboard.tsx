@@ -393,9 +393,8 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
   );
 
   useEffect(() => {
-    if (activeTab !== "ai-matches" || filteredAiMatches.length === 0) return;
-    const unseen = filteredAiMatches
-      .slice(0, 10)
+    if (activeTab !== "ai-matches" || paginatedAiMatches.length === 0) return;
+    const unseen = paginatedAiMatches
       .map((m) => m.jobId)
       .filter((jobId) => !trackedViewJobIds.has(jobId));
     if (unseen.length === 0) return;
@@ -409,7 +408,7 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
       unseen.forEach((jobId) => next.add(jobId));
       return next;
     });
-  }, [activeTab, filteredAiMatches, handleTrackEvent, trackedViewJobIds]);
+  }, [activeTab, paginatedAiMatches, handleTrackEvent, trackedViewJobIds]);
 
   const handleFeedback = async (jobId: string, feedback: DriverFeedback) => {
     setFeedbackPendingByJob((prev) => ({ ...prev, [jobId]: feedback }));

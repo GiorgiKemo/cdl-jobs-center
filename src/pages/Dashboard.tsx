@@ -454,8 +454,10 @@ const AiMatchesContent = ({
   };
 
   const handleFeedback = (m: typeof matches[0], feedback: CompanyFeedback) => {
+    const jobId = aiJobFilter !== "all" ? aiJobFilter : activeJobs[0]?.id;
+    if (!jobId) return; // no valid job — skip feedback write
     recordFeedback({
-      jobId: aiJobFilter !== "all" ? aiJobFilter : (activeJobs[0]?.id ?? ""),
+      jobId,
       candidateSource: m.candidateSource,
       candidateId: m.candidateId,
       feedback,
@@ -552,7 +554,8 @@ const AiMatchesContent = ({
             const cardKey = `${m.candidateId}-${m.candidateSource}`;
             const isExpanded = expandedCard === cardKey;
             const tier = TIER_CONFIG[m.rankTier] ?? TIER_CONFIG.explore;
-            const existingFeedback = feedbackMap.get(`${m.candidateSource}:${m.candidateId}`);
+            const feedbackJobKey = aiJobFilter !== "all" ? aiJobFilter : "*";
+            const existingFeedback = feedbackMap.get(`${feedbackJobKey}:${m.candidateSource}:${m.candidateId}`);
 
             return (
             <div
@@ -561,8 +564,9 @@ const AiMatchesContent = ({
                 m.rankTier === "hot" ? "border-red-500/30" : m.rankTier === "warm" ? "border-amber-500/20" : "border-border"
               }`}
               onClick={() => {
-                if (aiJobFilter !== "all") {
-                  trackEvent({ jobId: aiJobFilter, candidateSource: m.candidateSource, candidateId: m.candidateId, eventType: "view" });
+                const jobId = aiJobFilter !== "all" ? aiJobFilter : activeJobs[0]?.id;
+                if (jobId) {
+                  trackEvent({ jobId, candidateSource: m.candidateSource, candidateId: m.candidateId, eventType: "view" });
                 }
               }}
             >
