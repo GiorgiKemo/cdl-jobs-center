@@ -909,7 +909,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
       for (const row of data) {
         seen.add(`${(row as Record<string, unknown>).candidate_driver_id ?? (row as Record<string, unknown>).candidate_id}:${(row as Record<string, unknown>).candidate_source}`);
       }
-      return Math.min(seen.size, aiMatchLimit);
+      return seen.size;
     },
   });
 
