@@ -14,7 +14,7 @@ import { useJobs } from "@/hooks/useJobs";
 import { Job } from "@/data/jobs";
 import { COMPANY_GOALS } from "@/data/constants";
 import { toast } from "sonner";
-import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload, Bell, MessageSquare, Users, Phone as PhoneIcon, Mail as MailIcon, MapPin, Truck as TruckIcon, Lock, RefreshCw, CreditCard, Send, Briefcase, Check, Sparkles, CheckCircle, ShieldCheck, FileText, Search, XCircle } from "lucide-react";
+import { Pencil, Trash2, ChevronDown, ChevronUp, Plus, X, Upload, Bell, MessageSquare, Users, Phone as PhoneIcon, Mail as MailIcon, MapPin, Truck as TruckIcon, Lock, RefreshCw, CreditCard, Send, Briefcase, Check, Sparkles, CheckCircle, ShieldCheck, FileText, Search, XCircle, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -1156,6 +1156,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
   const [contactTitle, setContactTitle] = useState("");
   const [isVerified, setIsVerified] = useState<boolean | null>(null);
   const [declineReason, setDeclineReason] = useState<string | null>(null);
+  const [reapplyPending, setReapplyPending] = useState(false);
   const [verifiedBannerHidden, setVerifiedBannerHidden] = useState(() => localStorage.getItem("verified-banner-dismissed") === "1");
   const [companyGoal, setCompanyGoal] = useState("");
   const [profileSaveStatus, setProfileSaveStatus] = useState<SaveStatus>("idle");
@@ -1515,6 +1516,27 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
               <p className="font-medium mb-1">Reason:</p>
               <p className="text-muted-foreground">{declineReason}</p>
             </div>
+            <Button
+              className="mb-4"
+              disabled={reapplyPending}
+              onClick={async () => {
+                setReapplyPending(true);
+                const { error } = await supabase
+                  .from("company_profiles")
+                  .update({ decline_reason: null })
+                  .eq("id", user!.id);
+                setReapplyPending(false);
+                if (error) {
+                  toast.error("Failed to submit re-review request. Please try again.");
+                } else {
+                  setDeclineReason(null);
+                  toast.success("Re-review request submitted. Our team will review your account.");
+                }
+              }}
+            >
+              {reapplyPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+              Request Re-review
+            </Button>
             <p className="text-sm text-muted-foreground">
               Questions? Contact us at{" "}
               <a href="mailto:support@cdljobscenter.com" className="text-primary underline">
