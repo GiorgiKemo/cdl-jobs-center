@@ -13,8 +13,37 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 const SITE_URL = Deno.env.get("SITE_URL") ?? "https://cdl-jobs-center.vercel.app";
+
+async function sendMailgun(
+  apiKey: string,
+  domain: string,
+  senderEmail: string,
+  toEmail: string,
+  subject: string,
+  html: string,
+): Promise<string> {
+  const body = new URLSearchParams({
+    from: `CDL Jobs Center <${senderEmail}>`,
+    to: toEmail,
+    subject,
+    html,
+  });
+  const res = await fetch(`https://api.mailgun.net/v3/${domain}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${btoa("api:" + apiKey)}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Mailgun error ${res.status}: ${err}`);
+  }
+  const data = await res.json();
+  return (data.id as string) ?? "";
+}
 
 /** Only these types trigger transactional emails */
 const EMAIL_ENABLED_TYPES = new Set([
@@ -114,10 +143,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    const brevoApiKey = Deno.env.get("BREVO_API_KEY");
-    const senderEmail = Deno.env.get("BREVO_SENDER_EMAIL");
-    if (!brevoApiKey || !senderEmail) {
-      console.log("BREVO_API_KEY or BREVO_SENDER_EMAIL not set — skipping email");
+    const mailgunApiKey = Deno.env.get("MAILGUN_API_KEY");
+    const mailgunDomain = Deno.env.get("MAILGUN_DOMAIN");
+    const senderEmail = Deno.env.get("MAILGUN_SENDER_EMAIL") ?? (mailgunDomain ? `noreply@${mailgunDomain}` : null);
+    if (!mailgunApiKey || !mailgunDomain) {
+      console.log("MAILGUN_API_KEY or MAILGUN_DOMAIN not set — skipping email");
       return new Response(
         JSON.stringify({ skipped: true, reason: "no_api_key" }),
         { status: 200, headers: { "Content-Type": "application/json" } }
@@ -186,35 +216,22 @@ Deno.serve(async (req) => {
       preferencesUrl,
     });
 
-    // Send via Brevo
-    const emailRes = await fetch(BREVO_API_URL, {
-      method: "POST",
-      headers: {
-        "api-key": brevoApiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        sender: { name: "CDL Jobs Center", email: senderEmail },
-        to: [{ email: authUser.email }],
-        subject,
-        htmlContent: html,
-      }),
-    });
-
-    if (!emailRes.ok) {
-      const errBody = await emailRes.text();
-      console.error("Brevo API error:", emailRes.status, errBody);
+    // Send via Mailgun
+    let mgId: string;
+    try {
+      mgId = await sendMailgun(mailgunApiKey, mailgunDomain, senderEmail!, authUser.email, subject, html);
+    } catch (sendErr) {
+      const detail = sendErr instanceof Error ? sendErr.message : String(sendErr);
+      console.error("Mailgun send error:", detail);
       return new Response(
-        JSON.stringify({ error: "email_send_failed", detail: errBody }),
+        JSON.stringify({ error: "email_send_failed", detail }),
         { status: 502, headers: { "Content-Type": "application/json" } }
       );
     }
-
-    const result = await emailRes.json();
-    console.log(`Email sent for ${type} to ${authUser.email}:`, result.messageId);
+    console.log(`Email sent for ${type} to ${authUser.email}:`, mgId);
 
     return new Response(
-      JSON.stringify({ sent: true, message_id: result.messageId }),
+      JSON.stringify({ sent: true, message_id: mgId }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
   } catch (err) {

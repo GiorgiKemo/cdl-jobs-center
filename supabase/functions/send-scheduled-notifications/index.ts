@@ -1,33 +1,34 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildNotificationEmail, escapeHtml } from "../_shared/email/templates.ts";
 
-const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 const SITE_URL = Deno.env.get("SITE_URL") ?? "https://cdl-jobs-center.vercel.app";
 
-/** Send email via Brevo. Returns true if sent, false if skipped/failed. */
+/** Send email via Mailgun. Returns true if sent, false if skipped/failed. */
 async function sendEmail(
-  brevoApiKey: string,
+  mailgunApiKey: string,
+  mailgunDomain: string,
   senderEmail: string,
   toEmail: string,
   subject: string,
   html: string
 ): Promise<boolean> {
   try {
-    const res = await fetch(BREVO_API_URL, {
+    const body = new URLSearchParams({
+      from: `CDL Jobs Center <${senderEmail}>`,
+      to: toEmail,
+      subject,
+      html,
+    });
+    const res = await fetch(`https://api.mailgun.net/v3/${mailgunDomain}/messages`, {
       method: "POST",
       headers: {
-        "api-key": brevoApiKey,
-        "Content-Type": "application/json",
+        Authorization: `Basic ${btoa("api:" + mailgunApiKey)}`,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: JSON.stringify({
-        sender: { name: "CDL Jobs Center", email: senderEmail },
-        to: [{ email: toEmail }],
-        subject,
-        htmlContent: html,
-      }),
+      body,
     });
     if (!res.ok) {
-      console.error("Brevo error:", res.status, await res.text());
+      console.error("Mailgun error:", res.status, await res.text());
       return false;
     }
     return true;
@@ -65,9 +66,10 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const brevoApiKey = Deno.env.get("BREVO_API_KEY");
-    const senderEmail = Deno.env.get("BREVO_SENDER_EMAIL");
-    const canEmail = !!(brevoApiKey && senderEmail);
+    const mailgunApiKey = Deno.env.get("MAILGUN_API_KEY");
+    const mailgunDomain = Deno.env.get("MAILGUN_DOMAIN");
+    const senderEmail = Deno.env.get("MAILGUN_SENDER_EMAIL") ?? (mailgunDomain ? `noreply@${mailgunDomain}` : null);
+    const canEmail = !!(mailgunApiKey && mailgunDomain);
     const results: Record<string, number> = {};
 
     // ── Weekly Digest (Monday 8am CT) ──
@@ -135,7 +137,7 @@ Deno.serve(async (req) => {
               ctaUrl: `${SITE_URL}${dashLink}`,
               preferencesUrl: `${SITE_URL}${dashLink}?tab=profile`,
             });
-            await sendEmail(brevoApiKey!, senderEmail!, authUser.email, title, html);
+            await sendEmail(mailgunApiKey!, mailgunDomain!, senderEmail!, authUser.email, title, html);
           }
         }
         digestCount++;
@@ -209,7 +211,7 @@ Deno.serve(async (req) => {
             ctaUrl: `${SITE_URL}/driver-dashboard?tab=profile`,
             preferencesUrl: `${SITE_URL}/driver-dashboard?tab=profile`,
           });
-          await sendEmail(brevoApiKey!, senderEmail!, authUser.email, title, html);
+          await sendEmail(mailgunApiKey!, mailgunDomain!, senderEmail!, authUser.email, title, html);
         }
         reminderCount++;
       }
@@ -273,7 +275,7 @@ Deno.serve(async (req) => {
               ctaUrl: `${SITE_URL}/pricing`,
               preferencesUrl: `${SITE_URL}/dashboard?tab=profile`,
             });
-            await sendEmail(brevoApiKey!, senderEmail!, authUser.email, title, html);
+            await sendEmail(mailgunApiKey!, mailgunDomain!, senderEmail!, authUser.email, title, html);
           }
         }
         quotaCount++;

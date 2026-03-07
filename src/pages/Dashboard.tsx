@@ -49,6 +49,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ImageCropDialog } from "@/components/ImageCropDialog";
 import { ListPagination } from "@/components/ListPagination";
+import { LeadOutreachDialog } from "@/components/LeadOutreachDialog";
 
 const FREIGHT_TYPES = [
   "Box", "Car Hauler", "Drop and Hook", "Dry Bulk", "Dry Van", "Flatbed",
@@ -1066,6 +1067,7 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
   const [leadSearch, setLeadSearch] = useState("");
   const [contactLeadId, setContactLeadId] = useState<string | null>(null);
   const [sendApplyLeadId, setSendApplyLeadId] = useState<string | null>(null);
+  const [outreachLead, setOutreachLead] = useState<{ id: string; fullName: string; email: string | null; phone: string | null } | null>(null);
   const [showDismissed, setShowDismissed] = useState(false);
   const [dismissedSearch, setDismissedSearch] = useState("");
   const [dismissedPage, setDismissedPage] = useState(0);
@@ -2420,6 +2422,15 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                                 Contact
                               </Button>
                             )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-7 px-3 gap-1"
+                              onClick={() => setOutreachLead({ id: lead.id, fullName: lead.fullName, email: lead.email, phone: lead.phone })}
+                            >
+                              <MailIcon className="h-3 w-3" />
+                              Message
+                            </Button>
                             {lead.status === "contacted" && (
                               <>
                                 <Button
@@ -3163,6 +3174,16 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
 
       </main>
       <Footer />
+
+      {outreachLead && (
+        <LeadOutreachDialog
+          open={!!outreachLead}
+          onClose={() => setOutreachLead(null)}
+          lead={outreachLead}
+          companyId={user!.id}
+          plan={subscription?.plan ?? "free"}
+        />
+      )}
 
       {cropImageSrc && (
         <ImageCropDialog
