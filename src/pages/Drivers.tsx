@@ -87,6 +87,20 @@ const Drivers = () => {
   const { data: subscription } = useSubscription(isCompany ? user?.id : undefined);
   const hasUnlimited = isAdmin || subscription?.plan === "unlimited";
 
+  const { data: companyProfile } = useQuery({
+    queryKey: ["company-profile-verified", user?.id],
+    enabled: !!user?.id && isCompany,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("company_profiles")
+        .select("is_verified, decline_reason")
+        .eq("id", user!.id)
+        .maybeSingle();
+      return data;
+    },
+  });
+  const isVerifiedCompany = isCompany && (companyProfile?.is_verified === true) && !companyProfile?.decline_reason;
+
   const [classFilter, setClassFilter] = useState("All");
   const [expFilter, setExpFilter] = useState("All");
   const [stateFilter, setStateFilter] = useState("All");
@@ -247,9 +261,10 @@ const Drivers = () => {
     );
   }
 
-  if (!user || !hasUnlimited) {
+  if (!user || !hasUnlimited || (isCompany && !isVerifiedCompany)) {
     const isDriverUser = user?.role === "driver";
     const isCompanyNoUnlimited = isCompany && !hasUnlimited;
+    const isCompanyNotVerified = isCompany && hasUnlimited && !isVerifiedCompany;
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -266,14 +281,16 @@ const Drivers = () => {
               </div>
               <div>
                 <p className="font-display font-semibold text-lg">
-                  {isCompanyNoUnlimited ? "Unlimited Plan Required" : "Company Access Only"}
+                  {isCompanyNotVerified ? "Verification Required" : isCompanyNoUnlimited ? "Unlimited Plan Required" : "Company Access Only"}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                  {isCompanyNoUnlimited
-                    ? "The driver directory is exclusively available to companies on the Unlimited plan. Upgrade your subscription to browse driver profiles with full contact information."
-                    : isDriverUser
-                      ? "The driver directory is available to company accounts only. Your driver account does not have access to this section."
-                      : "The driver directory is available to company accounts with an Unlimited plan. Sign in or register as a company to get started."}
+                  {isCompanyNotVerified
+                    ? "Your company account must be verified before you can access the driver directory. Please wait for admin approval."
+                    : isCompanyNoUnlimited
+                      ? "The driver directory is exclusively available to companies on the Unlimited plan. Upgrade your subscription to browse driver profiles with full contact information."
+                      : isDriverUser
+                        ? "The driver directory is available to company accounts only. Your driver account does not have access to this section."
+                        : "The driver directory is available to company accounts with an Unlimited plan. Sign in or register as a company to get started."}
                 </p>
               </div>
               {isCompanyNoUnlimited && (
