@@ -15,7 +15,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ListPagination } from "@/components/ListPagination";
 import { useSubscription } from "@/hooks/useSubscription";
-import { LeadOutreachDialog } from "@/components/LeadOutreachDialog";
+import { DriverContactDialog } from "@/components/DriverContactDialog";
 
 const LICENSE_CLASSES = ["All", "Class A", "Class B", "Class C", "Permit Only"];
 const EXPERIENCE_OPTIONS = ["All", "None", "Less than 1 year", "1-3 years", "3-5 years", "5+ years"];
@@ -565,10 +565,10 @@ const Drivers = () => {
       <Footer />
 
       {outreachDriver && (
-        <LeadOutreachDialog
+        <DriverContactDialog
           open={!!outreachDriver}
           onClose={() => setOutreachDriver(null)}
-          lead={outreachDriver}
+          driver={{ id: outreachDriver.id, name: outreachDriver.fullName, email: outreachDriver.email, phone: outreachDriver.phone }}
           companyId={user!.id}
           plan={subscription?.plan ?? "free"}
         />

@@ -13,7 +13,7 @@ import { useActiveJobs } from "@/hooks/useJobs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { useDriverProfile, DriverProfile } from "@/hooks/useDriverProfile";
 import { DRIVER_INTERESTS, DRIVER_NEXT_JOB } from "@/data/constants";
-import { Truck, Briefcase, Bookmark, User, BarChart3, ChevronDown, ChevronUp, MapPin, DollarSign, Bell, MessageSquare, Check, Sparkles, RefreshCw, SlidersHorizontal } from "lucide-react";
+import { Truck, Briefcase, Bookmark, User, BarChart3, ChevronDown, ChevronUp, MapPin, DollarSign, Bell, MessageSquare, MessageCircle, ArrowUpRight, ArrowDownLeft, Check, Sparkles, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
@@ -21,7 +21,10 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recha
 import { ChatPanel } from "@/components/ChatPanel";
 import { NotificationPreferences } from "@/components/NotificationPreferences";
 import { useUnreadCount } from "@/hooks/useMessages";
-import { formatRelativeDate } from "@/lib/dateUtils";
+import { useDriverDirectThreads, useSendDirectMessage, useMarkDirectRead, type DirectThread } from "@/hooks/useDirectMessages";
+import { formatRelativeDate, formatDate } from "@/lib/dateUtils";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { usePageTitle, useNoIndex } from "@/hooks/usePageTitle";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -184,6 +187,10 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
   const { savedIds, toggle: toggleSave } = useSavedJobs(user!.id);
   const { profile, isLoading: profileLoading, saveProfile } = useDriverProfile(user!.id);
   const { data: unreadMsgCount = 0 } = useUnreadCount(user!.id, "driver");
+  const { data: directThreads = [] } = useDriverDirectThreads(user!.id);
+  const sendDirectReply = useSendDirectMessage();
+  const markDirectRead  = useMarkDirectRead();
+  const unreadDirectCount = directThreads.reduce((acc, t) => acc + t.unreadCount, 0);
   const { data: aiMatches = [], isLoading: aiMatchesLoading, isError: aiMatchesError, isFetched: aiMatchesFetched } = useDriverJobMatches(
     user!.id,
     { limit: 200, minScore: 0, excludeHidden: true },
@@ -213,6 +220,9 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
   const [feedbackPendingByJob, setFeedbackPendingByJob] = useState<Record<string, DriverFeedback | null>>({});
   const [trackedViewJobIds, setTrackedViewJobIds] = useState<Set<string>>(new Set());
   const [initialChatAppId, setInitialChatAppId] = useState<string | null>(() => searchParams.get("app"));
+  const [msgSubTab, setMsgSubTab] = useState<"application" | "direct">("application");
+  const [selectedDirectThread, setSelectedDirectThread] = useState<DirectThread | null>(null);
+  const [directReplyBody, setDirectReplyBody] = useState("");
   const lastAutoScrollAppIdRef = useRef<string | null>(null);
   const [dismissedApps, setDismissedApps] = useState<Set<string>>(() => {
     try {
@@ -1018,7 +1028,151 @@ const DriverDashboardInner = ({ user }: { user: AuthUser }) => {
 
         {/* ── MESSAGES ── */}
         {activeTab === "messages" && (
-          <ChatPanel userId={user!.id} userRole="driver" userName={user!.name} initialApplicationId={initialChatAppId} />
+          <div>
+            {/* Sub-tab bar */}
+            <div className="flex gap-0 border-b border-border mb-0">
+              <button
+                className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${msgSubTab === "application" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                onClick={() => setMsgSubTab("application")}
+              >
+                Application Messages
+                {unreadMsgCount > 0 && (
+                  <span className="ml-2 inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">{unreadMsgCount}</span>
+                )}
+              </button>
+              <button
+                className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${msgSubTab === "direct" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                onClick={() => { setMsgSubTab("direct"); setSelectedDirectThread(null); }}
+              >
+                <MessageCircle className="h-3.5 w-3.5" />
+                Direct Messages
+                {unreadDirectCount > 0 && (
+                  <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">{unreadDirectCount}</span>
+                )}
+              </button>
+            </div>
+
+            {msgSubTab === "application" ? (
+              <ChatPanel userId={user!.id} userRole="driver" userName={user!.name} initialApplicationId={initialChatAppId} />
+            ) : selectedDirectThread ? (
+              /* ── Direct thread detail ── */
+              <div className="flex flex-col h-[60vh]">
+                <div className="flex items-center gap-3 px-5 py-3 border-b border-border">
+                  <button
+                    onClick={() => { setSelectedDirectThread(null); setDirectReplyBody(""); }}
+                    className="text-muted-foreground hover:text-foreground transition-colors text-sm flex items-center gap-1"
+                  >
+                    ← Back
+                  </button>
+                  <span className="font-semibold text-sm">{selectedDirectThread.companyName}</span>
+                </div>
+                <ScrollArea className="flex-1 px-5 py-4">
+                  <div className="space-y-3">
+                    {selectedDirectThread.messages.map((msg) => {
+                      const isOut = msg.senderRole === "driver";
+                      return (
+                        <div key={msg.id} className={`flex flex-col gap-1 ${isOut ? "items-end" : "items-start"}`}>
+                          <div className={`rounded-2xl px-4 py-2.5 max-w-[85%] text-sm ${
+                            isOut
+                              ? "bg-primary text-primary-foreground rounded-br-sm"
+                              : "bg-muted text-foreground rounded-bl-sm"
+                          }`}>
+                            <p className="whitespace-pre-wrap break-words">{msg.body}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
+                            {isOut ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownLeft className="h-3 w-3" />}
+                            <span>{formatDate(msg.createdAt)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+                <Separator />
+                <div className="px-5 py-3 flex gap-2">
+                  <Textarea
+                    placeholder="Reply..."
+                    rows={2}
+                    value={directReplyBody}
+                    onChange={(e) => setDirectReplyBody(e.target.value)}
+                    className="text-sm resize-none flex-1"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        if (!directReplyBody.trim() || sendDirectReply.isPending) return;
+                        const thread = selectedDirectThread;
+                        sendDirectReply.mutate(
+                          { companyId: thread.companyId, driverId: user!.id, senderRole: "driver", body: directReplyBody.trim() },
+                          {
+                            onSuccess: () => setDirectReplyBody(""),
+                            onError: () => toast.error("Failed to send reply"),
+                          },
+                        );
+                      }
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    className="self-end"
+                    disabled={!directReplyBody.trim() || sendDirectReply.isPending}
+                    onClick={() => {
+                      if (!directReplyBody.trim()) return;
+                      const thread = selectedDirectThread;
+                      sendDirectReply.mutate(
+                        { companyId: thread.companyId, driverId: user!.id, senderRole: "driver", body: directReplyBody.trim() },
+                        {
+                          onSuccess: () => setDirectReplyBody(""),
+                          onError: () => toast.error("Failed to send reply"),
+                        },
+                      );
+                    }}
+                  >
+                    {sendDirectReply.isPending ? <Spinner /> : <ArrowUpRight className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              /* ── Direct thread list ── */
+              directThreads.length === 0 ? (
+                <div className="py-16 text-center text-sm text-muted-foreground">
+                  <MessageCircle className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                  No direct messages yet. Companies can reach out to you from the Drivers directory.
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {directThreads.map((thread) => (
+                    <button
+                      key={thread.companyId}
+                      className="w-full text-left px-5 py-4 hover:bg-muted/40 transition-colors flex items-start gap-3"
+                      onClick={() => {
+                        setSelectedDirectThread(thread);
+                        setDirectReplyBody("");
+                        if (thread.unreadCount > 0) {
+                          markDirectRead.mutate({ companyId: thread.companyId, driverId: user!.id, readerRole: "driver" });
+                        }
+                      }}
+                    >
+                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-primary font-bold text-sm">
+                        {thread.companyName.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-sm truncate">{thread.companyName}</span>
+                          <span className="text-xs text-muted-foreground shrink-0">{formatDate(thread.lastMessage.createdAt)}</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate mt-0.5">{thread.lastMessage.body}</p>
+                      </div>
+                      {thread.unreadCount > 0 && (
+                        <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold shrink-0 mt-1">
+                          {thread.unreadCount}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )
+            )}
+          </div>
         )}
 
         {/* ── SAVED JOBS ── */}
