@@ -1064,6 +1064,8 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
   const [jobPage, setJobPage] = useState(0);
   const [leadStateFilter, setLeadStateFilter] = useState("all");
   const [leadTypeFilter, setLeadTypeFilter] = useState<"all" | "owner-op" | "company">("all");
+  const [leadHasEmail, setLeadHasEmail] = useState(false);
+  const [leadHasPhone, setLeadHasPhone] = useState(false);
   const [leadSearch, setLeadSearch] = useState("");
   const [contactLeadId, setContactLeadId] = useState<string | null>(null);
   const [sendApplyLeadId, setSendApplyLeadId] = useState<string | null>(null);
@@ -2119,6 +2121,8 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
             if (leadStateFilter !== "all" && l.state !== leadStateFilter) return false;
             if (leadTypeFilter === "owner-op" && !l.isOwnerOp) return false;
             if (leadTypeFilter === "company" && l.isOwnerOp) return false;
+            if (leadHasEmail && !l.email) return false;
+            if (leadHasPhone && !l.phone) return false;
             if (searchLower && !(
               l.fullName.toLowerCase().includes(searchLower) ||
               (l.phone && l.phone.toLowerCase().includes(searchLower)) ||
@@ -2251,6 +2255,30 @@ const DashboardInner = ({ user }: { user: AuthUser }) => {
                         {t === "all" ? "All" : t === "owner-op" ? "Owner Op" : "Company"}
                       </button>
                     ))}
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => { setLeadHasEmail(!leadHasEmail); setLeadPage(0); }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                        leadHasEmail
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border bg-card text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <MailIcon className="h-3 w-3" />
+                      Has Email
+                    </button>
+                    <button
+                      onClick={() => { setLeadHasPhone(!leadHasPhone); setLeadPage(0); }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                        leadHasPhone
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border bg-card text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <PhoneIcon className="h-3 w-3" />
+                      Has Phone
+                    </button>
                   </div>
                 </div>
               </div>
