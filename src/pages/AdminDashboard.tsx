@@ -5,6 +5,7 @@ import { PageBreadcrumb } from "@/components/ui/PageBreadcrumb";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import {
   Select,
   SelectContent,
@@ -2066,7 +2067,7 @@ function AdminDashboardInner() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">New Password (leave blank to keep current)</Label>
-                  <Input type="password" value={editFields.password || ""} onChange={(e) => setEditFields((f) => ({ ...f, password: e.target.value }))} className="h-9" placeholder="Enter new password..." />
+                  <PasswordInput value={editFields.password || ""} onChange={(e) => setEditFields((f) => ({ ...f, password: e.target.value }))} className="h-9" placeholder="Enter new password..." />
                 </div>
 
                 {editTarget.role === "company" && (
@@ -2266,7 +2267,7 @@ function AdminDashboardInner() {
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Password *</Label>
-                <Input type="password" value={createFields.password || ""} onChange={(e) => setCreateFields((f) => ({ ...f, password: e.target.value }))} className="h-9" placeholder="Min 8 characters" />
+                <PasswordInput value={createFields.password || ""} onChange={(e) => setCreateFields((f) => ({ ...f, password: e.target.value }))} className="h-9" placeholder="Min 8 characters" />
               </div>
 
               {createRole === "company" && (

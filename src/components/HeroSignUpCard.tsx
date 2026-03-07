@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Loader2, Truck, Briefcase, Mail, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -288,7 +289,7 @@ export function RegistrationModal({ open, onOpenChange }: Props) {
               {/* Password — same as /signin */}
               <div className="space-y-1.5">
                 <Label htmlFor="modal-password">Password <span className="text-destructive">*</span></Label>
-                <Input id="modal-password" type="password" placeholder="Min. 12 characters" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
+                <PasswordInput id="modal-password" placeholder="Min. 12 characters" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
                 <PasswordStrengthIndicator password={password} />
               </div>
 

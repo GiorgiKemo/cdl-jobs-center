@@ -15,6 +15,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ListPagination } from "@/components/ListPagination";
 import { useSubscription } from "@/hooks/useSubscription";
+import { LeadOutreachDialog } from "@/components/LeadOutreachDialog";
 
 const LICENSE_CLASSES = ["All", "Class A", "Class B", "Class C", "Permit Only"];
 const EXPERIENCE_OPTIONS = ["All", "None", "Less than 1 year", "1-3 years", "3-5 years", "5+ years"];
@@ -107,6 +108,7 @@ const Drivers = () => {
   const [stateFilter, setStateFilter] = useState("All");
   const [showSavedOnly, setShowSavedOnly] = useState(false);
   const [page, setPage] = useState(0);
+  const [outreachDriver, setOutreachDriver] = useState<{ id: string; fullName: string; email: string | null; phone: string | null } | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch saved drivers from DB
@@ -519,6 +521,7 @@ const Drivers = () => {
                     {driver.about || "No profile summary provided yet."}
                   </p>
 
+                  <div className="flex items-center gap-2">
                   <Button
                     size="sm"
                     variant="outline"
@@ -528,6 +531,23 @@ const Drivers = () => {
                     <Eye className="h-3.5 w-3.5" />
                     View profile
                   </Button>
+                  {isCompany && (driver.email || driver.phone) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex items-center gap-2 text-xs"
+                      onClick={() => setOutreachDriver({
+                        id: driver.id,
+                        fullName: driver.name || "Driver",
+                        email: driver.email || null,
+                        phone: driver.phone || null,
+                      })}
+                    >
+                      <Mail className="h-3.5 w-3.5" />
+                      Message
+                    </Button>
+                  )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -543,6 +563,16 @@ const Drivers = () => {
         </div>
       </main>
       <Footer />
+
+      {outreachDriver && (
+        <LeadOutreachDialog
+          open={!!outreachDriver}
+          onClose={() => setOutreachDriver(null)}
+          lead={outreachDriver}
+          companyId={user!.id}
+          plan={subscription?.plan ?? "free"}
+        />
+      )}
     </div>
   );
 };

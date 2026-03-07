@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Loader2, Truck, Briefcase, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAuth } from "@/context/auth";
@@ -277,9 +278,8 @@ const SignIn = () => {
                 <form onSubmit={handleResetPassword} className="px-5 py-6 space-y-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="new-password">New password</Label>
-                    <Input
+                    <PasswordInput
                       id="new-password"
-                      type="password"
                       placeholder="••••••••••••"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
@@ -290,9 +290,8 @@ const SignIn = () => {
 
                   <div className="space-y-1.5">
                     <Label htmlFor="confirm-password">Confirm password</Label>
-                    <Input
+                    <PasswordInput
                       id="confirm-password"
-                      type="password"
                       placeholder="••••••••••••"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
@@ -504,9 +503,8 @@ const SignIn = () => {
                         </button>
                       )}
                     </div>
-                    <Input
+                    <PasswordInput
                       id="password"
-                      type="password"
                       placeholder={isSignUp ? "Min. 12 characters" : "••••••••"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}

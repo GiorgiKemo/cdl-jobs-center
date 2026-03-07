@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { X, Mail, RotateCw, Loader2, Check, XCircle, ChevronDown, Sparkles, Truck, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -424,9 +425,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
                 onChange={(e) => setLoginEmail(e.target.value)}
                 autoComplete="username"
               />
-              <Input
+              <PasswordInput
                 id="login-password"
-                type="password"
                 placeholder="Password"
                 name="loginPassword"
                 aria-label="Password"
@@ -677,7 +677,7 @@ export function SignInModal({ onClose }: SignInModalProps) {
               {/* Password — same as /signin */}
               <div className="space-y-1.5">
                 <Label htmlFor="reg-password">Password <span className="text-destructive">*</span></Label>
-                <Input id="reg-password" type="password" placeholder="Min. 12 characters" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} autoComplete="new-password" />
+                <PasswordInput id="reg-password" placeholder="Min. 12 characters" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} autoComplete="new-password" />
                 <PasswordStrengthIndicator password={regPassword} />
               </div>
 
