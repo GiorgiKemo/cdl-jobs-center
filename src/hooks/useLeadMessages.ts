@@ -57,7 +57,9 @@ export function useSendLeadEmail() {
 
   return useMutation({
     mutationFn: async (params: { leadId: string; subject: string; body: string }) => {
-      const { data: { session } } = await supabase.auth.getSession();
+      // Force-refresh so the gateway never gets an expired token
+      const { data: refreshed } = await supabase.auth.refreshSession();
+      const session = refreshed.session ?? (await supabase.auth.getSession()).data.session;
       if (!session) throw new Error("Not authenticated");
 
       const res = await fetch(
@@ -95,7 +97,9 @@ export function useSendLeadSms() {
 
   return useMutation({
     mutationFn: async (params: { leadId: string; body: string }) => {
-      const { data: { session } } = await supabase.auth.getSession();
+      // Force-refresh so the gateway never gets an expired token
+      const { data: refreshed } = await supabase.auth.refreshSession();
+      const session = refreshed.session ?? (await supabase.auth.getSession()).data.session;
       if (!session) throw new Error("Not authenticated");
 
       const res = await fetch(

@@ -1,5 +1,5 @@
 /**
- * send-lead-email — Send an outbound email to a lead via Mailgun.
+ * send-lead-email — Send an outbound email to a lead or registered driver via Mailgun.
  *
  * Called from the browser (company dashboard). Requires a valid user JWT.
  * Gated by subscription plan: starter / growth / unlimited.
@@ -71,14 +71,21 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return json({ error: "Missing auth header" }, 401);
 
-    const supabase = createClient(
+    // Use anon key + user JWT to verify identity (standard Supabase pattern)
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data: { user }, error: authErr } = await userClient.auth.getUser(token);
+    if (authErr || !user) return json({ error: "Unauthorized" }, 401);
+
+    // Service-role client for DB operations that bypass RLS
+    const db = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
-
-    const token = authHeader.replace(/^Bearer\s+/i, "");
-    const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
-    if (authErr || !user) return json({ error: "Unauthorized" }, 401);
 
     const { lead_id, subject, body } = await req.json() as {
       lead_id?: string; subject?: string; body?: string;
@@ -88,7 +95,7 @@ Deno.serve(async (req) => {
     }
 
     // Check subscription plan
-    const { data: sub } = await supabase
+    const { data: sub } = await db
       .from("subscriptions")
       .select("plan")
       .eq("company_id", user.id)
@@ -98,19 +105,33 @@ Deno.serve(async (req) => {
       return json({ error: "Email outreach requires Starter plan or higher" }, 403);
     }
 
-    // Get lead email
-    const { data: lead } = await supabase
+    // Look up recipient email — check leads table first, then registered profiles
+    let recipientEmail: string | null = null;
+
+    const { data: lead } = await db
       .from("leads")
-      .select("email, full_name")
+      .select("email")
       .eq("id", lead_id)
       .maybeSingle();
 
-    if (!lead?.email) {
-      return json({ error: "Lead has no email address on file" }, 400);
+    if (lead?.email) {
+      recipientEmail = lead.email;
+    } else {
+      // Registered driver — look up from auth profiles
+      const { data: profile } = await db
+        .from("profiles")
+        .select("email")
+        .eq("id", lead_id)
+        .maybeSingle();
+      recipientEmail = profile?.email ?? null;
+    }
+
+    if (!recipientEmail) {
+      return json({ error: "Recipient has no email address on file" }, 400);
     }
 
     // Get company name for the From header
-    const { data: company } = await supabase
+    const { data: company } = await db
       .from("company_profiles")
       .select("company_name")
       .eq("id", user.id)
@@ -131,14 +152,14 @@ Deno.serve(async (req) => {
     const mgId = await mailgunSend(
       apiKey, domain,
       `${companyName} via CDL Jobs Center <${senderEmail}>`,
-      lead.email,
+      recipientEmail,
       subject,
       body,
       replyTo,
     );
 
     // Log to lead_messages
-    await supabase.from("lead_messages").insert({
+    await db.from("lead_messages").insert({
       company_id: user.id,
       lead_id,
       direction: "outbound",
@@ -146,7 +167,7 @@ Deno.serve(async (req) => {
       subject,
       body,
       from_addr: senderEmail,
-      to_addr: lead.email,
+      to_addr: recipientEmail,
       mg_id: mgId,
       status: "sent",
     });

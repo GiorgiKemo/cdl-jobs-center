@@ -1,5 +1,5 @@
 /**
- * send-lead-sms — Send an outbound SMS to a lead via Twilio.
+ * send-lead-sms — Send an outbound SMS to a lead or registered driver via Twilio.
  *
  * Called from the browser (company dashboard). Requires a valid user JWT.
  * Gated by subscription plan: unlimited only.
@@ -44,14 +44,21 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return json({ error: "Missing auth header" }, 401);
 
-    const supabase = createClient(
+    // Use anon key + user JWT to verify identity (standard Supabase pattern)
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data: { user }, error: authErr } = await userClient.auth.getUser(token);
+    if (authErr || !user) return json({ error: "Unauthorized" }, 401);
+
+    // Service-role client for DB operations that bypass RLS
+    const db = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
-
-    const token = authHeader.replace(/^Bearer\s+/i, "");
-    const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
-    if (authErr || !user) return json({ error: "Unauthorized" }, 401);
 
     const { lead_id, body } = await req.json() as { lead_id?: string; body?: string };
     if (!lead_id || !body) {
@@ -59,7 +66,7 @@ Deno.serve(async (req) => {
     }
 
     // SMS is unlimited plan only
-    const { data: sub } = await supabase
+    const { data: sub } = await db
       .from("subscriptions")
       .select("plan")
       .eq("company_id", user.id)
@@ -69,15 +76,29 @@ Deno.serve(async (req) => {
       return json({ error: "SMS outreach requires Unlimited plan" }, 403);
     }
 
-    // Get lead phone
-    const { data: lead } = await supabase
+    // Look up recipient phone — check leads table first, then registered driver profiles
+    let recipientPhone: string | null = null;
+
+    const { data: lead } = await db
       .from("leads")
-      .select("phone, full_name")
+      .select("phone")
       .eq("id", lead_id)
       .maybeSingle();
 
-    if (!lead?.phone) {
-      return json({ error: "Lead has no phone number on file" }, 400);
+    if (lead?.phone) {
+      recipientPhone = lead.phone;
+    } else {
+      // Registered driver — look up from driver_profiles
+      const { data: driverProfile } = await db
+        .from("driver_profiles")
+        .select("phone")
+        .eq("id", lead_id)
+        .maybeSingle();
+      recipientPhone = driverProfile?.phone ?? null;
+    }
+
+    if (!recipientPhone) {
+      return json({ error: "Recipient has no phone number on file" }, 400);
     }
 
     // Twilio credentials
@@ -88,7 +109,7 @@ Deno.serve(async (req) => {
       return json({ error: "SMS service not configured" }, 503);
     }
 
-    const toNumber = normalizePhone(lead.phone);
+    const toNumber = normalizePhone(recipientPhone);
 
     const twilioBody = new URLSearchParams({
       From: fromNumber,
@@ -116,7 +137,7 @@ Deno.serve(async (req) => {
     const twilioData = await twilioRes.json();
 
     // Log to lead_messages
-    await supabase.from("lead_messages").insert({
+    await db.from("lead_messages").insert({
       company_id: user.id,
       lead_id,
       direction: "outbound",
