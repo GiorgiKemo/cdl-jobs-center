@@ -1636,18 +1636,18 @@ function AdminDashboardInner() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => navigate(`/admin?tab=users&search=${encodeURIComponent(c.company_name || c.email || "")}`)}
-                        >
-                          View Profile
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
                           className="text-destructive border-destructive/40 hover:bg-destructive/10"
                           onClick={() => { setDeclineDialogCompany({ id: c.id, name: c.company_name || "This company" }); setDeclineReasonText(""); }}
                         >
                           <XCircle className="h-3.5 w-3.5 mr-1.5" />
                           Decline
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => navigate(`/admin?tab=users&search=${encodeURIComponent(c.company_name || c.email || "")}`)}
+                        >
+                          View Profile
                         </Button>
                       </div>
                     </div>
