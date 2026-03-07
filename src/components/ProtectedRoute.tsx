@@ -20,6 +20,8 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
 
   if (!user) return <Navigate to="/signin" replace />;
 
+  if (user.needsOnboarding) return <Navigate to="/onboarding" replace />;
+
   if (requiredRole && user.role !== requiredRole) {
     return <Navigate to="/" replace />;
   }

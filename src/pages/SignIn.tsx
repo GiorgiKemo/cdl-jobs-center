@@ -13,6 +13,7 @@ import { getPasswordStrength, type PasswordStrengthLevel } from "@/lib/passwordS
 import { SocialLoginButtons, OrDivider } from "@/components/SocialLoginButtons";
 import { withTimeout } from "@/lib/withTimeout";
 import { PageBreadcrumb } from "@/components/ui/PageBreadcrumb";
+import { COMPANY_DRIVER_TYPES, COMPANY_ENDORSEMENTS } from "@/data/constants";
 
 const strengthGradientByLevel: Record<PasswordStrengthLevel, string> = {
   weak: "from-rose-600 to-red-500",
@@ -78,6 +79,8 @@ const SignIn = () => {
   const [companyName, setCompanyName] = useState("");
   const [contactName, setContactName] = useState("");
   const [companyPhone, setCompanyPhone] = useState("");
+  const [companyDriverType, setCompanyDriverType] = useState("");
+  const [companyEndorsements, setCompanyEndorsements] = useState<string[]>([]);
   const [emailSent, setEmailSent] = useState(false);
   const [sentEmail, setSentEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -150,6 +153,10 @@ const SignIn = () => {
           toast.error("Please fill in all required fields.");
           return;
         }
+        if (!companyDriverType) {
+          toast.error("Please select the type of drivers you want to hire.");
+          return;
+        }
       }
       if (password.length < 12) {
         toast.error("Password must be at least 12 characters.");
@@ -162,7 +169,13 @@ const SignIn = () => {
           : contactName.trim();
         const profileFields = signUpRole === "driver"
           ? { first_name: firstName.trim(), last_name: lastName.trim(), phone: driverPhone.trim() }
-          : { company_name: companyName.trim(), contact_name: contactName.trim(), phone: companyPhone.trim() };
+          : {
+              company_name: companyName.trim(),
+              contact_name: contactName.trim(),
+              phone: companyPhone.trim(),
+              company_driver_type: companyDriverType,
+              company_endorsements: JSON.stringify(companyEndorsements),
+            };
         await withTimeout(register(displayName, email, password, signUpRole, profileFields), 15_000);
         setSentEmail(email);
         setEmailSent(true);
@@ -401,6 +414,51 @@ const SignIn = () => {
                           <div className="space-y-1.5">
                             <Label htmlFor="company-phone">Phone number <span className="text-destructive">*</span></Label>
                             <Input id="company-phone" type="tel" placeholder="(555) 123-4567" value={companyPhone} onChange={(e) => setCompanyPhone(e.target.value)} autoComplete="tel" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Type of drivers needed <span className="text-destructive">*</span></Label>
+                            <div className="grid grid-cols-3 gap-2">
+                              {COMPANY_DRIVER_TYPES.map(({ value, label }) => (
+                                <button
+                                  key={value}
+                                  type="button"
+                                  onClick={() => setCompanyDriverType(value)}
+                                  className={`text-xs py-2 px-1 rounded border transition-colors text-center ${
+                                    companyDriverType === value
+                                      ? "border-primary bg-primary/10 text-primary font-semibold"
+                                      : "border-border text-muted-foreground hover:border-primary/50"
+                                  }`}
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Endorsements required <span className="text-xs text-muted-foreground font-normal">(select all that apply)</span></Label>
+                            <div className="grid grid-cols-3 gap-2">
+                              {COMPANY_ENDORSEMENTS.map((endorsement) => {
+                                const checked = companyEndorsements.includes(endorsement);
+                                return (
+                                  <button
+                                    key={endorsement}
+                                    type="button"
+                                    onClick={() =>
+                                      setCompanyEndorsements((prev) =>
+                                        checked ? prev.filter((e) => e !== endorsement) : [...prev, endorsement]
+                                      )
+                                    }
+                                    className={`text-xs py-2 px-1 rounded border transition-colors text-center ${
+                                      checked
+                                        ? "border-primary bg-primary/10 text-primary font-semibold"
+                                        : "border-border text-muted-foreground hover:border-primary/50"
+                                    }`}
+                                  >
+                                    {endorsement}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
                         </>
                       )}

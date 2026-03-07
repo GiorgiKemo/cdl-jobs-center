@@ -28,6 +28,14 @@ export const DRIVER_NEXT_JOB = [
   "Newer equipment",
 ] as const;
 
+export const COMPANY_DRIVER_TYPES = [
+  { value: "company_driver", label: "Company Drivers" },
+  { value: "owner_operator", label: "Owner Operators" },
+  { value: "both", label: "Both" },
+] as const;
+
+export const COMPANY_ENDORSEMENTS = ["Hazmat", "Tanker", "Doubles/Triples"] as const;
+
 export const COMPANY_GOALS = [
   "Acquire more driver leads",
   "Hire more CDL Class A drivers",

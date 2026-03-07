@@ -10,7 +10,7 @@ import { useAuth } from "@/context/auth";
 import { supabase } from "@/lib/supabase";
 import { friendlySignInError } from "@/lib/authErrorMessages";
 import { getPasswordStrength, type PasswordStrengthLevel } from "@/lib/passwordStrength";
-import { US_STATES, DRIVER_INTERESTS, DRIVER_NEXT_JOB, COMPANY_GOALS } from "@/data/constants";
+import { US_STATES, DRIVER_INTERESTS, DRIVER_NEXT_JOB, COMPANY_GOALS, COMPANY_DRIVER_TYPES, COMPANY_ENDORSEMENTS } from "@/data/constants";
 import { SocialLoginButtons, OrDivider } from "@/components/SocialLoginButtons";
 import { withTimeout } from "@/lib/withTimeout";
 
@@ -172,6 +172,10 @@ export function SignInModal({ onClose }: SignInModalProps) {
   const [companyPhone, setCompanyPhone] = useState(draft.companyPhone || "");
   const [companyState, setCompanyState] = useState(draft.companyState || "");
   const [companyGoal, setCompanyGoal] = useState<string>(draft.companyGoal || COMPANY_GOALS[0]);
+  const [companyDriverType, setCompanyDriverType] = useState<string>(draft.companyDriverType || "");
+  const [companyEndorsements, setCompanyEndorsements] = useState<string[]>(
+    draft.companyEndorsements ? (JSON.parse(draft.companyEndorsements) as string[]) : []
+  );
 
   // Persist registration fields to sessionStorage on change
   const saveDraft = useCallback(() => {
@@ -179,10 +183,12 @@ export function SignInModal({ onClose }: SignInModalProps) {
       role, regEmail, firstName, lastName, homeAddress, zipCode,
       driverPhone, cdlNumber, interestedIn, nextJobWant, hasAccidents, wantsContact,
       contactName, contactTitle, companyName, companyAddress, companyPhone, companyState, companyGoal,
+      companyDriverType, companyEndorsements: JSON.stringify(companyEndorsements),
     });
   }, [role, regEmail, firstName, lastName, homeAddress, zipCode,
       driverPhone, cdlNumber, interestedIn, nextJobWant, hasAccidents, wantsContact,
-      contactName, contactTitle, companyName, companyAddress, companyPhone, companyState, companyGoal]);
+      contactName, contactTitle, companyName, companyAddress, companyPhone, companyState, companyGoal,
+      companyDriverType, companyEndorsements]);
 
   useEffect(() => { saveDraft(); }, [saveDraft]);
 
@@ -309,6 +315,10 @@ export function SignInModal({ onClose }: SignInModalProps) {
       toast.error("Please fill in all required fields.");
       return;
     }
+    if (!companyDriverType) {
+      toast.error("Please select the type of drivers you want to hire.");
+      return;
+    }
     if (!EMAIL_RE.test(regEmail)) {
       toast.error("Please enter a valid email address.");
       return;
@@ -332,6 +342,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
         contact_name: contactName || "",
         contact_title: contactTitle || "",
         company_goal: companyGoal || "",
+        company_driver_type: companyDriverType,
+        company_endorsements: JSON.stringify(companyEndorsements),
       };
       await register(companyName, regEmail, regPassword, "company", companyFields);
 
@@ -348,6 +360,8 @@ export function SignInModal({ onClose }: SignInModalProps) {
             contact_name: contactName || "",
             contact_title: contactTitle || "",
             company_goal: companyGoal || "",
+            driver_types_wanted: companyDriverType,
+            endorsements_needed: companyEndorsements.length > 0 ? companyEndorsements : null,
           });
         } catch { /* deferred population in AuthContext handles this */ }
         clearRegDraft();
@@ -605,6 +619,51 @@ export function SignInModal({ onClose }: SignInModalProps) {
                   <div className="space-y-1.5">
                     <Label htmlFor="co-companyPhone">Phone number <span className="text-destructive">*</span></Label>
                     <Input id="co-companyPhone" type="tel" placeholder="(555) 123-4567" value={companyPhone} onChange={(e) => setCompanyPhone(e.target.value)} autoComplete="tel" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Type of drivers needed <span className="text-destructive">*</span></Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {COMPANY_DRIVER_TYPES.map(({ value, label }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setCompanyDriverType(value)}
+                          className={`text-xs py-2 px-1 rounded border transition-colors text-center ${
+                            companyDriverType === value
+                              ? "border-primary bg-primary/10 text-primary font-semibold"
+                              : "border-border text-muted-foreground hover:border-primary/50"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Endorsements required <span className="text-xs text-muted-foreground font-normal">(select all that apply)</span></Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {COMPANY_ENDORSEMENTS.map((endorsement) => {
+                        const checked = companyEndorsements.includes(endorsement);
+                        return (
+                          <button
+                            key={endorsement}
+                            type="button"
+                            onClick={() =>
+                              setCompanyEndorsements((prev) =>
+                                checked ? prev.filter((e) => e !== endorsement) : [...prev, endorsement]
+                              )
+                            }
+                            className={`text-xs py-2 px-1 rounded border transition-colors text-center ${
+                              checked
+                                ? "border-primary bg-primary/10 text-primary font-semibold"
+                                : "border-border text-muted-foreground hover:border-primary/50"
+                            }`}
+                          >
+                            {endorsement}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </>
               )}

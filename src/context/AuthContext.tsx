@@ -34,11 +34,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Retry up to 4 times with 600ms delay. The DB trigger that creates the
     // profiles row runs asynchronously and may not be committed yet on the
     // first attempt (especially right after signUp).
-    let data: { id: string; name: string | null; role: string | null } | null = null;
+    let data: { id: string; name: string | null; role: string | null; needs_onboarding: boolean | null } | null = null;
     for (let attempt = 0; attempt < 4; attempt++) {
       const { data: row } = await supabase
         .from("profiles")
-        .select("id, name, role")
+        .select("id, name, role, needs_onboarding")
         .eq("id", userId)
         .maybeSingle();
 
@@ -47,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: row.id as string,
           name: (row.name as string | null) ?? null,
           role: (row.role as string | null) ?? null,
+          needs_onboarding: (row.needs_onboarding as boolean | null) ?? null,
         };
         break;
       }
@@ -55,12 +56,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (data) {
-      const role = parseUserRole(data.role) ?? fallbackRole ?? "driver";
+      const resolvedRole = parseUserRole(data.role) ?? fallbackRole;
+      // If role is still unset and needs_onboarding is true, the user navigated
+      // away from /onboarding without choosing a role. Mark them so ProtectedRoute
+      // redirects them back to onboarding instead of silently assigning "driver".
+      const needsOnboarding = !resolvedRole && !!data.needs_onboarding;
+      const role = resolvedRole ?? "driver";
       setUser({
         id: data.id,
         name: data.name ?? fallbackDisplayName(userEmail, fallbackName),
         email: userEmail,
         role,
+        needsOnboarding,
       });
       localStorage.setItem(ROLE_CACHE_KEY, role);
 
@@ -108,6 +115,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .eq("id", userId)
               .maybeSingle();
             if (!existing) {
+              const rawEndorsements = meta.company_endorsements;
+              const endorsementsArr: string[] | null = rawEndorsements
+                ? (Array.isArray(rawEndorsements)
+                    ? rawEndorsements
+                    : (() => { try { return JSON.parse(rawEndorsements) as string[]; } catch { return null; } })())
+                : null;
               const { error: upsertErr } = await supabase.from("company_profiles").upsert({
                 id: userId,
                 company_name: meta.company_name || meta.name || "",
@@ -118,6 +131,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 contact_title: meta.contact_title || "",
                 company_goal: meta.company_goal || "",
                 website: meta.website || "",
+                driver_types_wanted: meta.company_driver_type || null,
+                endorsements_needed: endorsementsArr && endorsementsArr.length > 0 ? endorsementsArr : null,
               });
               // Fallback: if new columns don't exist yet, retry with base columns
               if (upsertErr) {

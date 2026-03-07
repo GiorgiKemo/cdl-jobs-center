@@ -5,6 +5,7 @@ export interface User {
   email: string;
   name: string;
   role: "driver" | "company" | "admin";
+  needsOnboarding?: boolean;
 }
 
 export interface AuthContextType {
